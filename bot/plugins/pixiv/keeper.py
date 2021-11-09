@@ -1,4 +1,6 @@
-from random import random
+import random
+
+from .pixivel import rec
 
 
 class keeper:
@@ -17,4 +19,5 @@ class keeper:
         pic=self.cache.pop(random.randint(0,len(self.cache)-1))
         self.history.add(pic['id'])
         return pic
+
 

@@ -1,4 +1,0 @@
-
-class mole:
-    pass
-
