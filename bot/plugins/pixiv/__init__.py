@@ -5,8 +5,8 @@ from nonebot.rule import startswith
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 
-from .keeper import keeper
-from .pixivel import url
+from tools.pixiv.keeper import keeper
+from tools.pixiv.pixivel import url
 
 kp=keeper()
 
