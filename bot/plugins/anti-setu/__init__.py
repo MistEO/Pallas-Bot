@@ -9,10 +9,10 @@ from nonebot.adapters import Bot, Event
 hello = on_message()
 @hello.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
-    print(event.dict())
+    # print(event.dict())
     if event.dict()['message_type'] == 'group':
         for msg in event.dict()['message']:
             if(msg['type'] == 'image'):
                 # print(msg['data']['url'])
                 return
-    #await hello.send(msgStr)
+    # await hello.send(msgStr)
