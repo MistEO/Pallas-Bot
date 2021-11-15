@@ -1,9 +1,10 @@
-FROM tiangolo/uvicorn-gunicorn-fastapi:python3.8
+FROM namiya233/go-cqhttp
 
-RUN python3 -m pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+FROM python:3.9
 
-RUN python3 -m pip install poetry && poetry config virtualenvs.create false
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-COPY pyproject.toml ./poetry.lock* /app/
-
-RUN poetry install --no-root --no-dev
+VOLUME /home/moles
+ADD / /
+CMD ["python","bot.py"]

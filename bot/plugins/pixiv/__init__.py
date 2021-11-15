@@ -8,7 +8,7 @@ from nonebot.adapters import Bot, Event
 from tools.pixiv.keeper import keeper
 from tools.pixiv.pixivel import url
 
-tu = on_message(startswith("兔兔涩涩"))
+tu = on_message(startswith("涩涩"))
 
 keepers={}
 def groupKeeper(group:int)->keeper:
