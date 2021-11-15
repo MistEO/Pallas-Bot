@@ -1,0 +1,10 @@
+account:
+  uin: 机器人QQ号
+  password: "机器人密码"
+
+message:
+  post-format: array
+
+servers:
+  - ws-reverse:
+      universal: ws://127.0.0.1:8080/cqhttp/ws
