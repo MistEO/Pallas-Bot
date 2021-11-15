@@ -5,8 +5,8 @@ from nonebot.rule import startswith
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 
+from tools.pixiv.pixivel import pic
 from tools.pixiv.keeper import keeper
-from tools.pixiv.pixivel import url
 
 tu = on_message(startswith("涩涩"))
 
@@ -23,7 +23,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     #print(event.dict())
     p=groupKeeper(event.dict()['group_id']).random()
     c:Message = Message()
-    c.append(f'https://www.pixiv.net/artworks/{p["id"]}')
-    c.append(MessageSegment(type='image',data={'file':url(p)}))
+    c.append(f'https://www.pixiv.net/artworks/{p.id}')
+    c.append(MessageSegment(type='image',data={'file':p.pic}))
     await tu.finish(c)
 

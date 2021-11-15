@@ -1,7 +1,7 @@
 import random
 
 from .history import table
-from .pixivel import rec
+from .pixivel import a60, pic
 
 
 class keeper:
@@ -17,15 +17,13 @@ class keeper:
         self.cache=list()
 
     def reload(self):
-        new = rec(self.page)
-        self.page += 1
-        for pic in new:
-            if pic['id'] not in self.history:self.cache.append(pic)
+        new = a60()
+        if new.id not in self.history:self.cache.append(new)
     def random(self):
         while len(self.cache)==0:self.reload()
-        pic=self.cache.pop(random.randint(0,len(self.cache)-1))
-        self.history.add(pic['id'])
-        table.insert_one({'id':pic['id'],'group':self.group})
-        return pic
+        p:pic=self.cache.pop(random.randint(0,len(self.cache)-1))
+        self.history.add(p.id)
+        table.insert_one({'id':p.id,'group':self.group})
+        return p
 
 
