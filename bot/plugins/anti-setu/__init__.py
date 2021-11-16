@@ -18,7 +18,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     # print(event.dict())
     if event.dict()['message_type'] == 'group':
         for msg in event.dict()['message']:
-            if(msg['type'] == 'image'):
+            if(msg['type'] == 'image') & door:
                 # print(msg['data']['url'])
                 reply = doImgCheck(str(msg['data']['url']))
                 if (reply != "") & door:
