@@ -12,10 +12,12 @@ from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 
 door = False
-hello = on_message()
+hello = on_message(startswith("x"))
 @hello.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     # print(event.dict())
+    print("in setu")
+    print("door is "+str(door))
     if event.dict()['message_type'] == 'group':
         for msg in event.dict()['message']:
             if(msg['type'] == 'image') & door:
@@ -24,10 +26,12 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
                 if (reply != "") & door:
                     await hello.send(str(reply)) 
     # await hello.send(msgStr)
+    return False
 
-switch = on_command("色图检测", rule=to_me(), priority=5)
+switch = on_command("色图检测", rule=to_me(), priority=1)
 @switch.handle()
-async def handle_s_first_receive(bot: Bot, event: Event, state: T_State):
+async def handle__first_receive(bot: Bot, event: Event, state: T_State):
+    print("in setu check")
     args = str(event.get_message()).strip()
     if args:
         state["param"] = args
@@ -37,9 +41,9 @@ async def handle_param(bot: Bot, event: Event, state: T_State):
     param = state["param"]
     if param not in ["开启", "关闭"]:
         await switch.reject("参数错误！")
-    if param == "开启":
+    if param in "开启":
         door = True
-    if param == "关闭":
+    if param in  "关闭":
         door = False
     await switch.finish("已"+str(param))
 
