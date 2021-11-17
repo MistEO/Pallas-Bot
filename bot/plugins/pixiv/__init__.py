@@ -5,7 +5,7 @@ from nonebot.rule import startswith
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 
-from tools.pixiv.pixivel import pic
+from tools.pixiv.pixiv import pic
 from tools.pixiv.keeper import keeper
 
 tu = on_message(startswith("涩涩"))

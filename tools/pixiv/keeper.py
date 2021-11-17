@@ -1,7 +1,7 @@
 import random
 
 from .history import table
-from .pixivel import a60, pic
+from .pixiv import a60, pic
 
 
 class keeper:
