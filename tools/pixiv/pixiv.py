@@ -11,7 +11,6 @@ class pic:
 def a60() -> list[pic]:
     url = "http://a60.one:404/"
     res = json.loads(requests.get(url).text)
-    print(res)
     p = pic()
     p.id = int(res['pic'].split('_')[0])
     p.pic = res['url']
