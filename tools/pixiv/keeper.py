@@ -18,7 +18,8 @@ class keeper:
 
     def reload(self):
         new = a60()
-        if new.id not in self.history:self.cache.append(new)
+        for p in new:
+            if p.id not in self.history:self.cache.append(new)
     def random(self):
         while len(self.cache)==0:self.reload()
         p:pic=self.cache.pop(random.randint(0,len(self.cache)-1))
