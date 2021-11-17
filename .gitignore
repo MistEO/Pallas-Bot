@@ -138,4 +138,6 @@ dmypy.json
 # pytype static type analyzer
 .pytype/
 
+repeater.db
+
 # End of https://www.toptal.com/developers/gitignore/api/python

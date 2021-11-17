@@ -2,4 +2,5 @@ nonebot2==2.0.0a16
 nonebot-adapter-cqhttp==2.0.0a16
 pymongo==3.12.1
 requests==2.26.0
-
+peewee~=3.14.4
+pypinyin~=0.41.0
