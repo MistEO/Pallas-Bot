@@ -1,4 +1,3 @@
-
 from nonebot import on_message
 from nonebot.adapters.cqhttp import MessageSegment, Message
 from nonebot.rule import startswith
@@ -10,20 +9,22 @@ from tools.pixiv.keeper import keeper
 
 tu = on_message(startswith("涩涩"))
 
-keepers={}
-def groupKeeper(group:int)->keeper:
-    kp=keepers.get(group)
-    if kp==None:
-        kp=keeper(group=group)
-        keepers[group]=kp
+keepers = {}
+
+
+def groupKeeper(group: int) -> keeper:
+    kp = keepers.get(group)
+    if kp == None:
+        kp = keeper(group=group)
+        keepers[group] = kp
     return kp
+
 
 @tu.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
-    #print(event.dict())
-    p=groupKeeper(event.dict()['group_id']).random()
-    c:Message = Message()
+    # print(event.dict())
+    p = groupKeeper(event.dict()['group_id']).random()
+    c: Message = Message()
     c.append(f'https://www.pixiv.net/artworks/{p.id}')
-    c.append(MessageSegment(type='image',data={'file':p.pic}))
+    c.append(MessageSegment(type='image', data={'file': p.pic}))
     await tu.finish(c)
-

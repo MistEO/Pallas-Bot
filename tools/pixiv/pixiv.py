@@ -1,28 +1,29 @@
 import json
 import requests
 
+
 class pic:
     id: int
-    pic: str #url
-    artwork: str #url
+    pic: str  # url for qq find pic
+    artwork: str  # url for show in group
 
-def a60()->list[pic]:
+
+def a60() -> list[pic]:
     url = "http://a60.one:404/"
     res = json.loads(requests.get(url).text)
     print(res)
     p = pic()
     p.id = int(res['pic'].split('_')[0])
     p.pic = res['url']
-    p.artwork=f'https://www.pixiv.net/artworks/{p.id}'
+    p.artwork = f'https://www.pixiv.net/artworks/{p.id}'
     return [p]
 
 
-
-def pixivel(page=0)->list[pic]:
-
+def pixivel(page=0) -> list[pic]:
     url = "https://api-jp1.pixivel.moe/pixiv?type=illust_recommended&page={}".format(page)
     res = json.loads(requests.get(url).text)
     pics = []
+
     def _elUrl(pir):
         meta_pages = pir['meta_pages']
         if len(meta_pages) == 0:
@@ -30,6 +31,7 @@ def pixivel(page=0)->list[pic]:
         else:
             url = meta_pages[0]['image_urls']['original']
         return url.replace('i.pximg.net', 'proxy-jp1.pixivel.moe')
+
     for pir in res['illusts']:
         p = pic()
         p.id = pir['id']
@@ -38,5 +40,6 @@ def pixivel(page=0)->list[pic]:
         pics.append(p)
     return pics
 
-if __name__=='__main__':
-    print(pixivel().__dict__)
+
+if __name__ == '__main__':
+    print(pixivel()[0].__dict__)
