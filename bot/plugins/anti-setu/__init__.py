@@ -22,8 +22,8 @@ hello = on_message(block=False)
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     # print(event.dict())
     global door
-    print("in setu")
-    print("door is "+str(door))
+    # print("in setu")
+    # print("door is "+str(door))
     if event.dict()['message_type'] == 'group':
         for msg in event.dict()['message']:
             if(msg['type'] == 'image') & door:
@@ -63,7 +63,7 @@ def doImgCheck(picUrl: str):
     headers = {'content-type': 'application/x-www-form-urlencoded'}
     response = requests.post(request_url, data=params, headers=headers)
     if response:
-        print (response.json())
+        # print (response.json())
         # print(response.json()['data'][0]['probability'])
         if response.json()['conclusion'] != "合规":
             conclusion = response.json()['data'][0]['msg']
