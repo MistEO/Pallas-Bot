@@ -20,7 +20,6 @@ reply_count_threshold = 2
 
 @any_msg.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
-    print(event.dict())
     if event.dict()['message_type'] != 'group':
         return False
 
