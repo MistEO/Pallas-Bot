@@ -67,12 +67,17 @@ def doImgCheck(picUrl: str):
     if response:
         # print (response.json())
         # print(response.json()['data'][0]['probability'])
-        if response.json()['conclusion'] != "合规":
-            conclusion = response.json()['data'][0]['msg']
-            deep = response.json()['data'][0]['probability']
-            reply = {'conclusion':str(conclusion),'probability':str(deep)}
-            return reply
-        return
+        try:
+            if response.json()['conclusion'] != "合规":
+                conclusion = response.json()['data'][0]['msg']
+                deep = response.json()['data'][0]['probability']
+                reply = {'conclusion':str(conclusion),'probability':str(deep)}
+                return reply
+        except KeyError:
+            print('KeyError')
+            return
+        else:    
+            return
     return
 
 
