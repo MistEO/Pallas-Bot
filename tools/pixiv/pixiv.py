@@ -1,6 +1,6 @@
 import json
 import requests
-
+from typing import List
 
 class pic:
     id: int
@@ -8,7 +8,7 @@ class pic:
     artwork: str  # url for show in group
 
 
-def a60() -> list[pic]:
+def a60() -> List[pic]:
     url = "http://a60.one:404/"
     res = json.loads(requests.get(url).text)
     p = pic()
@@ -18,7 +18,7 @@ def a60() -> list[pic]:
     return [p]
 
 
-def pixivel(page=0) -> list[pic]:
+def pixivel(page=0) -> List[pic]:
     url = "https://api-jp1.pixivel.moe/pixiv?type=illust_recommended&page={}".format(page)
     res = json.loads(requests.get(url).text)
     pics = []
