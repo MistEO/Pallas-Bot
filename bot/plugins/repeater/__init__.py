@@ -1,5 +1,6 @@
 import pypinyin
 import random
+import time
 
 from nonebot import on_message
 from nonebot.typing import T_State
@@ -20,13 +21,28 @@ reply_count_threshold = 2
 
 @any_msg.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
-    if event.dict()['message_type'] != 'group':
+    dict = event.dict()
+
+    if dict['message_type'] != 'group':
         return False
+
+    group = dict['group_id']
+    user = dict['user_id']
+    raw_msg = dict['raw_message']
+    is_pt = is_pure_text(event)
+    pt = event.get_plaintext()
+    pinyin = text_to_pinyin(pt)
+    cur_time = dict['time']
 
     rep = reply(bot, event, state)
     record(bot, event, state)
 
     if (rep):
+        ReplyModel.insert(
+            group=group,
+            raw_msg=raw_msg,
+            time=time.time()
+        ).execute()
         await any_msg.finish(Message(rep))
     else:
         return False
@@ -43,11 +59,19 @@ def reply(bot: Bot, event: Event, state: T_State):
     pinyin = text_to_pinyin(pt)
     cur_time = dict['time']
 
-    reply_msg = ContextModel.select().where(
-        ContextModel.group == group,
-        ContextModel.above_raw_msg == raw_msg,
-        ContextModel.count >= reply_count_threshold
-    ).order_by(ContextModel.count.desc()).limit(5)
+    # 纯文本匹配拼音即可，非纯文本需要raw_msg匹配
+    if is_pt and pinyin:
+        reply_msg = ContextModel.select().where(
+            ContextModel.group == group,
+            ContextModel.above_pinyin_msg == pinyin,
+            ContextModel.count >= reply_count_threshold
+        ).order_by(ContextModel.count.desc()).limit(5)
+    else:
+        reply_msg = ContextModel.select().where(
+            ContextModel.group == group,
+            ContextModel.above_raw_msg == raw_msg,
+            ContextModel.count >= reply_count_threshold
+        ).order_by(ContextModel.count.desc()).limit(5)
     if reply_msg:
         rand_idx = random.randint(0, len(reply_msg) - 1)
         reply_msg = reply_msg[rand_idx]
