@@ -20,7 +20,7 @@ class keeper:
         new = a60()
         for p in new:
             if p.id not in self.history:
-                self.cache.append(new)
+                self.cache.append(p)
 
     def random(self):
         while len(self.cache) == 0: self.reload()
