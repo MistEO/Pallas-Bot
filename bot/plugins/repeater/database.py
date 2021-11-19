@@ -54,7 +54,9 @@ class Context(BaseModel):
 class Reply(BaseModel):
     id = IntegerField(primary_key=True, constraints=[SQL('autoincrement')])
     group = IntegerField()
-    raw_msg = TextField()
+    is_proactive = BooleanField(default=False)
+    above_raw_msg = TextField(default='')
+    reply_raw_msg = TextField()
     time = BigIntegerField()
 
 

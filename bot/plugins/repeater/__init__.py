@@ -40,7 +40,9 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     if (rep):
         ReplyModel.insert(
             group=group,
-            raw_msg=raw_msg,
+            is_proactive=False,
+            above_raw_msg=raw_msg,
+            reply_raw_msg=rep,
             time=time.time()
         ).execute()
         await any_msg.finish(Message(rep))
