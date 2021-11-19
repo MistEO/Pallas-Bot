@@ -16,14 +16,15 @@ class keeper:
         print(f'load history: {num}')
         self.cache = list()
 
-    def reload(self):
-        new = a60()
+    async def reload(self):
+        new = await a60()
         for p in new:
             if p.id not in self.history:
                 self.cache.append(p)
 
-    def random(self):
-        while len(self.cache) == 0: self.reload()
+    async def random(self):
+        while len(self.cache) == 0:
+            await self.reload()
         p: pic = self.cache.pop(random.randint(0, len(self.cache) - 1))
         self.history.add(p.id)
         table.insert_one({'id': p.id, 'group': self.group})

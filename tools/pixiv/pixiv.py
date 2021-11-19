@@ -1,6 +1,6 @@
-import json
-import requests
+import httpx
 from typing import List
+
 
 class pic:
     id: int
@@ -8,9 +8,12 @@ class pic:
     artwork: str  # url for show in group
 
 
-def a60() -> List[pic]:
+async def a60() -> List[pic]:
     url = "http://a60.one:404/"
-    res = json.loads(requests.get(url).text)
+    async with httpx.AsyncClient() as client:
+        res = await client.get(url)
+        res = res.json()
+
     p = pic()
     p.id = int(res['pic'].split('_')[0])
     p.pic = res['url']
@@ -18,9 +21,15 @@ def a60() -> List[pic]:
     return [p]
 
 
-def pixivel(page=0) -> List[pic]:
-    url = "https://api-jp1.pixivel.moe/pixiv?type=illust_recommended&page={}".format(page)
-    res = json.loads(requests.get(url).text)
+async def pixivel(page=0) -> List[pic]:
+    url = "https://api-jp1.pixivel.moe/pixiv"
+    params = {
+        "type": "illust_recommended",
+        "page": str(page)
+    }
+    async with httpx.AsyncClient() as client:
+        res = await client.get(url, params=params)
+        res = res.json()
     pics = []
 
     def _elUrl(pir):
@@ -41,4 +50,6 @@ def pixivel(page=0) -> List[pic]:
 
 
 if __name__ == '__main__':
-    print(pixivel()[0].__dict__)
+    import asyncio
+    loop = asyncio.get_event_loop()
+    print(loop.run_until_complete(pixivel())[0].__dict__)
