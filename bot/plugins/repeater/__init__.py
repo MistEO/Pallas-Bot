@@ -29,7 +29,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     group = dict['group_id']
     user = dict['user_id']
     raw_msg = dict['raw_message']
-    is_pt = is_pure_text(event)
+    is_pt = is_plain_text(event)
     pt = event.get_plaintext()
     pinyin = text_to_pinyin(pt)
     cur_time = dict['time']
@@ -54,7 +54,7 @@ def reply(bot: Bot, event: Event, state: T_State):
     group = dict['group_id']
     user = dict['user_id']
     raw_msg = dict['raw_message']
-    is_pt = is_pure_text(event)
+    is_pt = is_plain_text(event)
     pt = event.get_plaintext()
     pinyin = text_to_pinyin(pt)
     cur_time = dict['time']
@@ -107,7 +107,7 @@ def record(bot: Bot, event: Event, state: T_State):
     group = dict['group_id']
     user = dict['user_id']
     raw_msg = dict['raw_message']
-    is_pt = is_pure_text(event)
+    is_pt = is_plain_text(event)
     pt = event.get_plaintext()
     pinyin = text_to_pinyin(pt)
     cur_time = dict['time']
@@ -138,7 +138,7 @@ def record(bot: Bot, event: Event, state: T_State):
         group=group,
         user=user,
         raw_msg=raw_msg,
-        is_pure_text=is_pt,
+        is_plain_text=is_pt,
         text_msg=pt,
         pinyin_msg=pinyin,
         time=cur_time
@@ -151,7 +151,7 @@ def update_context(pre_msg: MessageModel, cur_event: Event):
     group = dict['group_id']
     user = dict['user_id']
     raw_msg = dict['raw_message']
-    is_pt = is_pure_text(cur_event)
+    is_pt = is_plain_text(cur_event)
     pt = cur_event.get_plaintext()
     pinyin = text_to_pinyin(pt)
     cur_time = dict['time']
@@ -173,7 +173,7 @@ def update_context(pre_msg: MessageModel, cur_event: Event):
     ContextModel.insert(
         group=group,
         above_raw_msg=pre_msg.raw_msg,
-        above_is_pure_text=pre_msg.is_pure_text,
+        above_is_plain_text=pre_msg.is_plain_text,
         above_text_msg=pre_msg.text_msg,
         above_pinyin_msg=pre_msg.pinyin_msg,
         below_raw_msg=raw_msg,
@@ -188,7 +188,7 @@ def update_context(pre_msg: MessageModel, cur_event: Event):
     ).execute()
 
 
-def is_pure_text(event: Event):
+def is_plain_text(event: Event):
     msg = event.dict()['message']
     if len(msg) == 1:
         if msg[0]['type'] == 'text':
