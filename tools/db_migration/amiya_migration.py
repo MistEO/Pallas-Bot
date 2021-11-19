@@ -30,7 +30,7 @@ def mirai2cq(msg: str):
                 '{', '').replace('}', '').replace('-', '')
             imageId = imageId.split('.')[0]
             imageId = imageId.lower()
-            res += '[CQ:image,file={}.image,subType=1]'.format(imageId)
+            res += '[CQ:image,file={}.image]'.format(imageId)
         elif item['type'] == 'File':
             is_plain_text = False
         elif item['type'] == 'Quote':
@@ -80,8 +80,8 @@ def migrate_context():
 
         if raw_msg and rep_raw_msg:
             # 有一部分回复图的链接挂了，直接所有的都不迁移了
-            if 'CQ:image' in rep_raw_msg:
-                continue
+            # if 'CQ:image' in raw_msg:
+            #     continue
             data.append({
                 'group': item.group_id,
                 'above_raw_msg': raw_msg,

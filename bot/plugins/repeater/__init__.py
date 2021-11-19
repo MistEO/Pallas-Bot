@@ -1,6 +1,7 @@
 import pypinyin
 import random
 import time
+import re
 
 from nonebot import on_message
 from nonebot.typing import T_State
@@ -18,6 +19,8 @@ any_msg = on_message()
 
 count_thres_upper = 3
 
+image_pattern = ',subType=\d+'
+
 
 @any_msg.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
@@ -29,6 +32,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     group = dict['group_id']
     user = dict['user_id']
     raw_msg = dict['raw_message']
+    raw_msg = re.sub(image_pattern, '', raw_msg)
     is_pt = is_plain_text(event)
     pt = event.get_plaintext()
     pinyin = text_to_pinyin(pt)
@@ -56,6 +60,7 @@ def reply(bot: Bot, event: Event, state: T_State):
     group = dict['group_id']
     user = dict['user_id']
     raw_msg = dict['raw_message']
+    raw_msg = re.sub(image_pattern, '', raw_msg)
     is_pt = is_plain_text(event)
     pt = event.get_plaintext()
     pinyin = text_to_pinyin(pt)
@@ -117,6 +122,7 @@ def record(bot: Bot, event: Event, state: T_State):
     group = dict['group_id']
     user = dict['user_id']
     raw_msg = dict['raw_message']
+    raw_msg = re.sub(image_pattern, '', raw_msg)
     is_pt = is_plain_text(event)
     pt = event.get_plaintext()
     pinyin = text_to_pinyin(pt)
@@ -161,6 +167,7 @@ def update_context(pre_msg: MessageModel, cur_event: Event):
     group = dict['group_id']
     user = dict['user_id']
     raw_msg = dict['raw_message']
+    raw_msg = re.sub(image_pattern, '', raw_msg)
     is_pt = is_plain_text(cur_event)
     pt = cur_event.get_plaintext()
     pinyin = text_to_pinyin(pt)
