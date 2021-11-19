@@ -17,7 +17,7 @@ DataBase.create_base()
 
 any_msg = on_message()
 
-count_thres_upper = 3
+count_thres_upper = 2
 
 image_pattern = ',subType=\d+'
 
@@ -77,7 +77,7 @@ def reply(bot: Bot, event: Event, state: T_State):
     rand = random.randint(0, 100)
     if rand < 10:
         count_thres = 1
-    elif rand < 70:
+    elif rand < 60:
         count_thres = 2
     else:
         count_thres = 3
