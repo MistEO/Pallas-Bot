@@ -30,7 +30,9 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
                 # print(msg['data']['url'])
                 reply = doImgCheck(str(msg['data']['url']))
                 if (reply != "")&(reply != None) & door:
-                    await hello.send(str(reply)) 
+                    if float(reply['probability']) > plugin_config.recall_nsfw_pic_probability:
+                        await doRecall(bot,event,state)
+                    await hello.send(reply['conclusion']) 
     # await hello.send(msgStr)
     return False
 
@@ -65,9 +67,23 @@ def doImgCheck(picUrl: str):
     if response:
         # print (response.json())
         # print(response.json()['data'][0]['probability'])
-        if response.json()['conclusion'] != "合规":
-            conclusion = response.json()['data'][0]['msg']
-            deep = response.json()['data'][0]['probability']
-            return str(conclusion)+',色情程度：'+str(deep)
-        return
+        try:
+            if response.json()['conclusion'] != "合规":
+                conclusion = response.json()['data'][0]['msg']
+                deep = response.json()['data'][0]['probability']
+                reply = {'conclusion':str(conclusion),'probability':str(deep)}
+                return reply
+        except KeyError:
+            print('KeyError')
+            return
+        else:    
+            return
     return
+
+
+async def doRecall(bot: Bot, event: Event, state: T_State):
+    # do recall
+    # print(event.dict())
+    msgId = event.dict()['message_id']
+    # print(msgId)
+    await bot.call_api('delete_msg',message_id=msgId)
