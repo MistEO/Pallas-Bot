@@ -16,7 +16,7 @@ DataBase.create_base()
 
 any_msg = on_message()
 
-reply_count_threshold = 2
+count_thres_upper = 3
 
 
 @any_msg.handle()
@@ -59,22 +59,42 @@ def reply(bot: Bot, event: Event, state: T_State):
     pinyin = text_to_pinyin(pt)
     cur_time = dict['time']
 
+    rand = random.randint(0, 100)
+    if rand < 10:
+        count_thres = 1
+    elif rand < 70:
+        count_thres = 2
+    else:
+        count_thres = 3
+        
     # 纯文本匹配拼音即可，非纯文本需要raw_msg匹配
     if is_pt and pinyin:
         reply_msg = ContextModel.select().where(
             ContextModel.group == group,
             ContextModel.above_pinyin_msg == pinyin,
-            ContextModel.count >= reply_count_threshold
-        ).order_by(ContextModel.count.desc()).limit(5)
+            ContextModel.count >= count_thres
+        )#.order_by(ContextModel.count.desc())
     else:
         reply_msg = ContextModel.select().where(
             ContextModel.group == group,
             ContextModel.above_raw_msg == raw_msg,
-            ContextModel.count >= reply_count_threshold
-        ).order_by(ContextModel.count.desc()).limit(5)
+            ContextModel.count >= count_thres
+        )#.order_by(ContextModel.count.desc())
     if reply_msg:
-        rand_idx = random.randint(0, len(reply_msg) - 1)
-        reply_msg = reply_msg[rand_idx]
+        # count越大的结果，回复的概率越大
+        count_seg = []
+        count_sum = 0
+        for item in reply_msg:
+            count_sum += item.count
+            count_seg.append(count_sum)
+        rand_value = random.randint(0, count_sum)
+        rand_index = 0
+        for index in range(len(count_seg)):
+            if rand_value < count_seg[index]:
+                rand_index = index
+                break
+
+        reply_msg = reply_msg[rand_index]
         return reply_msg.below_raw_msg
     
     return False
@@ -136,12 +156,16 @@ def update_context(pre_msg: MessageModel, cur_event: Event):
     pinyin = text_to_pinyin(pt)
     cur_time = dict['time']
 
+    # 在复读，不学
+    if pre_msg.raw_msg == raw_msg:
+        return
+
     # 如果有反过来的，直接退出，说明可能是两句话在轮流复读。只取正向的（先达到阈值的）
     reverse = ContextModel.select().where(
         ContextModel.group == group,
         ContextModel.above_raw_msg == raw_msg,
         ContextModel.below_raw_msg == pre_msg.raw_msg,
-        ContextModel.count >= reply_count_threshold
+        ContextModel.count >= count_thres_upper
     ).limit(1)
     if reverse:
         return
