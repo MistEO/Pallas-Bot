@@ -1,5 +1,3 @@
-
-import json
 import pymongo
 
 myclient = pymongo.MongoClient("mongodb://www.moles.top:27017/")

@@ -4,3 +4,6 @@ pymongo==3.12.1
 requests==2.26.0
 peewee~=3.14.4
 pypinyin~=0.41.0
+
+pydantic~=1.8.2
+httpx~=0.21.1

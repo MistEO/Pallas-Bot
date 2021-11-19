@@ -5,7 +5,7 @@ import time
 from nonebot import on_message
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
-from nonebot.adapters.cqhttp import MessageSegment, Message
+from nonebot.adapters.cqhttp import MessageSegment, Message, GroupMessageEvent
 
 from .database import Message as MessageModel
 from .database import Reply as ReplyModel
