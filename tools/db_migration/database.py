@@ -46,6 +46,7 @@ class Context(BaseModel):
     below_raw_msg = TextField()
     count = IntegerField(default=1)
     latest_time = BigIntegerField()
+
     class Meta:
         primary_key = CompositeKey('group', 'above_raw_msg', 'below_raw_msg')
 
@@ -54,11 +55,9 @@ class Context(BaseModel):
 class Reply(BaseModel):
     id = IntegerField(primary_key=True, constraints=[SQL('autoincrement')])
     group = IntegerField()
-    above_raw_msg = TextField()
-    above_is_plain_text = BooleanField(default=False)
-    above_text_msg = TextField(default='')
-    above_pinyin_msg = TextField(default='')
-    raw_msg = TextField()
+    is_proactive = BooleanField(default=False)
+    above_raw_msg = TextField(default='')
+    reply_raw_msg = TextField()
     time = BigIntegerField()
 
 
