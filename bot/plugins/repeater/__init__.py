@@ -37,7 +37,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     rep = reply(bot, event, state)
     record(bot, event, state)
 
-    if (rep):
+    if rep:
         ReplyModel.insert(
             group=group,
             is_proactive=False,
@@ -60,6 +60,14 @@ def reply(bot: Bot, event: Event, state: T_State):
     pt = event.get_plaintext()
     pinyin = text_to_pinyin(pt)
     cur_time = dict['time']
+
+    latest_reply = ReplyModel.select().where(
+        ReplyModel.group==group
+    ).order_by(ReplyModel.time.desc()).limit(1)
+    if latest_reply:
+        latest_reply = latest_reply[0]
+        if time.time() - latest_reply.time < 3: # 限制发音频率，最多每3秒一次
+            return False
 
     rand = random.randint(0, 100)
     if rand < 10:
