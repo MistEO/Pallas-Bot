@@ -1,5 +1,5 @@
-from database import *
-from models import *
+import database
+import models
 
 import json
 import pypinyin
@@ -43,52 +43,59 @@ def mirai2cq(msg: str):
 
     return res, is_plain_text, msg_text, text_to_pinyin(msg_text)
 
-def migrate_message():
-    all_msg = MsgRecord.select()
 
+def migrate_message():
+    all_msg = models.MsgRecord.select()
+
+    data = []
     for item in all_msg:
         if item.group_id == 716692626:  # 测试群
-            continue;
+            continue
         raw_msg, is_pt, pt, pinyin = mirai2cq(item.msg)
         # print(raw_msg, is_pt, pt, pinyin)
         if raw_msg:
-            Message.insert(
-                group=item.group_id,
-                user=item.user_id,
-                raw_msg=raw_msg,
-                is_plain_text=is_pt,
-                text_msg=pt,
-                pinyin_msg=pinyin,
-                time=item.time
-            ).execute()
+            data.append(
+                {'group': item.group_id,
+                 'user': item.user_id,
+                 'raw_msg': raw_msg,
+                 'is_plain_text': is_pt,
+                 'text_msg': pt,
+                 'pinyin_msg': pinyin,
+                 'time': item.time}
+            )
+    num = 30000
+    for i in range(0, len(data), num):
+        database.Message.insert_many(data[i:i+num]).execute()
+
 
 def migrate_context():
-    all_msg = ReplyRecord.select()
-    
+    all_msg = models.ReplyRecord.select()
+
+    data = []
     for item in all_msg:
         if item.group_id == 716692626:  # 测试群
-            continue;
+            continue
         raw_msg, is_pt, pt, pinyin = mirai2cq(item.pre_msg)
         rep_raw_msg, _1, _2, _3 = mirai2cq(item.reply_msg)
 
         if raw_msg and rep_raw_msg:
-            Context.insert(
-                group = item.group,
-                above_raw_msg=raw_msg,
-                above_is_plain_text=is_pt,
-                above_text_msg=pt,
-                above_pinyin_msg=pinyin,
-                below_raw_msg=rep_raw_msg,
-                count=item.count,
-                latest_time=0
-            ).execute()
-
-
+            data.append({
+                'group': item.group_id,
+                'above_raw_msg': raw_msg,
+                'above_is_plain_text': is_pt,
+                'above_text_msg': pt,
+                'above_pinyin_msg': pinyin,
+                'below_raw_msg': rep_raw_msg,
+                'count': item.count,
+                'latest_time': 0})
+    num = 30000
+    for i in range(0, len(data), num):
+        database.Context.insert_many(data[i:i+num]).on_conflict('replace').execute()
 
 
 if __name__ == '__main__':
-    AmiyaDataBase.create_base()
-    DataBase.create_base()
+    models.AmiyaDataBase.create_base()
+    database.DataBase.create_base()
 
     migrate_message()
     migrate_context()
