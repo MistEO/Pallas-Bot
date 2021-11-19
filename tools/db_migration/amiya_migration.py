@@ -76,9 +76,12 @@ def migrate_context():
         if item.group_id == 716692626:  # 测试群
             continue
         raw_msg, is_pt, pt, pinyin = mirai2cq(item.pre_msg)
-        rep_raw_msg, _1, _2, _3 = mirai2cq(item.reply_msg)
+        rep_raw_msg, rep_is_pt, _2, _3 = mirai2cq(item.reply_msg)
 
         if raw_msg and rep_raw_msg:
+            # 有一部分回复图的链接挂了，直接所有的都不迁移了
+            if not rep_is_pt:
+                continue
             data.append({
                 'group': item.group_id,
                 'above_raw_msg': raw_msg,
