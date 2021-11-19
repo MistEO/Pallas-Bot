@@ -16,7 +16,6 @@ DataBase.create_base()
 
 any_msg = on_message()
 
-count_thres_lower = 2
 count_thres_upper = 3
 
 
@@ -60,7 +59,14 @@ def reply(bot: Bot, event: Event, state: T_State):
     pinyin = text_to_pinyin(pt)
     cur_time = dict['time']
 
-    count_thres = random.randint(count_thres_lower, count_thres_upper)
+    rand = random.randint(0, 100)
+    if rand < 10:
+        count_thres = 1
+    elif rand < 70:
+        count_thres = 2
+    else:
+        count_thres = 3
+        
     # 纯文本匹配拼音即可，非纯文本需要raw_msg匹配
     if is_pt and pinyin:
         reply_msg = ContextModel.select().where(
