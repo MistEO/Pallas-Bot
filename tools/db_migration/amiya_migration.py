@@ -80,7 +80,7 @@ def migrate_context():
 
         if raw_msg and rep_raw_msg:
             # 有一部分回复图的链接挂了，直接所有的都不迁移了
-            if not rep_is_pt:
+            if 'CQ:image' in rep_raw_msg:
                 continue
             data.append({
                 'group': item.group_id,
