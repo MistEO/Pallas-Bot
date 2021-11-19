@@ -15,17 +15,42 @@ from .config import Config
 import nonebot
 from aip import AipNlp
 
-door = True
-hello = on_message(block=False)
-@hello.handle()
+global_config = nonebot.get_driver().config
+plugin_config = Config(**global_config.dict())
+
+
+textAnalyse = on_message(block=False)
+@textAnalyse.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
-    global door
+    door =  plugin_config.textAnalyseSwitch
+    nicknameList = plugin_config.nicknameList
+    print(event.dict())
+    nl = nicknameList.split(",")
     if event.dict()['message_type'] == 'group':
-        for msg in event.dict()['message']:
-            if(msg['type'] == 'text') & door:
-              print(event.dict())
-              r = doTextAnalyse(msg['data']['text'])
-              await hello.send(r)
+        if len(event.dict()['message']) == 1:
+            for msg in event.dict()['message']:
+                if(msg['type'] == 'text') & door:
+                    # print(event.dict())
+                    try:
+                        msgContent = msg['data']['text']
+                        isCallBot = False
+                        for nickname in nl:
+                            if nickname in msgContent:
+                                isCallBot = True
+                                msgContent = msgContent.replace(nickname,"")
+
+                        if isCallBot != True:
+                            isCallBot = event.dict()['to_me']
+                        
+                        print(isCallBot)
+                        if isCallBot :
+                            r = doTextAnalyse(msgContent)
+                            await textAnalyse.send(r)
+                    except Exception as e:
+                        #print(e)
+                        return
+                    else:
+                        return
     # await hello.send(msgStr)
     return False
 
@@ -52,9 +77,9 @@ async def handle_param(bot: Bot, event: Event, state: T_State):
 def doTextAnalyse(msg:str()):
   print(msg)
   """ 你的 APPID AK SK """
-  APP_ID = '1'
-  API_KEY = '1'
-  SECRET_KEY = '1'
+  APP_ID = plugin_config.APP_ID
+  API_KEY = plugin_config.API_KEY
+  SECRET_KEY = plugin_config.SECRET_KEY
   client = AipNlp(APP_ID, API_KEY, SECRET_KEY)
   text = msg
   """ 调用对话情绪识别接口 """
@@ -65,35 +90,4 @@ def doTextAnalyse(msg:str()):
   """ 带参数调用对话情绪识别接口 """
   reply = client.emotion(text, options)
   print(str(reply))
-  return reply.json()['items'][0]['replies']
-def doImgCheck(picUrl: str):
-    # print("in img check function")
-    request_url = "https://aip.baidubce.com/rest/2.0/solution/v1/img_censor/v2/user_defined"
-    params = {"imgUrl":picUrl}
-    access_token = plugin_config.baidu_api_ak
-    request_url = request_url + "?access_token=" + access_token
-    headers = {'content-type': 'application/x-www-form-urlencoded'}
-    response = requests.post(request_url, data=params, headers=headers)
-    if response:
-        # print (response.json())
-        # print(response.json()['data'][0]['probability'])
-        try:
-            if response.json()['conclusion'] != "合规":
-                conclusion = response.json()['data'][0]['msg']
-                deep = response.json()['data'][0]['probability']
-                reply = {'conclusion':str(conclusion),'probability':str(deep)}
-                return reply
-        except KeyError:
-            print('KeyError')
-            return
-        else:    
-            return
-    return
-
-
-async def doRecall(bot: Bot, event: Event, state: T_State):
-    # do recall
-    # print(event.dict())
-    msgId = event.dict()['message_id']
-    # print(msgId)
-    await bot.call_api('delete_msg',message_id=msgId)
+  return reply['items'][0]['replies'][0]
