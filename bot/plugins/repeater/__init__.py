@@ -82,6 +82,24 @@ def reply(bot: Bot, event: Event, state: T_State):
         count_thres = count_thres_default
     else:
         count_thres = count_thres_default + 1
+
+    hist_msg = MessageModel.select().where(
+        MessageModel.group == group).order_by(
+        MessageModel.time.desc()).limit(count_thres)
+    # 复读！
+    if hist_msg:
+        is_repeat = True
+        for item in hist_msg:
+            if raw_msg != item.raw_msg:
+                is_repeat = False
+                break
+        if is_repeat:
+            if not latest_reply:
+                return raw_msg
+            # 不连续复读同一句话
+            if latest_reply.reply_raw_msg != raw_msg:
+                return raw_msg
+
         
     # 纯文本匹配拼音即可，非纯文本需要raw_msg匹配
     if is_pt and pinyin:
