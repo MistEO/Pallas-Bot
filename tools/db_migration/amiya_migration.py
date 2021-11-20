@@ -1,5 +1,5 @@
-import database
-import models
+from . import database
+from . import models
 
 import json
 import pypinyin
