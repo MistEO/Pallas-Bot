@@ -8,8 +8,7 @@ from tools.pixiv.keeper import keeper
 
 tu = on_command(cmd="涩涩",
                 rule=startswith("涩涩"),
-                priority=100,
-                block=True,
+                priority=1,
                 permission=permission.GROUP)
 
 keepers = {}

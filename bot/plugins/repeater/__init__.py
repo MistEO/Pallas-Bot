@@ -3,7 +3,7 @@ import random
 import time
 import re
 
-from nonebot import on_message, permission
+from nonebot import on_message
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.cqhttp import MessageSegment, Message, GroupMessageEvent
@@ -15,9 +15,7 @@ from .database import DataBase
 
 DataBase.create_base()
 
-any_msg = on_message(priority=10,
-                     block=True,
-                     permission=permission.GROUP)
+any_msg = on_message()
 
 count_thres_upper = 2
 
@@ -27,6 +25,9 @@ image_pattern = ',subType=\d+'
 @any_msg.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     dict = event.dict()
+
+    if dict['message_type'] != 'group':
+        return False
 
     group = dict['group_id']
     user = dict['user_id']
