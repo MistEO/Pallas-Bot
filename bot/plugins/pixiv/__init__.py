@@ -1,13 +1,12 @@
 from nonebot import on_command
 from nonebot.adapters.cqhttp import MessageSegment, Message, permission, GroupMessageEvent
-from nonebot.rule import startswith
+from nonebot.rule import startswith, to_me
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 
 from tools.pixiv.keeper import keeper
 
 tu = on_command(cmd="涩涩",
-                rule=startswith("涩涩"),
                 priority=1,
                 permission=permission.GROUP)
 
