@@ -75,12 +75,10 @@ def reply(bot: Bot, event: Event, state: T_State):
             return False
 
     rand = random.randint(0, 100)
-    if rand < 10:
+    if rand < 5:
         count_thres = 1
-    elif rand < 60:
-        count_thres = 2
     else:
-        count_thres = 3
+        count_thres = count_thres_upper
         
     # 纯文本匹配拼音即可，非纯文本需要raw_msg匹配
     if is_pt and pinyin:
