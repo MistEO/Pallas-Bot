@@ -21,7 +21,7 @@ any_msg = on_message(
     permission=permission.GROUP
 )
 
-count_thres_upper = 2
+count_thres_default = 2
 
 image_pattern = ',subType=\d+'
 
@@ -32,7 +32,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
 
     group = dict['group_id']
     user = dict['user_id']
-    raw_msg = dict['raw_message']
+    raw_msg = dict['raw_message'].strip()
     raw_msg = re.sub(image_pattern, '', raw_msg)
     is_pt = is_plain_text(event)
     pt = event.get_plaintext()
@@ -60,7 +60,7 @@ def reply(bot: Bot, event: Event, state: T_State):
 
     group = dict['group_id']
     user = dict['user_id']
-    raw_msg = dict['raw_message']
+    raw_msg = dict['raw_message'].strip()
     raw_msg = re.sub(image_pattern, '', raw_msg)
     is_pt = is_plain_text(event)
     pt = event.get_plaintext()
@@ -77,9 +77,11 @@ def reply(bot: Bot, event: Event, state: T_State):
 
     rand = random.randint(0, 100)
     if rand < 5:
-        count_thres = 1
+        count_thres = count_thres_default - 1
+    elif rand < 70:
+        count_thres = count_thres_default
     else:
-        count_thres = count_thres_upper
+        count_thres = count_thres_default + 1
         
     # 纯文本匹配拼音即可，非纯文本需要raw_msg匹配
     if is_pt and pinyin:
@@ -120,7 +122,7 @@ def record(bot: Bot, event: Event, state: T_State):
 
     group = dict['group_id']
     user = dict['user_id']
-    raw_msg = dict['raw_message']
+    raw_msg = dict['raw_message'].strip()
     raw_msg = re.sub(image_pattern, '', raw_msg)
     is_pt = is_plain_text(event)
     pt = event.get_plaintext()
@@ -165,7 +167,7 @@ def update_context(pre_msg: MessageModel, cur_event: Event):
 
     group = dict['group_id']
     user = dict['user_id']
-    raw_msg = dict['raw_message']
+    raw_msg = dict['raw_message'].strip()
     raw_msg = re.sub(image_pattern, '', raw_msg)
     is_pt = is_plain_text(cur_event)
     pt = cur_event.get_plaintext()
@@ -181,7 +183,7 @@ def update_context(pre_msg: MessageModel, cur_event: Event):
         ContextModel.group == group,
         ContextModel.above_raw_msg == raw_msg,
         ContextModel.below_raw_msg == pre_msg.raw_msg,
-        ContextModel.count >= count_thres_upper
+        ContextModel.count >= count_thres_default
     ).limit(1)
     if reverse:
         return
