@@ -1,6 +1,9 @@
 # NLP-TEXT-ANALYSE
 对话情绪识别
-
+## 依赖
+~~~
+pip install baidu-aip
+~~~
 ## 说明
  插件默认开关状态textAnalyseSwitch在config.py中设置
 ## 配置
