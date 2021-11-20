@@ -20,7 +20,9 @@ global_config = nonebot.get_driver().config
 plugin_config = Config(**global_config.dict())
 
 
-textAnalyse = on_message(block=False)
+textAnalyse = on_message(priority=5,
+                         block=True,
+                         permission=perm.GROUP)
 @textAnalyse.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State): 
     door =  plugin_config.textAnalyseSwitch
