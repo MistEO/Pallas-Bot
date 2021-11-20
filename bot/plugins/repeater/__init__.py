@@ -17,6 +17,7 @@ DataBase.create_base()
 
 any_msg = on_message(
     priority=15,
+    block=False,
     permission=permission.GROUP
 )
 

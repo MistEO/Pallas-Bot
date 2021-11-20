@@ -141,3 +141,17 @@ dmypy.json
 repeater.db
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+resource/voices/1.wav
+resource/voices/帕拉斯/帕拉斯_交谈1.wav
+resource/voices/帕拉斯/帕拉斯_交谈2.wav
+resource/voices/帕拉斯/帕拉斯_交谈3.wav
+resource/voices/帕拉斯/帕拉斯_任命助理.wav
+resource/voices/帕拉斯/帕拉斯_信赖提升后交谈1.wav
+resource/voices/帕拉斯/帕拉斯_信赖提升后交谈2.wav
+resource/voices/帕拉斯/帕拉斯_信赖提升后交谈3.wav
+resource/voices/帕拉斯/帕拉斯_信赖触摸.wav
+resource/voices/帕拉斯/帕拉斯_戳一下.wav
+resource/voices/帕拉斯/帕拉斯_晋升后交谈1.wav
+resource/voices/帕拉斯/帕拉斯_晋升后交谈2.wav
+resource/voices/帕拉斯/帕拉斯_问候.wav
+resource/voices/帕拉斯/帕拉斯_闲置.wav
