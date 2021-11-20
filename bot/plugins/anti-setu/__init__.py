@@ -17,7 +17,7 @@ global_config = nonebot.get_driver().config
 plugin_config = Config(**global_config.dict())
 
 door = False
-hello = on_message(block=False)
+hello = on_message(block=False, priority=10)
 @hello.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     # print(event.dict())
@@ -38,7 +38,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
 
 switch = on_command("色图检测", rule=to_me(), priority=5)
 @switch.handle()
-async def handle__first_receive(bot: Bot, event: Event, state: T_State):
+async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     # print("in setu check")
     args = str(event.get_message()).strip()
     if args:

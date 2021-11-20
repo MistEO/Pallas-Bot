@@ -5,7 +5,7 @@ import json
 from nonebot import permission as perm
 from nonebot import on_command
 from nonebot import on_message
-from nonebot.adapters.cqhttp import MessageSegment, Message
+from nonebot.adapters.cqhttp import MessageSegment, Message, permission
 from nonebot.rule import to_me
 from nonebot.rule import startswith
 from nonebot.rule import regex
@@ -20,7 +20,10 @@ global_config = nonebot.get_driver().config
 plugin_config = Config(**global_config.dict())
 
 
-textAnalyse = on_message(block=False)
+textAnalyse = on_message(
+    block=False,
+    priority=20,
+    permission=permission.GROUP)
 @textAnalyse.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State): 
     door =  plugin_config.textAnalyseSwitch

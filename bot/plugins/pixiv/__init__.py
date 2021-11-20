@@ -7,7 +7,7 @@ from nonebot.adapters import Bot, Event
 from tools.pixiv.keeper import keeper
 
 tu = on_command(cmd="涩涩",
-                priority=1,
+                priority=10,
                 permission=permission.GROUP)
 
 keepers = {}
