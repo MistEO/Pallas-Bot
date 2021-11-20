@@ -59,7 +59,7 @@ all_notice = on_notice(
 @all_notice.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     print(all_notice)
-    if event.dict()['notice_type'] == 'notify' and event.dict()['sub_type'] == 'poke' and str(event.dict()['target_id']) in bot.self_id:
+    if event.dict()['notice_type'] == 'notify' and event.dict()['sub_type'] == 'poke' and str(event.dict()['target_id']) == bot.self_id:
         poke_msg: str = '[CQ:poke,qq={}]'.format(event.dict()['user_id'])
         await all_notice.finish(Message(poke_msg))
     if event.dict()['notice_type'] == 'group_increase':
