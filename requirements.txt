@@ -3,7 +3,6 @@ nonebot-adapter-cqhttp==2.0.0a16
 pymongo==3.12.1
 requests==2.26.0
 requests-html~=0.10.0
-requests-toolbelt~=0.9.1
 peewee~=3.14.4
 pypinyin~=0.41.0
 
@@ -11,3 +10,4 @@ pydantic~=1.8.2
 httpx~=0.21.1
 
 baidu-aip~=2.2.18.0
+apscheduler~=3.8.1

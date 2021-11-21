@@ -23,6 +23,10 @@ driver.register_adapter("cqhttp", CQHTTPBot)
 # As an alternative, you should use command `nb` or modify `pyproject.toml` to load plugins
 nonebot.load_from_toml("pyproject.toml")
 nonebot.load_plugins("bot/plugins")
+nonebot.init(apscheduler_autostart=True)
+nonebot.init(apscheduler_config={
+    "apscheduler.timezone": "Asia/Shanghai"
+})
 
 # Modify some config / config depends on loaded configs
 # 

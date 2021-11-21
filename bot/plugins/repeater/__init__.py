@@ -15,6 +15,8 @@ from .database import Reply as ReplyModel
 from .database import Context as ContextModel
 from .database import DataBase
 
+from .active import sched
+
 DataBase.create_base()
 count_thres_default = 2
 image_pattern = ',subType=\d+'

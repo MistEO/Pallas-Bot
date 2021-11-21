@@ -14,7 +14,7 @@ nb-cli = "^0.5.0"
 nonebot-plugin-test = "^0.3.0"
 
 [nonebot.plugins]
-plugins = []
+plugins = ["nonebot_plugin_apscheduler"]
 plugin_dirs = ["bot/plugins"]
 
 [build-system]
