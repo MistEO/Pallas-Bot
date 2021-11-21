@@ -6,6 +6,7 @@ import asyncio
 
 from nonebot import on_message
 from nonebot.typing import T_State
+from nonebot.rule import keyword, to_me
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.cqhttp import MessageSegment, Message, GroupMessageEvent, permission
 
@@ -15,6 +16,46 @@ from .database import Context as ContextModel
 from .database import DataBase
 
 DataBase.create_base()
+count_thres_default = 2
+image_pattern = ',subType=\d+'
+
+
+to_me_msg = on_message(
+    rule=to_me() & keyword('不可以', '不准'),
+    priority=5,
+    block=False,
+    permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
+)
+
+
+@to_me_msg.handle()
+async def handle_first_receive(bot: Bot, event: Event, state: T_State):
+    print('enter')
+    if '[CQ:reply,' not in event.dict()['raw_message']:
+        return False
+    reply_msg = event.dict()['reply']['message'][0]
+    group = event.dict()['group_id']
+    if reply_msg['type'] == 'image':
+        will_ban = ReplyModel.select().where(
+            ReplyModel.group == group,
+            ReplyModel.reply_raw_msg.contains(reply_msg['data']['file'])
+        ).order_by(ReplyModel.time.desc())
+    else:
+        will_ban = ReplyModel.select().where(
+            ReplyModel.group == group,
+            ReplyModel.reply_raw_msg == str(reply_msg)
+        ).order_by(ReplyModel.time.desc())
+    if will_ban:
+        will_ban = will_ban[0]
+        ContextModel.update(
+            count=-5,
+        ).where(
+            ContextModel.group == group,
+            ContextModel.above_raw_msg == will_ban.above_raw_msg,
+            ContextModel.below_raw_msg == will_ban.reply_raw_msg
+        ).execute()
+        await to_me_msg.finish('听啊，悲鸣停止了。这是幸福的和平到来前的宁静。')
+
 
 any_msg = on_message(
     priority=15,
@@ -22,23 +63,19 @@ any_msg = on_message(
     permission=permission.GROUP
 )
 
-count_thres_default = 2
-
-image_pattern = ',subType=\d+'
-
 
 @any_msg.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
-    dict = event.dict()
+    event_dict = event.dict()
 
-    group = dict['group_id']
-    user = dict['user_id']
-    raw_msg = dict['raw_message'].strip()
+    group = event_dict['group_id']
+    user = event_dict['user_id']
+    raw_msg = event_dict['raw_message'].strip()
     raw_msg = re.sub(image_pattern, '', raw_msg)
     is_pt = is_plain_text(event)
     pt = event.get_plaintext()
     pinyin = text_to_pinyin(pt)
-    cur_time = dict['time']
+    cur_time = event_dict['time']
 
     rep = reply(bot, event, state)
     record(bot, event, state)
@@ -59,23 +96,23 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
 
 
 def reply(bot: Bot, event: Event, state: T_State):
-    dict = event.dict()
+    event_dict = event.dict()
 
-    group = dict['group_id']
-    user = dict['user_id']
-    raw_msg = dict['raw_message'].strip()
+    group = event_dict['group_id']
+    user = event_dict['user_id']
+    raw_msg = event_dict['raw_message'].strip()
     raw_msg = re.sub(image_pattern, '', raw_msg)
     is_pt = is_plain_text(event)
     pt = event.get_plaintext()
     pinyin = text_to_pinyin(pt)
-    cur_time = dict['time']
+    cur_time = event_dict['time']
 
     latest_reply = ReplyModel.select().where(
-        ReplyModel.group==group
+        ReplyModel.group == group
     ).order_by(ReplyModel.time.desc()).limit(1)
     if latest_reply:
         latest_reply = latest_reply[0]
-        if time.time() - latest_reply.time < 3: # 限制发音频率，最多每3秒一次
+        if time.time() - latest_reply.time < 3:  # 限制发音频率，最多每3秒一次
             return False
 
     rand = random.randint(0, 100)
@@ -103,20 +140,19 @@ def reply(bot: Bot, event: Event, state: T_State):
             if latest_reply.reply_raw_msg != raw_msg:
                 return raw_msg
 
-        
     # 纯文本匹配拼音即可，非纯文本需要raw_msg匹配
     if is_pt and pinyin:
         reply_msg = ContextModel.select().where(
             ContextModel.group == group,
             ContextModel.above_pinyin_msg == pinyin,
             ContextModel.count >= count_thres
-        )#.order_by(ContextModel.count.desc())
+        )  # .order_by(ContextModel.count.desc())
     else:
         reply_msg = ContextModel.select().where(
             ContextModel.group == group,
             ContextModel.above_raw_msg == raw_msg,
             ContextModel.count >= count_thres
-        )#.order_by(ContextModel.count.desc())
+        )  # .order_by(ContextModel.count.desc())
     if reply_msg:
         # count越大的结果，回复的概率越大
         count_seg = []
@@ -133,22 +169,21 @@ def reply(bot: Bot, event: Event, state: T_State):
 
         reply_msg = reply_msg[rand_index]
         return reply_msg.below_raw_msg
-    
+
     return False
 
 
-
 def record(bot: Bot, event: Event, state: T_State):
-    dict = event.dict()
+    event_dict = event.dict()
 
-    group = dict['group_id']
-    user = dict['user_id']
-    raw_msg = dict['raw_message'].strip()
+    group = event_dict['group_id']
+    user = event_dict['user_id']
+    raw_msg = event_dict['raw_message'].strip()
     raw_msg = re.sub(image_pattern, '', raw_msg)
     is_pt = is_plain_text(event)
     pt = event.get_plaintext()
     pinyin = text_to_pinyin(pt)
-    cur_time = dict['time']
+    cur_time = event_dict['time']
 
     pre_msg = MessageModel.select().where(
         MessageModel.group == group
@@ -184,16 +219,16 @@ def record(bot: Bot, event: Event, state: T_State):
 
 
 def update_context(pre_msg: MessageModel, cur_event: Event):
-    dict = cur_event.dict()
+    event_dict = cur_event.dict()
 
-    group = dict['group_id']
-    user = dict['user_id']
-    raw_msg = dict['raw_message'].strip()
+    group = event_dict['group_id']
+    user = event_dict['user_id']
+    raw_msg = event_dict['raw_message'].strip()
     raw_msg = re.sub(image_pattern, '', raw_msg)
     is_pt = is_plain_text(cur_event)
     pt = cur_event.get_plaintext()
     pinyin = text_to_pinyin(pt)
-    cur_time = dict['time']
+    cur_time = event_dict['time']
 
     # 在复读，不学
     if pre_msg.raw_msg == raw_msg:
