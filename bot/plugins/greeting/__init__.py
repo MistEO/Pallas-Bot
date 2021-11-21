@@ -1,4 +1,5 @@
 import random
+import asyncio
 
 from pathlib import Path
 from nonebot import on_command, on_message, on_notice
@@ -61,6 +62,8 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     print(all_notice)
     if event.dict()['notice_type'] == 'notify' and event.dict()['sub_type'] == 'poke' and str(event.dict()['target_id']) == bot.self_id:
         poke_msg: str = '[CQ:poke,qq={}]'.format(event.dict()['user_id'])
+        delay = random.randint(1, 3)
+        await asyncio.sleep(delay)
         await all_notice.finish(Message(poke_msg))
     if event.dict()['notice_type'] == 'group_increase':
         if str(event.dict()['user_id']) == bot.self_id:

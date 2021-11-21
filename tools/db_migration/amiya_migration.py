@@ -127,7 +127,7 @@ def strip_context():
             item.above_raw_msg = item.above_raw_msg.strip()
             item.above_text_msg = item.above_text_msg.strip()
             item.below_raw_msg = item.below_raw_msg.strip()
-            
+
             database.Context.insert(
                 group=item.group,
                 above_raw_msg=item.above_raw_msg,
@@ -140,9 +140,41 @@ def strip_context():
             ).on_conflict('replace').execute()
 
 
+def tutu2niuniu_context():
+    all_msg = database.Context.select().where(
+        (database.Context.above_raw_msg.contains('兔兔')) |
+        (database.Context.below_raw_msg.contains('兔兔'))
+    )
+    for item in all_msg:
+        database.Context.delete().where(
+            database.Context.group == item.group,
+            database.Context.above_raw_msg == item.above_raw_msg,
+            database.Context.above_is_plain_text == item.above_is_plain_text,
+            database.Context.above_text_msg == item.above_text_msg,
+            database.Context.above_pinyin_msg == item.above_pinyin_msg,
+            database.Context.below_raw_msg == item.below_raw_msg,
+            database.Context.count == item.count,
+            database.Context.latest_time == item.latest_time,).execute()
+
+        item.above_raw_msg = item.above_raw_msg.replace('兔兔', '牛牛')
+        item.above_text_msg = item.above_text_msg.replace('兔兔', '牛牛')
+        item.above_pinyin_msg = item.above_pinyin_msg.replace('tutu', 'niuniu')
+        item.below_raw_msg = item.below_raw_msg.replace('兔兔', '牛牛')
+
+        database.Context.insert(
+            group=item.group,
+            above_raw_msg=item.above_raw_msg,
+            above_is_plain_text=item.above_is_plain_text,
+            above_text_msg=item.above_text_msg,
+            above_pinyin_msg=item.above_pinyin_msg,
+            below_raw_msg=item.below_raw_msg,
+            count=item.count,
+            latest_time=item.latest_time,
+        ).on_conflict('ignore').execute()
+
+
 if __name__ == '__main__':
     models.AmiyaDataBase.create_base()
     database.DataBase.create_base()
-
-    strip_message()
-    strip_context()
+    
+    tutu2niuniu_context()

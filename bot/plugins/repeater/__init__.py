@@ -2,6 +2,7 @@ import pypinyin
 import random
 import time
 import re
+import asyncio
 
 from nonebot import on_message
 from nonebot.typing import T_State
@@ -43,13 +44,15 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     record(bot, event, state)
 
     if rep:
+        delay = random.randint(2, 5)
         ReplyModel.insert(
             group=group,
             is_proactive=False,
             above_raw_msg=raw_msg,
             reply_raw_msg=rep,
-            time=time.time()
+            time=time.time() + delay
         ).execute()
+        await asyncio.sleep(delay)
         await any_msg.finish(Message(rep))
     else:
         return False
