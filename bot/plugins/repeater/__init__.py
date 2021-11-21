@@ -48,6 +48,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
             ReplyModel.reply_raw_msg == str(reply_msg)
         ).order_by(ReplyModel.time.desc())
     if will_ban:
+        to_me_msg.block = True
         will_ban = will_ban[0]
         ContextModel.update(
             count=-5,
@@ -83,6 +84,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     record(bot, event, state)
 
     if rep:
+        any_msg.block = True
         delay = random.randint(2, 5)
         ReplyModel.insert(
             group=group,

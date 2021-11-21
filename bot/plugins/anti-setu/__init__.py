@@ -32,6 +32,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
                 if (reply != "")&(reply != None) & door:
                     if float(reply['probability']) > plugin_config.recall_nsfw_pic_probability:
                         await doRecall(bot,event,state)
+                    hello.block = True
                     await hello.send(reply['conclusion']) 
     # await hello.send(msgStr)
     return False
@@ -54,6 +55,7 @@ async def handle_param(bot: Bot, event: Event, state: T_State):
         door = True
     if param in  "关闭":
         door = False
+    switch.block = True
     await switch.finish("已"+str(param))
 
 def doImgCheck(picUrl: str):
