@@ -54,7 +54,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
             ContextModel.above_raw_msg == will_ban.above_raw_msg,
             ContextModel.below_raw_msg == will_ban.reply_raw_msg
         ).execute()
-        await to_me_msg.finish('听啊，悲鸣停止了。这是幸福的和平到来前的宁静。')
+        await to_me_msg.finish('纵使人类的战争没尽头......在这一刻，我们守护住了自己生的尊严。离开吧。但要昂首挺胸。')
 
 
 any_msg = on_message(
