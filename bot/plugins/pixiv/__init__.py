@@ -15,7 +15,7 @@ status = {}
 
 @main.handle()
 async def ma(bot: Bot, event: GroupMessageEvent, state: T_State):
-    s = status[event.group_id]
+    s = status.get(event.group_id)
     if s:
         p = (await a60())[0]
         url = f'https://www.pixiv.net/artworks/{p.id}'
@@ -29,6 +29,9 @@ switch = on_message(rule=keyword("可以涩涩"), permission=permission.GROUP)
 
 @switch.handle()
 async def sw(bot: Bot, event: GroupMessageEvent, state: T_State):
+    print(event.sender.role,event.sender.role not in ['admin', 'owner'])
+    if event.sender.role not in ['admin', 'owner']:
+        return
     s = str(event.get_message())
     if '不' in s:
         status[event.group_id] = False
