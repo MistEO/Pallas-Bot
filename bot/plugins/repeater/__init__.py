@@ -45,7 +45,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     else:
         will_ban = ReplyModel.select().where(
             ReplyModel.group == group,
-            ReplyModel.reply_raw_msg == str(reply_msg)
+            ReplyModel.reply_raw_msg.contains(str(reply_msg))
         ).order_by(ReplyModel.time.desc())
     if will_ban:
         will_ban = will_ban[0]
@@ -54,7 +54,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
         ).where(
             ContextModel.group == group,
             ContextModel.above_raw_msg == will_ban.above_raw_msg,
-            ContextModel.below_raw_msg == will_ban.reply_raw_msg
+            ContextModel.below_raw_msg.contains(will_ban.reply_raw_msg)
         ).execute()
         await to_me_msg.finish('纵使人类的战争没尽头......在这一刻，我们守护住了自己生的尊严。离开吧。但要昂首挺胸。')
 
