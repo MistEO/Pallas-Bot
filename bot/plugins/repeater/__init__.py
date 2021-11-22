@@ -89,7 +89,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
                 group=group,
                 is_proactive=False,
                 above_raw_msg=raw_msg,
-                reply_raw_msg=rep,
+                reply_raw_msg=item,
                 time=time.time() + delay
             ).execute()
             await asyncio.sleep(delay)
