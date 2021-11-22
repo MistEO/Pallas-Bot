@@ -71,12 +71,15 @@ def get_context(group):
     return False, False
 
 
-@sched.scheduled_job('interval', minutes=17)
+@sched.scheduled_job('interval', minutes=10)
 async def active_repeater():
 
     groups = await get_bot().call_api('get_group_list')
 
     for item in groups:
+        if random.randint(0, 9) > 0:
+            continue
+
         group = item['group_id']
         if not need_active_send(group):
             continue
