@@ -27,6 +27,8 @@ textAnalyse = on_message(
 @textAnalyse.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State): 
     door =  plugin_config.textAnalyseSwitch
+    if not door:
+        return False
     nicknameList = plugin_config.nicknameList
     keyWordsList = ["涩涩"]
     #print(event.dict())
