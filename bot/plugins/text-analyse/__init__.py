@@ -27,9 +27,9 @@ textAnalyse = on_message(
 @textAnalyse.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State): 
     door =  plugin_config.textAnalyseSwitch
-    if not door:
-        return False
     nicknameList = plugin_config.nicknameList
+    keyWordsList = ["涩涩"]
+    #print(event.dict())
     nl = nicknameList.split(',')
     if event.dict()['message_type'] == 'group':
         if len(event.dict()['message']) == 1:
@@ -39,10 +39,14 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
                     try:
                         msgContent = msg['data']['text']
                         isCallBot = False
+                        isNotOtherKeyWords = True
                         for nickname in nl:
                             if nickname in msgContent:
                                 isCallBot = True
                                 msgContent = msgContent.replace(nickname,'')
+                        for keyWords in keyWordsList:
+                            if keyWords in msgContent:
+                               isNotOtherKeyWords = False 
                         if isCallBot != True:
                             receiveTime = event.dict()['time']
                             t = int(time.time())
@@ -52,8 +56,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
                             isCallBot = event.dict()['to_me']
                         
                         # print(isCallBot)
-                        if isCallBot:
-                            textAnalyse.block = True
+                        if isCallBot and isNotOtherKeyWords  :
                             r = doTextAnalyse(msgContent)
                             await textAnalyse.send(r)
                     except Exception as e:
@@ -82,7 +85,6 @@ async def handle_param(bot: Bot, event: Event, state: T_State):
         door = True
     if param in  '关闭':
         door = False
-    switch.block = True
     await switch.finish('已'+str(param))
 
 def doTextAnalyse(msg:str()):

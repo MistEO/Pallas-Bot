@@ -8,7 +8,6 @@ from tools.pixiv.pixiv import a60
 
 main = on_command(cmd='涩涩',
                 priority=10,
-                block=True,
                 permission=permission.GROUP)
 
 status = {}
@@ -30,7 +29,6 @@ switch = on_command(
     cmd='',
     rule=keyword("可以涩涩"), 
     priority=5,
-    block=True,
     permission=permission.GROUP_ADMIN | permission.GROUP_OWNER)
 
 @switch.handle()
