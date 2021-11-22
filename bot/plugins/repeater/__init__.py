@@ -162,7 +162,7 @@ def reply(bot: Bot, event: Event, state: T_State):
         count_seg = []
         count_sum = 0
         for item in reply_msg:
-            count_sum += item.count
+            count_sum += (item.count * item.count)
             count_seg.append(count_sum)
         rand_value = random.randint(0, count_sum)
         rand_index = 0
