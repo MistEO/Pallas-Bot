@@ -28,7 +28,9 @@ def need_active_send(group):
     ).order_by(MessageModel.time.desc())
 
     if latest_msg:
-        time_thres = 3600 * 24 / len(latest_msg) * 10 # 聊天频率相比过去24小时突然下降了10倍，就主动发言
+        # 聊天频率相比过去24小时突然下降了10倍，就主动发言
+        # 再额外加个随机起步延时
+        time_thres = 3600 * 24 / len(latest_msg) * 10 + random.randint(30, 60) * 60
         print('group: {}, last 24h count: {}, active time threshold: {}'.format(
             group, len(latest_msg), time_thres))
         latest_msg = latest_msg[0]
