@@ -15,7 +15,7 @@ from .database import Reply as ReplyModel
 from .database import Context as ContextModel
 from .database import DataBase
 
-from .active import sched
+# from .active import sched
 
 DataBase.create_base()
 count_thres_default = 2
@@ -83,16 +83,17 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     record(bot, event, state)
 
     if rep:
-        delay = random.randint(2, 5)
-        ReplyModel.insert(
-            group=group,
-            is_proactive=False,
-            above_raw_msg=raw_msg,
-            reply_raw_msg=rep,
-            time=time.time() + delay
-        ).execute()
-        await asyncio.sleep(delay)
-        await any_msg.finish(Message(rep))
+        for item in rep:
+            delay = random.randint(500, 2000) / 1000.0
+            ReplyModel.insert(
+                group=group,
+                is_proactive=False,
+                above_raw_msg=raw_msg,
+                reply_raw_msg=rep,
+                time=time.time() + delay
+            ).execute()
+            await asyncio.sleep(delay)
+            await any_msg.send(Message(item))
     else:
         return False
 
@@ -137,10 +138,10 @@ def reply(bot: Bot, event: Event, state: T_State):
                 break
         if is_repeat:
             if not latest_reply:
-                return raw_msg
+                return raw_msg,
             # 不连续复读同一句话
             if latest_reply.reply_raw_msg != raw_msg:
-                return raw_msg
+                return raw_msg,
 
     # 纯文本匹配拼音即可，非纯文本需要raw_msg匹配
     if is_pt and pinyin:
@@ -170,7 +171,10 @@ def reply(bot: Bot, event: Event, state: T_State):
                 break
 
         reply_msg = reply_msg[rand_index]
-        return reply_msg.below_raw_msg
+        res = reply_msg.below_raw_msg
+        if 0 < res.count('，') <= 3:
+            return res.split('，')
+        return res,
 
     return False
 
