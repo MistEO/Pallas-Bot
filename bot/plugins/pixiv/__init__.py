@@ -1,12 +1,12 @@
 from nonebot import on_command , on_message
 from nonebot.adapters.cqhttp import MessageSegment, Message, permission, GroupMessageEvent
-from nonebot.rule import keyword
+from nonebot.rule import keyword, startswith
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 
 from tools.pixiv.pixiv import a60
 
-main = on_command(cmd='涩涩',
+main = on_message(rule=startswith('牛牛涩涩'),
                 priority=10,
                 permission=permission.GROUP)
 
@@ -25,9 +25,8 @@ async def ma(bot: Bot, event: GroupMessageEvent, state: T_State):
         await main.finish("听啊，悲鸣停止了。这是幸福的和平到来前的宁静。")
 
 
-switch = on_command(
-    cmd='',
-    rule=keyword("可以涩涩"), 
+switch = on_message(
+    rule=keyword("牛牛可以涩涩", "牛牛不可以涩涩"), 
     priority=5,
     permission=permission.GROUP_ADMIN | permission.GROUP_OWNER)
 

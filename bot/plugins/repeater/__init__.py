@@ -162,7 +162,7 @@ def reply(bot: Bot, event: Event, state: T_State):
     if is_pt and pinyin:
         reply_msg = ContextModel.select().where(
             ContextModel.group == group,
-            ContextModel.above_pinyin_msg.contains(pinyin),
+            ContextModel.above_pinyin_msg == pinyin,
             ContextModel.count >= count_thres
         )  # .order_by(ContextModel.count.desc())
     else:

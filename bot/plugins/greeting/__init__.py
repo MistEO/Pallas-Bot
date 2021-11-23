@@ -4,7 +4,7 @@ import asyncio
 from pathlib import Path
 from nonebot import on_command, on_message, on_notice
 from nonebot.adapters.cqhttp import MessageSegment, Message, permission, GroupMessageEvent
-from nonebot.rule import startswith, to_me
+from nonebot.rule import keyword, startswith, to_me
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 
@@ -25,8 +25,8 @@ def get_voice():
     return file
 
 
-any_cmd = on_command(
-    cmd='',
+any_cmd = on_message(
+    rule=keyword('牛牛', '帕拉斯'),
     priority=13,
     block=False,
     permission=permission.GROUP)
@@ -34,7 +34,8 @@ any_cmd = on_command(
 
 @any_cmd.handle()
 async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_State):
-    if len(event.get_plaintext().strip()) == 0:
+    plain = event.get_plaintext().strip();
+    if plain == '牛牛' or plain == '帕拉斯':
         msg: Message = MessageSegment.record(file=Path(get_voice()))
         await any_cmd.finish(msg)
 
