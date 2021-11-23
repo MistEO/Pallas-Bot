@@ -3,7 +3,6 @@ import random
 import time
 import re
 import asyncio
-import cmath
 
 from nonebot import on_message
 from nonebot.typing import T_State
@@ -126,20 +125,6 @@ def reply(bot: Bot, event: Event, state: T_State):
         count_thres = count_thres_default
     else:
         count_thres = count_thres_default + 1
-
-    all_context = ContextModel.select().where(
-        ContextModel.group == group,
-        ContextModel.count >= count_thres_default
-    )
-    all_context_count = all_context.count()
-    if all_context_count < 100:
-        pass
-    elif all_context_count < 1000:
-        count_thres += 1
-    elif all_context_count < 10000:
-        count_thres += 2
-    else:
-        count_thres += 3
 
     hist_msg = MessageModel.select().where(
         MessageModel.group == group).order_by(
