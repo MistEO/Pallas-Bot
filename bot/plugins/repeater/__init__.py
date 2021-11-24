@@ -279,4 +279,4 @@ def is_plain_text(event: Event):
 
 def text_to_pinyin(text: str):
     return ''.join([item[0] for item in pypinyin.pinyin(
-        text, style=pypinyin.NORMAL, errors='ignore')]).lower()
+        text, style=pypinyin.NORMAL, errors='default')]).lower()

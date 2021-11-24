@@ -7,8 +7,7 @@ import pypinyin
 
 def text_to_pinyin(text: str):
     return ''.join([item[0] for item in pypinyin.pinyin(
-        text, style=pypinyin.NORMAL, errors='ignore')]).lower()
-
+        text, style=pypinyin.NORMAL, errors='default')]).lower()
 
 # return [cq_result: str, is_plain_text: bool, msg_text: str, msg_pinyin: str]
 def mirai2cq(msg: str):
@@ -172,9 +171,52 @@ def tutu2niuniu_context():
             latest_time=item.latest_time,
         ).on_conflict('ignore').execute()
 
+def text2pinyin_context():
+    all_plain = database.Context.select().where(
+        database.Context.above_is_plain_text == True)
+
+    len = all_plain.count()
+    count = 0
+    for item in all_plain:
+        pinyin = text_to_pinyin(item.above_text_msg)
+        # for ch in ' ，。？！（）…—【】、“”：；《》‘’￥『』': # with space
+        #     pinyin = pinyin.replace(ch, '')
+        # print(pinyin)
+        database.Context.update(
+            above_pinyin_msg=pinyin,
+        ).where(
+            database.Context.group == item.group,
+            database.Context.above_raw_msg == item.above_raw_msg,
+            database.Context.below_raw_msg == item.below_raw_msg,
+        ).execute()
+
+        count = count + 1
+        if count % 100 == 0:
+            print('text2pinyin_context: ', count / len * 100, "%")
+
+def text2pinyin_message():
+
+    all_plain = database.Message.select().where(
+        database.Message.is_plain_text == True)
+
+    len = all_plain.count()
+    count = 0
+    for item in all_plain:
+        pinyin = text_to_pinyin(item.text_msg)
+        database.Message.update(
+            pinyin_msg=pinyin,
+        ).where(
+            database.Message.id == item.id,
+        ).execute()
+
+        count = count + 1
+        if count % 100 == 0:            
+            print('text2pinyin_message: ', count / len * 100, "%")
+
 
 if __name__ == '__main__':
     models.AmiyaDataBase.create_base()
     database.DataBase.create_base()
     
-    tutu2niuniu_context()
+    text2pinyin_context()
+    text2pinyin_message()
