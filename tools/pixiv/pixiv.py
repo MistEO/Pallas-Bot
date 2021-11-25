@@ -15,6 +15,7 @@ async def a60() -> List[pic]:
         res = res.json()
 
     p = pic()
+    res = res['data']['imgs'][0]
     p.id = int(res['pic'].split('_')[0])
     p.pic = res['url']
     p.artwork = f'https://www.pixiv.net/artworks/{p.id}'
