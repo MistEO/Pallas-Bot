@@ -3,8 +3,8 @@ import time
 import random
 
 from nonebot import require, get_bot
-
 from nonebot.adapters import Bot, Event
+from nonebot.adapters.cqhttp import MessageSegment, Message
 
 from .database import Message as MessageModel
 from .database import Reply as ReplyModel
@@ -68,7 +68,7 @@ def get_context(group):
                 break
 
         reply_msg = reply_msg[rand_index]
-        return reply_msg.above_raw_msg, reply_msg.below_raw_msg
+        return Message(reply_msg.above_raw_msg), Message(reply_msg.below_raw_msg)
 
     return False, False
 
