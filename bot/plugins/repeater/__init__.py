@@ -85,7 +85,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
 
     if rep:
         any_msg.block = True
-        delay = random.randint(3, 20)
+        delay = random.randint(2, 5)
         for item in rep:
             ReplyModel.insert(
                 group=group,
@@ -95,7 +95,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
                 time=time.time() + delay
             ).execute()
             await asyncio.sleep(delay)
-            delay = random.randint(500, 3000) / 1000.0
+            delay = random.randint(1, 3)
             await any_msg.send(Message(item))
     else:
         return False
