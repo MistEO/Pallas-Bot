@@ -83,7 +83,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     record(bot, event, state)
 
     if rep:
-        delay = random.randint(2, 10)
+        delay = random.randint(3, 20)
         for item in rep:
             ReplyModel.insert(
                 group=group,
