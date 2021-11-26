@@ -56,6 +56,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
             ContextModel.above_raw_msg == will_ban.above_raw_msg,
             ContextModel.below_raw_msg.contains(will_ban.reply_raw_msg)
         ).execute()
+        to_me_msg.block = True
         await to_me_msg.finish('纵使人类的战争没尽头......在这一刻，我们守护住了自己生的尊严。离开吧。但要昂首挺胸。')
 
 
@@ -83,6 +84,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     record(bot, event, state)
 
     if rep:
+        any_msg.block = True
         delay = random.randint(3, 20)
         for item in rep:
             ReplyModel.insert(

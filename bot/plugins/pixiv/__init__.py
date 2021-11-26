@@ -8,6 +8,7 @@ from tools.pixiv.pixiv import a60
 
 main = on_message(rule=startswith('牛牛涩涩'),
                 priority=10,
+                block=True,
                 permission=permission.GROUP)
 
 status = {}
@@ -27,6 +28,7 @@ async def ma(bot: Bot, event: GroupMessageEvent, state: T_State):
 
 switch = on_message(
     rule=keyword("牛牛可以涩涩", "牛牛不可以涩涩"), 
+    block=True,
     priority=5,
     permission=permission.GROUP_ADMIN | permission.GROUP_OWNER)
 
