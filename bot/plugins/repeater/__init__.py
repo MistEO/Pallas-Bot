@@ -109,6 +109,7 @@ def reply(bot: Bot, event: Event, state: T_State):
     raw_msg = event_dict['raw_message'].strip()
     raw_msg = re.sub(image_pattern, '', raw_msg)
     is_pt = is_plain_text(event)
+    is_img = is_image(event)
     pt = event.get_plaintext()
     pinyin = text_to_pinyin(pt)
     cur_time = event_dict['time']
@@ -147,11 +148,19 @@ def reply(bot: Bot, event: Event, state: T_State):
                 return raw_msg,
 
     # 纯文本匹配拼音即可，非纯文本需要raw_msg匹配
-    if is_pt and pinyin:
+    if is_pt:
         reply_msg = ContextModel.select().where(
             ContextModel.group == group,
             ContextModel.above_pinyin_msg == pinyin,
             ContextModel.count >= count_thres
+        )  # .order_by(ContextModel.count.desc())
+    elif is_img:
+        # 屏蔽图片（表情包）后的纯文字回复
+        reply_msg = ContextModel.select().where(
+            ContextModel.group == group,
+            ContextModel.above_raw_msg == raw_msg,
+            ContextModel.count >= count_thres,
+            ContextModel.below_raw_msg.startswith('[CQ:')
         )  # .order_by(ContextModel.count.desc())
     else:
         reply_msg = ContextModel.select().where(
@@ -159,6 +168,7 @@ def reply(bot: Bot, event: Event, state: T_State):
             ContextModel.above_raw_msg == raw_msg,
             ContextModel.count >= count_thres
         )  # .order_by(ContextModel.count.desc())
+
     if reply_msg:
         # count越大的结果，回复的概率越大
         count_seg = []
@@ -279,6 +289,13 @@ def is_plain_text(event: Event):
 
     return False
 
+def is_image(event: Event):
+    msg = event.dict()['message']
+    if len(msg) == 1:
+        if msg[0]['type'] == 'image':
+            return True
+
+    return False
 
 def text_to_pinyin(text: str):
     return ''.join([item[0] for item in pypinyin.pinyin(
