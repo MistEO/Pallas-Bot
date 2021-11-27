@@ -6,25 +6,39 @@ from nonebot.adapters import Bot, Event
 
 from tools.pixiv.pixiv import a60
 
-main = on_message(rule=startswith('牛牛涩涩'),
-                priority=10,
-                block=True,
-                permission=permission.GROUP)
-
 status = {}
 
+can = on_message(rule=startswith('牛牛涩涩'),
+                priority=10,
+                permission=permission.GROUP)
 
-@main.handle()
-async def ma(bot: Bot, event: GroupMessageEvent, state: T_State):
+@can.handle()
+async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_State):
     s = status.get(event.group_id)
     if s:
-        p = (await a60())[0]
+        can.block = True
+        p = await a60()
         url = f'https://www.pixiv.net/artworks/{p.id}'
         msg: Message = MessageSegment.text(url) + MessageSegment.image(file=p.pic)
-        await main.finish(msg)
+        await can.finish(msg)
     else:
-        await main.finish("听啊，悲鸣停止了。这是幸福的和平到来前的宁静。")
+        can.block = False
 
+cannot = on_message(rule=startswith('牛牛涩涩'),
+                  priority=17,
+                  permission=permission.GROUP)
+
+
+@cannot.handle()
+async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_State):
+    s = status.get(event.group_id)
+    if not s:
+        cannot.block = True
+        await cannot.finish("听啊，悲鸣停止了。这是幸福的和平到来前的宁静。")
+    else:
+        cannot.block = False
+
+status = {}
 
 switch = on_message(
     rule=keyword("牛牛可以涩涩", "牛牛不可以涩涩"), 

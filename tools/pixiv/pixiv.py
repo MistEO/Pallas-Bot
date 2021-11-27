@@ -19,7 +19,7 @@ async def a60() -> List[pic]:
     p.id = int(res['pic'].split('_')[0])
     p.pic = res['url']
     p.artwork = f'https://www.pixiv.net/artworks/{p.id}'
-    return [p]
+    return p
 
 
 async def pixivel(page=0) -> List[pic]:

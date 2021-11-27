@@ -58,6 +58,8 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
         ).execute()
         to_me_msg.block = True
         await to_me_msg.finish('纵使人类的战争没尽头......在这一刻，我们守护住了自己生的尊严。离开吧。但要昂首挺胸。')
+    else:
+        to_me_msg.block = False
 
 
 any_msg = on_message(
@@ -98,6 +100,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
             delay = random.randint(1, 3)
             await any_msg.send(Message(item))
     else:
+        any_msg.block = False
         return False
 
 
