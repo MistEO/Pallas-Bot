@@ -30,3 +30,33 @@ async def push_bili():
                     'group_id': group})
         
         bili_status[item] = now
+
+from .weibo import Weibo
+
+weibo_list = []
+for weibo_id in plugin_config.weibo_id:
+    weibo_list.append(Weibo(weibo_id))
+
+weibo_status = {}
+
+@sched.scheduled_job('interval', seconds=5)
+async def push_weibo():
+    for wb in weibo_list:
+        pre = weibo_status.get(wb, False)
+        now = wb.requests_content(0, only_id=True)
+        if pre and pre != now:
+        # if True:
+            result, detail_url, pics_list = wb.requests_content(0)
+            msg: Message = MessageSegment.text(detail_url + '\n') \
+                + MessageSegment.text(result)
+            if pics_list:
+                for pic in pics_list:
+                    msg += MessageSegment.image(pic)
+            
+            for group in plugin_config.weibo_push_groups:
+                await get_bot().call_api('send_group_msg', **{
+                    'message': msg,
+                    'group_id': group})
+            
+        weibo_status[wb] = now
+
