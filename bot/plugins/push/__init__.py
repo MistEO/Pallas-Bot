@@ -1,6 +1,6 @@
 from nonebot import require, get_bot, get_driver
 from nonebot.adapters.cqhttp import MessageSegment, Message
-from asyncio import asyncio
+import asyncio
 
 from .config import Config
 from .bili_api import *
@@ -12,14 +12,14 @@ plugin_config = Config(**global_config.dict())
 
 bili_status = {}
 
-@sched.scheduled_job('interval', seconds=5)
+@sched.scheduled_job('interval', seconds=30)
 async def push_bili():
     global bili_status
     for item in plugin_config.bili_user:
         pre:bool = bili_status.get(item, True)  # 避免bot启动时正在直播，又推送了，默认True
-
         user = bili_api.user(item)
         now:bool = user.room.liveStatus == 1
+        bili_status[item] = now
         if now and not pre:
             msg: Message = MessageSegment.text('开播啦！') \
                 + MessageSegment.text(user.room.title) \
@@ -29,8 +29,8 @@ async def push_bili():
                 await get_bot().call_api('send_group_msg', **{
                     'message': msg,
                     'group_id': group})
-        
-        bili_status[item] = now
+                await asyncio.sleep(5)
+
 
 from .weibo import Weibo
 
@@ -40,11 +40,13 @@ for weibo_id in plugin_config.weibo_id:
 
 weibo_status = {}
 
-@sched.scheduled_job('interval', seconds=5)
+
+@sched.scheduled_job('interval', seconds=30)
 async def push_weibo():
     for wb in weibo_list:
         pre = weibo_status.get(wb, False)
         now = wb.requests_content(0, only_id=True)
+        weibo_status[wb] = now
         if pre and pre != now:
         # if True:
             result, detail_url, pics_list = wb.requests_content(0)
@@ -58,19 +60,20 @@ async def push_weibo():
                 await get_bot().call_api('send_group_msg', **{
                     'message': msg,
                     'group_id': group})
-            
-        weibo_status[wb] = now
+                await asyncio.sleep(5)
+
 
 from .github import Release, get_latest_release
 
 repo_status = {}
 
 
-@sched.scheduled_job('interval', seconds=5)
+@sched.scheduled_job('interval', seconds=30)
 async def push_repo():
     for repo in plugin_config.github_repo:
         pre_id = repo_status.get(repo, False)
         now = get_latest_release(repo)
+        repo_status[repo] = now.id
 
         if pre_id and pre_id != now.id:
         # if True:
@@ -83,5 +86,4 @@ async def push_repo():
                 await get_bot().call_api('send_group_msg', **{
                     'message': msg,
                     'group_id': group})
-
-        repo_status[repo] = now.id
+                await asyncio.sleep(5)
