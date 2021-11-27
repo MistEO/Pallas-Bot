@@ -68,10 +68,10 @@ repo_status = {}
 @sched.scheduled_job('interval', seconds=5)
 async def push_repo():
     for repo in plugin_config.github_repo:
-        pre = repo_status.get(repo, False)
+        pre_id = repo_status.get(repo, False)
         now = get_latest_release(repo)
 
-        if pre and pre != now:
+        if pre_id and pre_id != now.id:
         # if True:
             pre_rel = ''
             if now.prerelease:
@@ -83,4 +83,4 @@ async def push_repo():
                     'message': msg,
                     'group_id': group})
 
-        repo_status[repo] = now
+        repo_status[repo] = now.id
