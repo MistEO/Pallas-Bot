@@ -6,10 +6,10 @@ from .bili_api import *
 
 sched = require('nonebot_plugin_apscheduler').scheduler
 
-bili_status = {}
-
 global_config = get_driver().config
 plugin_config = Config(**global_config.dict())
+
+bili_status = {}
 
 @sched.scheduled_job('interval', seconds=5)
 async def push_bili():
@@ -60,3 +60,27 @@ async def push_weibo():
             
         weibo_status[wb] = now
 
+from .github import Release, get_latest_release
+
+repo_status = {}
+
+
+@sched.scheduled_job('interval', seconds=5)
+async def push_repo():
+    for repo in plugin_config.github_repo:
+        pre = repo_status.get(repo, False)
+        now = get_latest_release(repo)
+
+        if pre and pre != now:
+        # if True:
+            pre_rel = ''
+            if now.prerelease:
+                pre_rel = ' (测试版本)'
+            msg_str = f'{now.author} released {now.title} of {repo}{pre_rel}:\n{now.url}\n{now.body}'
+            msg: Message = MessageSegment.text(msg_str)
+            for group in plugin_config.weibo_push_groups:
+                await get_bot().call_api('send_group_msg', **{
+                    'message': msg,
+                    'group_id': group})
+
+        repo_status[repo] = now
