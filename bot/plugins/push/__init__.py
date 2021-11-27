@@ -1,5 +1,6 @@
 from nonebot import require, get_bot, get_driver
 from nonebot.adapters.cqhttp import MessageSegment, Message
+from asyncio import asyncio
 
 from .config import Config
 from .bili_api import *
@@ -78,7 +79,7 @@ async def push_repo():
                 pre_rel = ' (测试版本)'
             msg_str = f'{now.author} released {now.title} of {repo}{pre_rel}:\n{now.url}\n{now.body}'
             msg: Message = MessageSegment.text(msg_str)
-            for group in plugin_config.weibo_push_groups:
+            for group in plugin_config.github_push_groups:
                 await get_bot().call_api('send_group_msg', **{
                     'message': msg,
                     'group_id': group})
