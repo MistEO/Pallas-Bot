@@ -34,10 +34,11 @@ class Weibo():
         target_blog = cards[index]
         blog = target_blog['mblog']
         detail_url = target_blog['scheme']
-        item_id = target_blog['itemid']
+        bid = blog['bid']
+
 
         if only_id:
-            return item_id
+            return bid
 
         # 获取完整正文
         url = 'https://m.weibo.cn/statuses/extend?id=' + blog['id']
