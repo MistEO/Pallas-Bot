@@ -68,7 +68,7 @@ from .github import Release, get_latest_release
 repo_status = {}
 
 
-@sched.scheduled_job('interval', seconds=30)
+@sched.scheduled_job('interval', seconds=120)
 async def push_repo():
     for repo in plugin_config.github_repo:
         pre_id = repo_status.get(repo, False)
