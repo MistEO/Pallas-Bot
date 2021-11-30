@@ -16,10 +16,10 @@ sched = require('nonebot_plugin_apscheduler').scheduler
 
 
 def need_active_send(group):
-    # 大半夜的不主动回复
-    hour = datetime.datetime.now().hour
-    if hour > 2 and hour < 9:
-        return False
+    # # 大半夜的不主动回复
+    # hour = datetime.datetime.now().hour
+    # if hour > 2 and hour < 9:
+    #     return False
 
     # 过去24个小时聊的
     latest_msg = MessageModel.select().where(
@@ -100,7 +100,7 @@ async def active_repeater():
             'group_id': group
         })
         # 有一定概率再连着发一条
-        if random.randint(0, 9) < 3:
+        if random.randint(1, 10) <= 5:
             ReplyModel.insert(
                 group=group,
                 is_proactive=True,

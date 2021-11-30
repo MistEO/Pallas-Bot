@@ -126,7 +126,7 @@ def reply(bot: Bot, event: Event, state: T_State):
             return False
 
     rand = random.randint(0, 100)
-    if rand < 5:
+    if rand < 3:
         count_thres = count_thres_default - 1
     elif rand < 60:
         count_thres = count_thres_default
@@ -188,7 +188,7 @@ def reply(bot: Bot, event: Event, state: T_State):
 
         reply_msg = reply_msg[rand_index]
         res = reply_msg.below_raw_msg
-        if 0 < res.count('，') <= 3:
+        if 0 < res.count('，') <= 3 and random.randint(1, 10) < 5:
             return res.split('，')
         return res,
 
