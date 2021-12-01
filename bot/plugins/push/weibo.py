@@ -26,7 +26,7 @@ class Weibo():
         }
         self.url = f'https://m.weibo.cn/api/container/getIndex?uid={weibo_id}&type=uid&value={weibo_id}'
 
-    def requests_content(self, index: int, only_id=False):
+    def requests_content(self, index: int, only_created_at=False):
         session = requests.session()
 
         cards = self.get_cards_list()
@@ -34,11 +34,11 @@ class Weibo():
         target_blog = cards[index]
         blog = target_blog['mblog']
         detail_url = target_blog['scheme']
-        bid = blog['created_at']
+        created_at = blog['created_at']
 
 
-        if only_id:
-            return bid
+        if only_created_at:
+            return created_at
 
         # 获取完整正文
         url = 'https://m.weibo.cn/statuses/extend?id=' + blog['id']

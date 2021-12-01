@@ -1,6 +1,8 @@
+from datetime import datetime
 from nonebot import require, get_bot, get_driver
 from nonebot.adapters.cqhttp import MessageSegment, Message
 import asyncio
+from dateutil import parser
 
 from .config import Config
 from .bili_api import *
@@ -44,17 +46,19 @@ weibo_pushed = []
 @sched.scheduled_job('interval', seconds=30)
 async def push_weibo():
     for wb in weibo_list:
-        now_id = wb.requests_content(0, only_id=True)
-        
-        if not now_id:
-            return
-        elif not weibo_pushed:
-            weibo_pushed.append(now_id)
-            return
-        elif not isinstance(now_id, str) or now_id in weibo_pushed:
+        created_at = wb.requests_content(0, only_created_at=True)
+        created_time = parser.parse(created_at).replace(tzinfo=None)
+        duration = abs((datetime.now() - created_time).total_seconds())
+        if duration > 600: # 一直在轮询，新发的微博不可能有超过十分钟的。如果有，说明本次获取的有问题
             return
 
-        weibo_pushed.append(now_id)
+        if not weibo_pushed:
+            weibo_pushed.append(created_at)
+            return
+        elif not isinstance(created_at, str) or created_at in weibo_pushed:
+            return
+
+        weibo_pushed.append(created_at)
         result, detail_url, pics_list = wb.requests_content(0)
         msg: Message = MessageSegment.text(detail_url + '\n') \
             + MessageSegment.text(result)
