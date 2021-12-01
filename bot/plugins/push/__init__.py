@@ -45,7 +45,10 @@ weibo_pushed = []
 async def push_weibo():
     for wb in weibo_list:
         now_id = wb.requests_content(0, only_id=True)
-        if not weibo_pushed:
+        
+        if not now_id:
+            return
+        elif not weibo_pushed:
             weibo_pushed.append(now_id)
             return
         elif not isinstance(now_id, str) or now_id in weibo_pushed:
