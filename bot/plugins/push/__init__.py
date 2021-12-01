@@ -41,7 +41,7 @@ for weibo_id in plugin_config.weibo_id:
 weibo_pushed = []
 
 
-@sched.scheduled_job('interval', seconds=2)
+@sched.scheduled_job('interval', seconds=30)
 async def push_weibo():
     for wb in weibo_list:
         now_id = wb.requests_content(0, only_id=True)
