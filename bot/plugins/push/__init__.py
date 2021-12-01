@@ -47,10 +47,6 @@ weibo_pushed = []
 async def push_weibo():
     for wb in weibo_list:
         created_at = wb.requests_content(0, only_created_at=True)
-        created_time = parser.parse(created_at).replace(tzinfo=None)
-        duration = abs((datetime.now() - created_time).total_seconds())
-        if duration > 600: # 一直在轮询，新发的微博不可能有超过十分钟的。如果有，说明本次获取的有问题
-            return
 
         if not weibo_pushed:
             weibo_pushed.append(created_at)
@@ -59,6 +55,12 @@ async def push_weibo():
             return
 
         weibo_pushed.append(created_at)
+        
+        created_time = parser.parse(created_at).replace(tzinfo=None)
+        duration = abs((datetime.now() - created_time).total_seconds())
+        if duration > 600:  # 一直在轮询，新发的微博不可能有超过十分钟的。如果有，说明本次获取的有问题
+            return
+
         result, detail_url, pics_list = wb.requests_content(0)
         msg: Message = MessageSegment.text(detail_url + '\n') \
             + MessageSegment.text(result)
