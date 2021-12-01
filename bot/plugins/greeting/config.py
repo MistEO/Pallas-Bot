@@ -1,7 +1,7 @@
 from pydantic import BaseSettings
 
 class Config(BaseSettings):
-  greetings_groups = []
+  greeting_groups = []
 
   class Config:
     extra = "ignore"
