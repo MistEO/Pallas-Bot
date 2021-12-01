@@ -34,7 +34,7 @@ class Weibo():
         target_blog = cards[index]
         blog = target_blog['mblog']
         detail_url = target_blog['scheme']
-        bid = blog['bid']
+        bid = blog['created_at']
 
 
         if only_id:
