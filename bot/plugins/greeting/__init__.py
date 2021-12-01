@@ -2,7 +2,7 @@ import random
 import asyncio
 
 from pathlib import Path
-from nonebot import on_command, on_message, on_notice
+from nonebot import on_command, on_message, on_notice, get_driver
 from nonebot.adapters.cqhttp import MessageSegment, Message, permission, GroupMessageEvent
 from nonebot.rule import keyword, startswith, to_me
 from nonebot.typing import T_State
@@ -58,9 +58,13 @@ all_notice = on_notice(
     block=False)
 
 
+from .config import Config
+
+global_config = get_driver().config
+plugin_config = Config(**global_config.dict())
+
 @all_notice.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
-    print(all_notice)
     if event.dict()['notice_type'] == 'notify' and event.dict()['sub_type'] == 'poke' and str(event.dict()['target_id']) == bot.self_id:
         poke_msg: str = '[CQ:poke,qq={}]'.format(event.dict()['user_id'])
         delay = random.randint(1, 3)
@@ -69,7 +73,9 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     if event.dict()['notice_type'] == 'group_increase':
         if str(event.dict()['user_id']) == bot.self_id:
             msg = '我是来自米诺斯的祭司帕拉斯，会在罗德岛休息一段时间......虽然这么说，我渴望以美酒和戏剧被招待，更渴望走向战场。'
-        else:
+        elif event.dict()['group_id'] in plugin_config.greetings_groups:
             msg: Message = MessageSegment.at(event.dict()['user_id']) + MessageSegment.text(
                 '博士，欢迎加入这盛大的庆典，我是来自米诺斯的祭司帕拉斯......要来一杯美酒么？')
+        else:
+            return False
         await all_notice.finish(msg)
