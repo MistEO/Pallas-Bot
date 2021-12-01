@@ -11,3 +11,4 @@ httpx~=0.21.1
 
 baidu-aip~=2.2.18.0
 apscheduler~=3.8.1
+python-dateutil~=2.8.2
