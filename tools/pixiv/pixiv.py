@@ -8,7 +8,7 @@ class pic:
     artwork: str  # url for show in group
 
 
-async def a60() -> List[pic]:
+async def a60() -> pic:
     url = "http://a60.one:404/"
     async with httpx.AsyncClient() as client:
         res = await client.get(url)
