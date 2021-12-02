@@ -11,7 +11,7 @@ class pic:
 
 async def a60() -> pic:
     url = "http://a60.one:404/"
-    if random.random() > 0.3:
+    if random.random() < 0.3:
         url = 'http://a60.one:404/get/tags/furry?num=1&san=4&only=false&original=false'
     async with httpx.AsyncClient() as client:
         res = await client.get(url)
