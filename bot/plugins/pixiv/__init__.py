@@ -18,8 +18,10 @@ can = on_message(rule=startswith('牛牛涩涩'),
 async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_State):
     s = status.get(event.group_id)
     if s:
-        can.block = True
         p = await a60()
+        if not p:
+            return False
+        can.block = True
         url = f'https://www.pixiv.net/artworks/{p.id}'
         msg: Message = MessageSegment.text(url) + MessageSegment.image(file=p.pic)
         await can.finish(msg)
@@ -40,8 +42,10 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
     match_obj = re.match('牛牛我要看(.+)涩图', event.get_plaintext())
     s = status.get(event.group_id)
     if s and match_obj:
-        tags.block = True
         p = await a60(match_obj.group(1))
+        if not p:
+            return False
+        tags.block = True
         url = f'https://www.pixiv.net/artworks/{p.id}'
         msg: Message = MessageSegment.text(url) + MessageSegment.image(file=p.pic)
         await tags.finish(msg)
