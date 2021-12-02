@@ -8,8 +8,11 @@ class pic:
     artwork: str  # url for show in group
 
 
-async def a60() -> pic:
+async def a60(tags = '') -> pic:
     url = "http://a60.one:404/"
+    if tags:
+        url += 'get/tags/' + tags
+    url += '?only=true'
     async with httpx.AsyncClient() as client:
         res = await client.get(url)
         res = res.json()

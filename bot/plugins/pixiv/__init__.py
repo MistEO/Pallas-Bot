@@ -1,3 +1,5 @@
+import re
+
 from nonebot import on_command , on_message
 from nonebot.adapters.cqhttp import MessageSegment, Message, permission, GroupMessageEvent
 from nonebot.rule import keyword, startswith
@@ -23,6 +25,29 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
         await can.finish(msg)
     else:
         can.block = False
+
+
+tags = on_message(rule=startswith('牛牛我要看'),
+                priority=10,
+                permission=permission.GROUP)
+
+
+@tags.handle()
+async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_State):
+    if '涩图' not in event.get_plaintext():
+        return
+
+    match_obj = re.match('牛牛我要看(.+)涩图', event.get_plaintext())
+    s = status.get(event.group_id)
+    if s and match_obj:
+        tags.block = True
+        p = await a60(match_obj.group(1))
+        url = f'https://www.pixiv.net/artworks/{p.id}'
+        msg: Message = MessageSegment.text(url) + MessageSegment.image(file=p.pic)
+        await tags.finish(msg)
+    else:
+        tags.block = False
+
 
 cannot = on_message(rule=startswith('牛牛涩涩'),
                   priority=17,
