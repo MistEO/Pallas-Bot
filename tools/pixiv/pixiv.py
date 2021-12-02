@@ -1,3 +1,4 @@
+import random
 import httpx
 from typing import List
 
@@ -10,6 +11,8 @@ class pic:
 
 async def a60() -> pic:
     url = "http://a60.one:404/"
+    if random.random() > 0.3:
+        url = 'http://a60.one:404/get/tags/furry?num=1&san=4&only=false&original=false'
     async with httpx.AsyncClient() as client:
         res = await client.get(url)
         res = res.json()
@@ -52,5 +55,6 @@ async def pixivel(page=0) -> List[pic]:
 
 if __name__ == '__main__':
     import asyncio
+
     loop = asyncio.get_event_loop()
     print(loop.run_until_complete(pixivel())[0].__dict__)
