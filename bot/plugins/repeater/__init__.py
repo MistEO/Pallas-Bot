@@ -188,6 +188,9 @@ def reply(bot: Bot, event: Event, state: T_State):
 
         reply_msg = reply_msg[rand_index]
         res = reply_msg.below_raw_msg
+        # 不要一直说同一句话
+        if latest_reply and latest_reply.reply_raw_msg == res:
+            return False
         if 0 < res.count('，') <= 3 and random.randint(1, 10) < 5:
             return res.split('，')
         return res,
