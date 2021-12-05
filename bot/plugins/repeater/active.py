@@ -18,7 +18,7 @@ sched = require('nonebot_plugin_apscheduler').scheduler
 def need_active_send(group):
     # 大半夜的不主动回复
     hour = datetime.datetime.now().hour
-    if hour > 2 and hour < 8:
+    if hour > 1 and hour < 8:
         return False
 
     # 过去24个小时聊的

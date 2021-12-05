@@ -124,6 +124,9 @@ def reply(bot: Bot, event: Event, state: T_State):
         latest_reply = latest_reply[0]
         if time.time() - latest_reply.time < 3:  # 限制发音频率，最多每3秒一次
             return False
+        # 不要一直回复一同个内容
+        if latest_reply.above_raw_msg == raw_msg:
+            return False
 
     rand = random.randint(0, 100)
     if rand < 3:
@@ -188,9 +191,6 @@ def reply(bot: Bot, event: Event, state: T_State):
 
         reply_msg = reply_msg[rand_index]
         res = reply_msg.below_raw_msg
-        # 不要一直说同一句话
-        if latest_reply and latest_reply.reply_raw_msg == res:
-            return False
         if 0 < res.count('，') <= 3 and random.randint(1, 10) < 5:
             return res.split('，')
         return res,
