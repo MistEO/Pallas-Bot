@@ -175,27 +175,30 @@ def reply(bot: Bot, event: Event, state: T_State):
             ContextModel.count >= count_thres
         )  # .order_by(ContextModel.count.desc())
 
-    # 一定概率从别的群直接捞一条（
-    if not reply_msg and random.randint(0, 100) < 5:
+    # 一定概率从别的群捞一条（
+    if random.randint(0, 100) < 5:
         # 纯文本匹配拼音即可，非纯文本需要raw_msg匹配
         if is_pt:
-            reply_msg = ContextModel.select().where(
+            reply_msg += ContextModel.select().where(
+                ContextModel.group != group,
                 ContextModel.above_pinyin_msg == pinyin,
                 ContextModel.count >= count_thres_default
             )  # .order_by(ContextModel.count.desc())
         elif is_img:
             # 屏蔽图片（表情包）后的纯文字回复
-            reply_msg = ContextModel.select().where(
+            reply_msg += ContextModel.select().where(
+                ContextModel.group != group,
                 ContextModel.above_raw_msg == raw_msg,
                 ContextModel.count >= count_thres_default,
                 ContextModel.below_raw_msg.startswith('[CQ:')
             )  # .order_by(ContextModel.count.desc())
         else:
-            reply_msg = ContextModel.select().where(
+            reply_msg += ContextModel.select().where(
+                ContextModel.group != group,
                 ContextModel.above_raw_msg == raw_msg,
                 ContextModel.count >= count_thres_default
             )  # .order_by(ContextModel.count.desc())
-
+    
     if reply_msg:
         # count越大的结果，回复的概率越大
         count_seg = []
