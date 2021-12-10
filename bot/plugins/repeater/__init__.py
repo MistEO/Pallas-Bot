@@ -3,6 +3,7 @@ import random
 import time
 import re
 import asyncio
+from collections import defaultdict
 
 from nonebot import on_message
 from nonebot.typing import T_State
@@ -155,50 +156,37 @@ def reply(bot: Bot, event: Event, state: T_State):
 
     # 纯文本匹配拼音即可，非纯文本需要raw_msg匹配
     if is_pt:
-        reply_msg = ContextModel.select().where(
-            ContextModel.group == group,
+        all_context = ContextModel.select().where(
             ContextModel.above_pinyin_msg == pinyin,
             ContextModel.count >= count_thres
         )  # .order_by(ContextModel.count.desc())
     elif is_img:
         # 屏蔽图片（表情包）后的纯文字回复
-        reply_msg = ContextModel.select().where(
-            ContextModel.group == group,
+        all_context = ContextModel.select().where(
             ContextModel.above_raw_msg == raw_msg,
             ContextModel.count >= count_thres,
             ContextModel.below_raw_msg.startswith('[CQ:')
         )  # .order_by(ContextModel.count.desc())
     else:
-        reply_msg = ContextModel.select().where(
-            ContextModel.group == group,
+        all_context = ContextModel.select().where(
             ContextModel.above_raw_msg == raw_msg,
             ContextModel.count >= count_thres
         )  # .order_by(ContextModel.count.desc())
 
-    # 一定概率从别的群捞一条（
-    if random.randint(0, 100) < 5:
-        # 纯文本匹配拼音即可，非纯文本需要raw_msg匹配
-        if is_pt:
-            reply_msg += ContextModel.select().where(
-                ContextModel.group != group,
-                ContextModel.above_pinyin_msg == pinyin,
-                ContextModel.count >= count_thres_default
-            )  # .order_by(ContextModel.count.desc())
-        elif is_img:
-            # 屏蔽图片（表情包）后的纯文字回复
-            reply_msg += ContextModel.select().where(
-                ContextModel.group != group,
-                ContextModel.above_raw_msg == raw_msg,
-                ContextModel.count >= count_thres_default,
-                ContextModel.below_raw_msg.startswith('[CQ:')
-            )  # .order_by(ContextModel.count.desc())
+    reply_msg = []
+    general_dict = defaultdict(int)
+    for item in all_context:
+        if item.group == group:
+            reply_msg.append(item)
+        elif '[CQ:reply,' in item.below_raw_msg or '[CQ:at,' in item.below_raw_msg:
+            continue
         else:
-            reply_msg += ContextModel.select().where(
-                ContextModel.group != group,
-                ContextModel.above_raw_msg == raw_msg,
-                ContextModel.count >= count_thres_default
-            )  # .order_by(ContextModel.count.desc())
-    
+            general_dict[item.below_raw_msg] += 1
+            count = general_dict[item.below_raw_msg]
+            if count == 2:
+                reply_msg.append(item)
+
+
     if reply_msg:
         # count越大的结果，回复的概率越大
         count_seg = []
