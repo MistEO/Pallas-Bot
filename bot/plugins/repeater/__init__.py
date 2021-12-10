@@ -57,7 +57,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
             ContextModel.below_raw_msg.contains(will_ban.reply_raw_msg)
         ).execute()
         to_me_msg.block = True
-        await to_me_msg.finish('纵使人类的战争没尽头......在这一刻，我们守护住了自己生的尊严。离开吧。但要昂首挺胸。')
+        await to_me_msg.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
     else:
         to_me_msg.block = False
 

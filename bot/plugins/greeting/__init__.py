@@ -65,12 +65,13 @@ plugin_config = Config(**global_config.dict())
 
 @all_notice.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
-    if event.dict()['notice_type'] == 'notify' and event.dict()['sub_type'] == 'poke' and str(event.dict()['target_id']) == bot.self_id:
+    notice_type = event.dict()['notice_type']
+    if notice_type == 'notify' and event.dict()['sub_type'] == 'poke' and str(event.dict()['target_id']) == bot.self_id:
         poke_msg: str = '[CQ:poke,qq={}]'.format(event.dict()['user_id'])
         delay = random.randint(1, 3)
         await asyncio.sleep(delay)
         await all_notice.finish(Message(poke_msg))
-    if event.dict()['notice_type'] == 'group_increase':
+    elif notice_type == 'group_increase':
         if str(event.dict()['user_id']) == bot.self_id:
             msg = '我是来自米诺斯的祭司帕拉斯，会在罗德岛休息一段时间......虽然这么说，我渴望以美酒和戏剧被招待，更渴望走向战场。'
         elif event.dict()['group_id'] in plugin_config.greeting_groups:
@@ -79,3 +80,5 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
         else:
             return False
         await all_notice.finish(msg)
+    elif notice_type == 'group_admin' and event.dict()['sub_type'] == 'set' and str(event.dict()['user_id']) == bot.self_id:
+        await all_notice.finish('担任助理？和十二英雄殿里的祭司职责相似的话，我应该能做好吧。')
