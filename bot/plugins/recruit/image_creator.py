@@ -28,7 +28,7 @@ def create_recruit_image(recruit_info):
             r = op[1] + 1
             if r != last_r:
                 stars = ''
-                for i in range(r + 1):
+                for i in range(r):
                     stars += '★'
                 text += '\n['
                 if r == 6:
