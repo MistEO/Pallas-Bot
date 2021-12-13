@@ -1,45 +1,40 @@
 import asyncio
-import numpy as np
-import paddleocr.paddleocr as pocr
 
+import nonebot
+from .config import Config
+
+from aip import AipOcr
 from PIL import Image
 from io import BytesIO
-from pathlib import Path
-from typing import Union
-from loguru import logger
 
-
-paddleocr_file = Path(pocr.__file__).read_text()
-if "# print(params)" not in paddleocr_file:
-    logger.warning("paddleocr.paddleocr.__file__ fixed")
-    Path(pocr.__file__).write_text(
-        paddleocr_file.replace("print(params)", "# print(params)")
-    )
-
-ocr_core = pocr.PaddleOCR(lang="ch", show_log=False, use_mp=True, use_angle_cls=False)
-
+global_config = nonebot.get_driver().config
+plugin_config = Config(**global_config.dict())
 
 class OCR:
-    def __init__(self, image_data: Union[bytes, Image.Image, np.ndarray, Path, str]):
-        self.image_data = image_data
+    def __init__(self, image_url: str):
+        self.image_url = image_url
 
-    async def ocr(self, detail=False):
+    def ocr(self):
 
-        if isinstance(self.image_data, Image.Image):
-            img: np.ndarray = (
-                self.image_data.convert("RGB").__array__()
-            )
-        elif isinstance(self.image_data, np.ndarray):
-            img = self.image_data
-        elif isinstance(self.image_data, Path) or isinstance(self.image_data, str):
-            img = Image.open(self.image_data).convert("RGB").__array__()
-        elif isinstance(self.image_data, bytes):
-            img = Image.open(BytesIO(self.image_data)).convert("RGB").__array__()
-        else:
-            raise TypeError(
-                "image_data must be bytes, Image.Image, np.ndarray, Path, or str"
-            )
+        if not plugin_config.recruitSwitch:
+            return []
+        """ 你的 APPID AK SK """
+        APP_ID = plugin_config.APP_ID
+        API_KEY = plugin_config.API_KEY
+        SECRET_KEY = plugin_config.SECRET_KEY
+        client = AipOcr(APP_ID, API_KEY, SECRET_KEY)
 
-        result = ocr_core.ocr(img, cls=False)
+        options = {}
+        options["language_type"] = "CHN_ENG"
+        options["detect_direction"] = "true"
+        options["detect_language"] = "false"
+        options["probability"] = "true"
+        response = client.basicGeneralUrl(self.image_url, options)
+        print(response)
 
-        return result if detail else [r[-1][0] for r in result]
+        res = []
+        for words in response["words_result"]:
+            res.append(words["words"])
+
+        return res
+

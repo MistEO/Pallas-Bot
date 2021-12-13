@@ -28,8 +28,9 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
     cost = 0
     for msg in event.dict()['message']:
         if(msg['type'] == 'image'):
+            url = msg['data']['url']
             async with httpx.AsyncClient() as client:
-                response = await client.get(msg['data']['url'])
+                response = await client.get(url)
             start_time = time.time()
             image = Image.open(BytesIO(response.content))
             hash_value = dhash.dhash_int(image)
@@ -37,8 +38,8 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
             cost += (time.time() - start_time)
             reply_msg += f'dHash diff: {diff}\n'
             if diff <= hash_diff_thres:
-                ocr = OCR(image)
-                ocr_result = await ocr.ocr()
+                ocr = OCR(url)
+                ocr_result = ocr.ocr()
                 print(ocr_result)
                 recruit_res = calculate_recruit(ocr_result)
                 if recruit_res:

@@ -98,7 +98,7 @@ def doTextAnalyse(msg:str()):
   client = AipNlp(APP_ID, API_KEY, SECRET_KEY)
   text = msg
   """ 调用对话情绪识别接口 """
-  client.emotion(text)
+#   client.emotion(text)
   """ 如果有可选参数 """
   options = {}
   # options["scene"] = "talk"
