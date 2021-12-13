@@ -6,7 +6,7 @@ from nonebot.rule import keyword, startswith
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 
-from tools.pixiv.pixiv import a60
+from .pixiv import a60
 
 status = {}
 
