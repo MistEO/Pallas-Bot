@@ -1,12 +1,10 @@
 import dhash
-import time
 import httpx
 from PIL import Image
 from io import BytesIO
 
-from nonebot import on_command, on_message
+from nonebot import on_message, logger
 from nonebot.adapters.cqhttp import MessageSegment, Message, permission, GroupMessageEvent
-from nonebot.rule import keyword, startswith
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 
@@ -24,23 +22,20 @@ hash_diff_thres = 50
 
 @hello.handle()
 async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_State):
-    reply_msg = ''
-    cost = 0
     for msg in event.dict()['message']:
         if(msg['type'] == 'image'):
             url = msg['data']['url']
             async with httpx.AsyncClient() as client:
                 response = await client.get(url)
-            start_time = time.time()
             image = Image.open(BytesIO(response.content))
             hash_value = dhash.dhash_int(image)
             diff = dhash.get_num_bits_different(hash_value, hash_templ)
-            cost += (time.time() - start_time)
-            reply_msg += f'dHash diff: {diff}\n'
+            logger.info(f'dHash diff: {diff}')
+            
             if diff <= hash_diff_thres:
                 ocr = OCR(url)
                 ocr_result = ocr.ocr()
-                print(ocr_result)
+                logger.info('ocr 结果', ocr_result)
                 recruit_res = calculate_recruit(ocr_result)
                 if recruit_res:
                     hello.block = True
