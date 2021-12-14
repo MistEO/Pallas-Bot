@@ -17,7 +17,7 @@ hello = on_message(priority=10,
 
 # 某张公招界面截图的hash
 hash_templ = 298539435919003337906396405361402448896
-hash_diff_thres = 50
+hash_diff_thres = 40
 
 
 @hello.handle()

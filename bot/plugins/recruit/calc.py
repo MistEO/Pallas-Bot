@@ -63,4 +63,4 @@ def calculate_tags(tags):
         operator_for_tags[tags] = ops
     items = list(operator_for_tags.items())
     combs = [(tags, ops, _rank(ops)) for tags, ops in items]
-    return sorted(combs, key=lambda x: x[2], reverse=True)
+    return sorted(combs, key=lambda x: (x[2], -len(x[1])), reverse=True)

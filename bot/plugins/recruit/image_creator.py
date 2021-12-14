@@ -13,14 +13,13 @@ def create_recruit_image(recruit_info):
             continue
         rank += 3
         
-        star_text = '['
+        star_text = '[cl ['
         for tag in tags:
             star_text += ' ' + tag + ' '
-        star_text += ']  ' + (str)(rank) + ' ★'
+        star_text += ']  ' + (str)(rank) + ' ★@#174CC6 cle]'
 
-        text += '\n\n\n'
+        text += '\n\n'
         text += star_text
-        text += '\n'
 
         last_r = 0
         for op in operators:
@@ -30,29 +29,29 @@ def create_recruit_image(recruit_info):
                 stars = ''
                 for i in range(r):
                     stars += '★'
-                text += '\n['
+                text += '\n\n['
                 if r == 6:
-                    text += f'[cl {stars}@#FF4500 cle]'
+                    text += f'[cl {stars}@#FF4343 cle]'
                 elif r == 5:
-                    text += f'[cl {stars}@#FFD700 cle]'
+                    text += f'[cl {stars}@#FEA63A cle]'
                 elif r == 4:
-                    text += f'[cl {stars}@#9400D3 cle]'
+                    text += f'[cl {stars}@#A288B5 cle]'
                 else:
                     text += stars
 
                 text += '] '
             last_r = r
             text += ' ' + name + ' '
-
+        text += '\n\n'
     print(text)
     if not len(text):
         return False
 
-    return create_image('伟大的战士们啊，我会在你们身边，与你们一同奋勇搏杀。' + text)
+    return create_image('伟大的战士们啊，我会在你们身边，与你们一同奋勇搏杀。\n' + text)
 
 
 class TextParser:
-    def __init__(self, text: str, color='#000000', font_size=18, max_seat=560):
+    def __init__(self, text: str, color='#000000', font_size=16, max_seat=560):
         self.font = ImageFont.truetype(font_file, font_size)
         self.text = text
         self.color = color
@@ -133,7 +132,7 @@ line_height = 16
 side_padding = 10
 
 
-def create_image(text: str, images=None, font_size=18):
+def create_image(text: str, images=None, font_size=16):
     text = TextParser(text, font_size=font_size)
 
     height = text.line + 2
