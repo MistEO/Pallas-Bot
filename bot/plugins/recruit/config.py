@@ -2,7 +2,7 @@ from pydantic import BaseSettings
 
 
 class Config(BaseSettings):
-    recruitSwitch = False
+    baiduApiSwitch = False
     APP_ID = ''
     API_KEY = ''
     SECRET_KEY = ''

@@ -17,6 +17,8 @@ def calculate_recruit(ocr_result):
     for i in ocr_result:
         if i in known_tags:
             tags.append(i)
+        elif '击干员' in i:
+            tags.append('狙击干员')
 
     if len(tags) == 5:
         return calculate_tags(tags)

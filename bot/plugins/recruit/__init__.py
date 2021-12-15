@@ -33,9 +33,9 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
             logger.info(f'dHash diff: {diff}')
             
             if diff <= hash_diff_thres:
-                ocr = OCR(url)
+                ocr = OCR(response.content)
                 ocr_result = ocr.ocr()
-                logger.info('ocr 结果', ocr_result)
+                # logger.info('ocr result', ocr_result)
                 recruit_res = calculate_recruit(ocr_result)
                 if recruit_res:
                     hello.block = True
