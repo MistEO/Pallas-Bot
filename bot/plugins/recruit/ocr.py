@@ -42,9 +42,10 @@ class OCR:
             options["detect_language"] = "false"
             options["probability"] = "true"
 
-            with client.basicAccurate(self.image_data, options) as response:
-                print('basicAccurate', response)
+            response = client.basicAccurate(self.image_data, options)
+            print('basicAccurate', response)
 
+            if ("words_result" in response):
                 res = []
                 for words in response["words_result"]:
                     res.append(words["words"])
@@ -52,9 +53,9 @@ class OCR:
                 if len(res):
                     return res
 
-            with client.basicGeneral(self.image_data, options) as response:
-                print('basicGeneral', response)
-
+            response = client.basicGeneral(self.image_data, options)
+            print('basicGeneral', response)
+            if ("words_result" in response):
                 res = []
                 for words in response["words_result"]:
                     res.append(words["words"])
