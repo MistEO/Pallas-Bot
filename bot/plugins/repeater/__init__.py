@@ -130,7 +130,7 @@ def reply(bot: Bot, event: Event, state: T_State):
             return False
 
     rand = random.randint(0, 100)
-    if rand < 2:
+    if rand < 0:
         count_thres = count_thres_default - 1
     elif rand < 60:
         count_thres = count_thres_default
