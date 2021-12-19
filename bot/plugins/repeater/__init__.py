@@ -128,6 +128,9 @@ def reply(bot: Bot, event: Event, state: T_State):
         # 不要一直回复一同个内容
         if latest_reply.above_raw_msg == raw_msg:
             return False
+        # 说明有人复读了牛牛的回复，不继续回复
+        if latest_reply.reply_raw_msg == raw_msg:
+            return False
 
     rand = random.randint(0, 100)
     if rand < 0:
