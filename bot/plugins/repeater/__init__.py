@@ -126,8 +126,8 @@ def reply(bot: Bot, event: Event, state: T_State):
         if time.time() - latest_reply.time < 3:  # 限制发音频率，最多每3秒一次
             return False
         # 不要一直回复一同个内容
-        if latest_reply.above_raw_msg == raw_msg:
-            return False
+        # if latest_reply.above_raw_msg == raw_msg:
+        #     return False
         # 说明有人复读了牛牛的回复，不继续回复
         if latest_reply.reply_raw_msg == raw_msg:
             return False
