@@ -2,7 +2,7 @@ import re
 
 from nonebot import on_message
 from nonebot.adapters.cqhttp import MessageSegment, Message, permission, GroupMessageEvent
-from nonebot.rule import keyword, startswith
+from nonebot.rule import keyword, startswith, endswith
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 from peewee import fn
@@ -84,7 +84,7 @@ async def pick_bottle(bot: Bot, event: GroupMessageEvent, state: T_State):
         await drift.finish('米诺斯的十二英雄最伟大的一点是——他们无一例外，成为英雄以后，又再次变回了质朴的，最普通的人。')
 
 
-throw_back = on_message(rule=keyword("扔回去", "丢回去"),
+throw_back = on_message(rule=endswith("扔回去", "丢回去"),
                         priority=10,
                         block=False,
                         permission=permission.GROUP)
@@ -108,6 +108,13 @@ async def handle_throw_back(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     lastest_pick = lastest_pick[0]
     if cur_time - lastest_pick.time > 300:  # 上一次捞瓶子是5分钟前了，那就忽略
+        throw_back.block = False
+        return False
+
+    lastest_bottle = Drift.select().where(
+        Drift.drift_id == lastest_pick.drift_id
+    )
+    if lastest_bottle and not lastest_bottle[0].is_picked:  # 说明已经扔回去过了
         throw_back.block = False
         return False
 
