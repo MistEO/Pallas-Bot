@@ -41,14 +41,17 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
 
     match_obj = re.match('牛牛我要看(.+)涩图', event.get_plaintext())
     s = status.get(event.group_id)
-    if s and match_obj:
-        p = await a60(match_obj.group(1))
-        if not p:
-            return False
-        tags.block = True
-        url = f'https://www.pixiv.net/artworks/{p.id}'
-        msg: Message = MessageSegment.text(url) + MessageSegment.image(file=p.pic)
-        await tags.finish(msg)
+    if match_obj:
+        if s:
+            p = await a60(match_obj.group(1))
+            if not p:
+                return False
+            tags.block = True
+            url = f'https://www.pixiv.net/artworks/{p.id}'
+            msg: Message = MessageSegment.text(url) + MessageSegment.image(file=p.pic)
+            await tags.finish(msg)
+        else:
+            await tags.finish("听啊，悲鸣停止了。这是幸福的和平到来前的宁静。")
     else:
         tags.block = False
 
@@ -63,7 +66,6 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
     s = status.get(event.group_id)
     if not s:
         cannot.block = True
-        await cannot.finish("听啊，悲鸣停止了。这是幸福的和平到来前的宁静。")
     else:
         cannot.block = False
 
