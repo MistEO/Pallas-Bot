@@ -8,7 +8,7 @@ help = on_command("help", aliases={'Help', '帮助', '牛牛帮助', '帕拉斯�
 
 @help.handle()
 async def _(bot: Bot, event: GroupMessageEvent):
-    if status.get(event.group_id): 
+    if status.get(event.group_id, True):
         await help.send(
 r'''保佑胜利的英雄，我将领受你们的祝福。
 呼喊[牛牛/帕拉斯]，聆听我的呼唤。
@@ -31,8 +31,8 @@ help_mode_switch = on_command(
 
 @help_mode_switch.handle()
 async def _(bot: Bot, event: GroupMessageEvent):
-    s = event.get_plaintext()
-    if '关掉' in s:
+    msg = event.dict()['raw_message']
+    if '关掉' in msg:
         status[event.group_id] = False
         await help_mode_switch.finish("现在可没有后悔的余地了。")
     else:
