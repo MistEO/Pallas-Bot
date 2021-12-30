@@ -82,3 +82,5 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
         await all_notice.finish(msg)
     elif notice_type == 'group_admin' and event.dict()['sub_type'] == 'set' and str(event.dict()['user_id']) == bot.self_id:
         await all_notice.finish('担任助理？和十二英雄殿里的祭司职责相似的话，我应该能做好吧。')
+    elif notice_type == 'friend_add':
+        await all_notice.finish('我是......追随英雄们意志的信仰者。我的武器不得钝锈，它将被用来对抗不公和残暴。我的谦卑不得遗忘，它将使我不忘救济的使命。')

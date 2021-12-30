@@ -22,7 +22,6 @@ async def handle_request(bot: Bot, event: Union[GroupRequestEvent, FriendRequest
         )
         nonebot.logger.info("同意加入群聊: {}", event. group_id)
     elif isinstance(event, FriendRequestEvent):
-        nonebot.logger.info("属于私有")
         await bot.set_friend_add_request(
             flag=event.flag,
             approve=True,
