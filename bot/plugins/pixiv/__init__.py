@@ -43,10 +43,11 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
     s = status.get(event.group_id)
     if match_obj:
         if s:
+            tags.block = True
             p = await a60(match_obj.group(1))
             if not p:
-                return False
-            tags.block = True
+                await tags.finish("呃......咳嗯，下次不能喝、喝这么多了......呀，博士。你今天走起路来，怎么看着摇摇晃晃的？")
+                return
             url = f'https://www.pixiv.net/artworks/{p.id}'
             msg: Message = MessageSegment.text(url) + MessageSegment.image(file=p.pic)
             await tags.finish(msg)
