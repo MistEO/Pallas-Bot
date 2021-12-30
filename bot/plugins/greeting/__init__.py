@@ -48,7 +48,7 @@ to_me_cmd = on_message(
 
 @to_me_cmd.handle()
 async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_State):
-    print(event.dict())
+    # print(event.dict())
     if len(event.get_plaintext().strip()) == 0 and not event.dict()['reply']:
         msg: Message = MessageSegment.record(file=Path(get_voice()))
         await to_me_cmd.finish(msg)
