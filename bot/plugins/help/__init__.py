@@ -3,38 +3,39 @@ from nonebot.adapters.cqhttp import Bot, GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.cqhttp.permission import GROUP_ADMIN, GROUP_OWNER
 
 status = {}
+help_text = r'''“战争女神”的故事经历，就交给前赴后继渴望解放的人们好好使用吧！
 
-help = on_command("help", aliases={'Help', '帮助', '牛牛帮助', '帕拉斯帮助'})
+「漂流瓶」的命运是被传承，还是就此遗弃呢；
+「涩图」是幸福的和平到来前的宁静；
+「公招图片」里伟大的战士们啊，我会在你们身边，与你们一同奋勇搏杀。
+
+而我所拥有的，不过是这染病的身体，和不会改变的信仰。
+'''
+
+
+help = on_command("牛牛帮助", aliases={'牛牛功能', '帕拉斯帮助', '帕拉斯功能'})
 
 @help.handle()
 async def _(bot: Bot, event: GroupMessageEvent):
     if status.get(event.group_id, True):
-        await help.send(
-r'''保佑胜利的英雄，我将领受你们的祝福。
-呼喊[牛牛/帕拉斯]，聆听我的呼唤。
-[(牛牛/帕拉斯)(扔/丢)(瓶子/漂流瓶)]，是你的信念；
-[(牛牛/帕拉斯)(捡/捞)(瓶子/漂流瓶)]，是你的渴望；
-[(扔/丢)回去]，是你的宽慰。
-当时机成熟时，[牛牛涩涩/牛牛我要看...涩图]，能够体会至高的荣誉和幸福。
-提供{公招图片}，我们将带着胜利归来。'''
-)
+        await help.finish(help_text)
 
 @help.handle()
 async def _(bot: Bot, event: PrivateMessageEvent):
-    await help.send("可爱")
+    await help.finish(help_text)
 
 
 help_mode_switch = on_command(
-    "牛牛开启帮助", aliases={"牛牛关掉帮助"},
+    "牛牛开启帮助", aliases={"牛牛关闭帮助"},
     permission=GROUP_ADMIN|GROUP_OWNER
 )
 
 @help_mode_switch.handle()
 async def _(bot: Bot, event: GroupMessageEvent):
     msg = event.dict()['raw_message']
-    if '关掉' in msg:
+    if '关闭' in msg:
         status[event.group_id] = False
-        await help_mode_switch.finish("现在可没有后悔的余地了。")
+        await help_mode_switch.finish("承受长期的悲痛以至于麻木，可怜的被压迫的人们，如果心中没有希望，是无法燃烧起怒火的。")
     else:
         status[event.group_id] = True
-        await help_mode_switch.finish("欢呼吧！")
+        await help_mode_switch.finish("人们若向往成为勇士，需要一份信仰，一点星火，一处滥觞。")
