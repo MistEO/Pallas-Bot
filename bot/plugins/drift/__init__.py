@@ -85,7 +85,7 @@ async def pick_bottle(bot: Bot, event: GroupMessageEvent, state: T_State):
 
         await drift.finish(Message('比起所谓的真实，我更希望它是作为故事慢慢流传：\n' + bottle.content))
     else:
-        await drift.finish('米诺斯的十二英雄最伟大的一点是——他们无一例外，成为英雄以后，又再次变回了质朴的，最普通的人。')
+        await drift.finish('他们无一例外，成为英雄以后，又再次变回了质朴的，最普通的人。')
 
 
 async def throw_back_match(bot: "Bot", event: "Event", state: T_State) -> bool:
