@@ -306,7 +306,9 @@ def is_plain_text(event: Event):
     msg = event.dict()['message']
     if len(msg) == 1:
         if msg[0]['type'] == 'text':
-            return True
+            pt = event.get_plaintext()
+            if len(pt) and '[CQ:' not in pt:
+                return True
 
     return False
 
