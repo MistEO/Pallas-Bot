@@ -19,6 +19,10 @@ def calculate_recruit(ocr_result):
             tags.append(i)
         elif '击干员' in i:
             tags.append('狙击干员')
+        elif '高级资深' in i:
+            tags.append('高级资深干员')
+        elif '资深' in i:
+            tags.append('资深干员')
 
     if len(tags) == 5:
         return calculate_tags(tags)
