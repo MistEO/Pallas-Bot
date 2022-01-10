@@ -42,25 +42,19 @@ class OCR:
             options["detect_language"] = "false"
             options["probability"] = "true"
 
-            response = client.basicAccurate(self.image_data, options)
-            print('basicAccurate', response)
+            requeset_list = [client.basicAccurate, client.accurate, client.webImage, client.basicGeneral, client.general, ]
 
-            if ("words_result" in response):
-                res = []
-                for words in response["words_result"]:
-                    res.append(words["words"])
+            for method in requeset_list:
+                response = method(self.image_data, options)
+                print(method, response)
 
-                if len(res):
-                    return res
+                if ("words_result" in response):
+                    res = []
+                    for words in response["words_result"]:
+                        res.append(words["words"])
 
-            response = client.basicGeneral(self.image_data, options)
-            print('basicGeneral', response)
-            if ("words_result" in response):
-                res = []
-                for words in response["words_result"]:
-                    res.append(words["words"])
-
-                return res
+                    if len(res):
+                        return res
 
         img = Image.open(BytesIO(self.image_data)).convert("RGB").__array__()
         result = ocr_core.ocr(img, cls=False)
