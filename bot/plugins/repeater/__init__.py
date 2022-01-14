@@ -294,6 +294,13 @@ def update_context(pre_msg: MessageModel, cur_event: Event):
     if pre_msg.raw_msg == raw_msg:
         return
 
+    # 刚说完话一分钟内不学新东西，不然容易乱
+    latest_reply = ReplyModel.select().where(
+        ReplyModel.group == group
+    ).order_by(ReplyModel.time.desc()).limit(1)
+    if latest_reply and time.time() - latest_reply[0].time < 60:
+        return
+
     # 如果有反过来的，直接退出，说明可能是两句话在轮流复读。只取正向的（先达到阈值的）
     reverse = ContextModel.select().where(
         ContextModel.group == group,
