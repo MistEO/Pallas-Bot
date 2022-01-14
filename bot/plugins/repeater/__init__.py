@@ -3,7 +3,9 @@ import random
 import time
 import re
 import asyncio
+import jieba
 from collections import defaultdict
+from peewee import Value
 
 from nonebot import on_message
 from nonebot.typing import T_State
@@ -189,6 +191,24 @@ def reply(bot: Bot, event: Event, state: T_State):
             if count == 2:
                 reply_msg.append(item)
 
+    if not reply_msg and is_pt:
+        seg_list = []
+        for seg in jieba.cut(pt):
+            if len(seg) > 1:
+                seg_list.append(text_to_pinyin(seg))
+
+        if len(seg_list) < 2:
+            return False
+        conds = TRUE_condition()
+        for seg in random.sample(set(seg_list), 2):
+            conds &= (ContextModel.above_pinyin_msg.contains(seg))
+
+        all_context = ContextModel.select().where(
+            ContextModel.count >= count_thres,
+            ContextModel.group == group,
+            conds
+            )  # .order_by(ContextModel.count.desc())
+        reply_msg = all_context
 
     if reply_msg:
         # count越大的结果，回复的概率越大
@@ -323,3 +343,6 @@ def is_image(event: Event):
 def text_to_pinyin(text: str):
     return ''.join([item[0] for item in pypinyin.pinyin(
         text, style=pypinyin.NORMAL, errors='default')]).lower()
+
+def TRUE_condition():
+   return (Value(1) == Value(1))
