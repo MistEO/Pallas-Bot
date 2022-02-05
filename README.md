@@ -9,3 +9,8 @@
 3. clone 本仓库，并安装 requirements
 4. 部分 [插件](bot/plugins) 需要额外安装依赖或配置，请自行查阅对应的 README ~
 5. run your bot using `nb run` .
+
+## QQ群
+
+舟舟群：684479866  
+开发者群：852191455
