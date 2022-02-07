@@ -32,6 +32,8 @@ to_me_msg = on_message(
     permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
 )
 
+reply_dict = {}
+
 
 @to_me_msg.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
@@ -76,27 +78,35 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     event_dict = event.dict()
 
     group = event_dict['group_id']
+
     # user = event_dict['user_id']
     raw_msg = event_dict['raw_message'].strip()
     raw_msg = re.sub(image_pattern, '', raw_msg)
     # is_pt = is_plain_text(event)
     pt = event.get_plaintext()
     # pinyin = text_to_pinyin(pt)
-    # cur_time = event_dict['time']
+    cur_time = event_dict['time']
 
-    rep = reply(bot, event, state)
+    # 缓解牛牛服务器压力，回复过后十秒内所有消息全部无视
+    if group in reply_dict and time.time() - reply_dict[group] > 10:
+        pass
+    else:
+        rep = reply(bot, event, state)
+
     record(bot, event, state)
 
     if rep:
         any_msg.block = True
         delay = random.randint(2, 5)
         for item in rep:
+            cur_time_and_delay = cur_time + delay
+            reply_dict[group] = cur_time_and_delay
             ReplyModel.insert(
                 group=group,
                 is_proactive=False,
                 above_raw_msg=raw_msg,
                 reply_raw_msg=item,
-                time=time.time() + delay
+                time=cur_time_and_delay
             ).execute()
             await asyncio.sleep(delay)
             delay = random.randint(1, 3)
@@ -117,7 +127,7 @@ def reply(bot: Bot, event: Event, state: T_State):
     is_img = is_image(event)
     pt = event.get_plaintext()
     pinyin = text_to_pinyin(pt)
-    # cur_time = event_dict['time']
+    cur_time = event_dict['time']
 
     # 不回复太短的对话，大部分是“？”、“草”
     if is_pt and len(pt) < 2:
@@ -128,7 +138,7 @@ def reply(bot: Bot, event: Event, state: T_State):
     ).order_by(ReplyModel.time.desc()).limit(1)
     if latest_reply:
         latest_reply = latest_reply[0]
-        if time.time() - latest_reply.time < 3:  # 限制发音频率，最多每3秒一次
+        if cur_time - latest_reply.time < 10:  # 限制发音频率，最多每10秒一次
             return False
         # 不要一直回复一同个内容
         # if latest_reply.above_raw_msg == raw_msg:
