@@ -3,7 +3,7 @@ import random
 import time
 import re
 import asyncio
-import jieba
+import jieba.analyse
 from collections import defaultdict
 from peewee import Value
 
@@ -76,13 +76,13 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     event_dict = event.dict()
 
     group = event_dict['group_id']
-    user = event_dict['user_id']
+    # user = event_dict['user_id']
     raw_msg = event_dict['raw_message'].strip()
     raw_msg = re.sub(image_pattern, '', raw_msg)
-    is_pt = is_plain_text(event)
+    # is_pt = is_plain_text(event)
     pt = event.get_plaintext()
-    pinyin = text_to_pinyin(pt)
-    cur_time = event_dict['time']
+    # pinyin = text_to_pinyin(pt)
+    # cur_time = event_dict['time']
 
     rep = reply(bot, event, state)
     record(bot, event, state)
@@ -110,14 +110,14 @@ def reply(bot: Bot, event: Event, state: T_State):
     event_dict = event.dict()
 
     group = event_dict['group_id']
-    user = event_dict['user_id']
+    # user = event_dict['user_id']
     raw_msg = event_dict['raw_message'].strip()
     raw_msg = re.sub(image_pattern, '', raw_msg)
     is_pt = is_plain_text(event)
     is_img = is_image(event)
     pt = event.get_plaintext()
     pinyin = text_to_pinyin(pt)
-    cur_time = event_dict['time']
+    # cur_time = event_dict['time']
 
     # 不回复太短的对话，大部分是“？”、“草”
     if is_pt and len(pt) < 2:
@@ -195,23 +195,21 @@ def reply(bot: Bot, event: Event, state: T_State):
                 reply_msg.append(item)
 
     if not reply_msg and is_pt:
-        seg_list = []
-        for seg in jieba.cut(pt):
-            if len(seg) > 1:
-                seg_list.append(text_to_pinyin(seg))
+        seg_str = '%'
+        for seg in jieba.analyse.extract_tags(pt, topK=20):
+            seg_str += text_to_pinyin(seg) + '%'
 
-        if len(seg_list) < 2:
+        print(seg_str)
+        if len(seg_str) < 3:
             return False
-        conds = TRUE_condition()
-        for seg in random.sample(set(seg_list), 2):
-            conds &= (ContextModel.above_pinyin_msg.contains(seg))
 
         all_context = ContextModel.select().where(
             ContextModel.count >= count_thres,
             ContextModel.group == group,
-            conds
+            ( ContextModel.above_pinyin_msg ** seg_str)
             )  # .order_by(ContextModel.count.desc())
         reply_msg = all_context
+        print(reply_msg)
 
     if reply_msg:
         # count越大的结果，回复的概率越大
