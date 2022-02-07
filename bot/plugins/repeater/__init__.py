@@ -3,7 +3,7 @@ import random
 import time
 import re
 import asyncio
-import jieba.analyse
+import jieba_fast.analyse
 from collections import defaultdict
 from peewee import Value
 
@@ -207,7 +207,7 @@ def reply(bot: Bot, event: Event, state: T_State):
     if not reply_msg and is_pt and random.randint(0, 100) < 30:
         seg_list = []
         seg_len = 2
-        for seg in jieba.analyse.extract_tags(pt, topK=seg_len):
+        for seg in jieba_fast.analyse.extract_tags(pt, topK=seg_len):
             seg_list.append(text_to_pinyin(seg))
 
         if len(seg_list) != seg_len:
