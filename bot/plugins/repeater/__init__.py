@@ -204,18 +204,22 @@ def reply(bot: Bot, event: Event, state: T_State):
             if count == count_thres_default: # count 个群友相同的回复，就作为全局回复
                 reply_msg.append(item)
 
-    if not reply_msg and is_pt:
-        seg_str = '%'
-        for seg in jieba.analyse.extract_tags(pt, topK=20):
-            seg_str += text_to_pinyin(seg) + '%'
+    if not reply_msg and is_pt and random.randint(0, 100) < 30:
+        seg_list = []
+        seg_len = 2
+        for seg in jieba.analyse.extract_tags(pt, topK=seg_len):
+            seg_list.append(text_to_pinyin(seg))
 
-        if len(seg_str) < 3:
+        if len(seg_list) != seg_len:
             return False
+        conds = TRUE_condition()
+        for seg in seg_list:
+            conds &= (ContextModel.above_pinyin_msg.contains(seg))
 
         all_context = ContextModel.select().where(
             ContextModel.count >= count_thres,
             ContextModel.group == group,
-            ( ContextModel.above_pinyin_msg ** seg_str)
+            conds
             )  # .order_by(ContextModel.count.desc())
         reply_msg = all_context
 
