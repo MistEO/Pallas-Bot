@@ -37,7 +37,6 @@ reply_dict = {}
 
 @to_me_msg.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
-    print('enter')
     if '[CQ:reply,' not in event.dict()['raw_message']:
         return False
     reply_msg = event.dict()['reply']['message'][0]
@@ -89,7 +88,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
 
     # 缓解牛牛服务器压力，回复过后十秒内所有消息全部无视
     if group in reply_dict and time.time() - reply_dict[group] > 10:
-        pass
+        rep = False
     else:
         rep = reply(bot, event, state)
 
@@ -209,7 +208,6 @@ def reply(bot: Bot, event: Event, state: T_State):
         for seg in jieba.analyse.extract_tags(pt, topK=20):
             seg_str += text_to_pinyin(seg) + '%'
 
-        print(seg_str)
         if len(seg_str) < 3:
             return False
 
@@ -219,7 +217,6 @@ def reply(bot: Bot, event: Event, state: T_State):
             ( ContextModel.above_pinyin_msg ** seg_str)
             )  # .order_by(ContextModel.count.desc())
         reply_msg = all_context
-        print(reply_msg)
 
     if reply_msg:
         # count越大的结果，回复的概率越大
