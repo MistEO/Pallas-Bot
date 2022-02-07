@@ -88,7 +88,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     cur_time = event_dict['time']
 
     # 缓解牛牛服务器压力，回复过后 5 秒内所有消息全部无视
-    if group in reply_dict and time.time() - reply_dict[group] > 5:
+    if group in reply_dict and time.time() - reply_dict[group] < 5:
         rep = False
     else:
         rep = reply(bot, event, state)
