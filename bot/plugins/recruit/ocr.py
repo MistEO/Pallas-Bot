@@ -3,20 +3,20 @@ import asyncio
 import nonebot
 from .config import Config
 import numpy as np
-import paddleocr.paddleocr as pocr
+#import paddleocr.paddleocr as pocr
 from pathlib import Path
 
 from aip import AipOcr
 from PIL import Image
 from io import BytesIO
 
-paddleocr_file = Path(pocr.__file__).read_text()
-if "# print(params)" not in paddleocr_file:
-    Path(pocr.__file__).write_text(
-        paddleocr_file.replace("print(params)", "# print(params)")
-    )
+# paddleocr_file = Path(pocr.__file__).read_text()
+# if "# print(params)" not in paddleocr_file:
+#     Path(pocr.__file__).write_text(
+#         paddleocr_file.replace("print(params)", "# print(params)")
+#     )
 
-ocr_core = pocr.PaddleOCR(lang="ch", show_log=False, use_mp=True)
+# ocr_core = pocr.PaddleOCR(lang="ch", show_log=False, use_mp=True)
 
 
 global_config = nonebot.get_driver().config
@@ -56,7 +56,7 @@ class OCR:
                     if len(res):
                         return res
 
-        img = Image.open(BytesIO(self.image_data)).convert("RGB").__array__()
-        result = ocr_core.ocr(img, cls=False)
-        print('paddleocr', result)
-        return [r[-1][0] for r in result]
+        # img = Image.open(BytesIO(self.image_data)).convert("RGB").__array__()
+        # result = ocr_core.ocr(img, cls=False)
+        # print('paddleocr', result)
+        # return [r[-1][0] for r in result]

@@ -9,12 +9,12 @@ class pic:
 
 
 async def a60(tags = '') -> pic:
-    url = "http://a60.one:404/"
+    url = "http://api.a60.one:404/"
     if tags:
         url += 'get/tags/' + tags
     # url += '?only=true'
     async with httpx.AsyncClient() as client:
-        res = await client.get(url, params={'only': True})
+        res = await client.get(url) #, params={'only': True})
         if res.status_code != 200:
             return False
         res = res.json()

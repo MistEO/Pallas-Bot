@@ -21,7 +21,7 @@ from .database import DataBase
 from .active import sched
 
 DataBase.create_base()
-count_thres_default = 2
+count_thres_default = 3
 image_pattern = ',subType=\d+'
 
 
@@ -120,6 +120,10 @@ def reply(bot: Bot, event: Event, state: T_State):
     pinyin = text_to_pinyin(pt)
     cur_time = event_dict['time']
 
+    # 不回复太短的对话，大部分是“？”、“草”
+    if is_pt and len(pt) < 2:
+        return False
+
     latest_reply = ReplyModel.select().where(
         ReplyModel.group == group
     ).order_by(ReplyModel.time.desc()).limit(1)
@@ -135,7 +139,7 @@ def reply(bot: Bot, event: Event, state: T_State):
             return False
 
     rand = random.randint(0, 100)
-    if rand < 0:
+    if rand < 30:
         count_thres = count_thres_default - 1
     elif rand < 60:
         count_thres = count_thres_default
@@ -188,7 +192,7 @@ def reply(bot: Bot, event: Event, state: T_State):
         else:
             general_dict[item.below_raw_msg] += 1
             count = general_dict[item.below_raw_msg]
-            if count == 2:
+            if count == count_thres_default: # count 个群友相同的回复，就作为全局回复
                 reply_msg.append(item)
 
     if not reply_msg and is_pt:
