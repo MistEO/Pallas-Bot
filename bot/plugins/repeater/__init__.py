@@ -87,8 +87,8 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     # pinyin = text_to_pinyin(pt)
     cur_time = event_dict['time']
 
-    # 缓解牛牛服务器压力，回复过后十秒内所有消息全部无视
-    if group in reply_dict and time.time() - reply_dict[group] > 10:
+    # 缓解牛牛服务器压力，回复过后 5 秒内所有消息全部无视
+    if group in reply_dict and time.time() - reply_dict[group] > 5:
         rep = False
     else:
         rep = reply(bot, event, state)
@@ -138,7 +138,7 @@ def reply(bot: Bot, event: Event, state: T_State):
     ).order_by(ReplyModel.time.desc()).limit(1)
     if latest_reply:
         latest_reply = latest_reply[0]
-        if cur_time - latest_reply.time < 10:  # 限制发音频率，最多每10秒一次
+        if cur_time - latest_reply.time < 5:  # 限制发音频率，最多每 5 秒一次
             return False
         # 不要一直回复一同个内容
         # if latest_reply.above_raw_msg == raw_msg:
