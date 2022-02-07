@@ -13,15 +13,19 @@ from nonebot.rule import keyword, to_me
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.cqhttp import MessageSegment, Message, GroupMessageEvent, permission
 
-from .database import Message as MessageModel
-from .database import Reply as ReplyModel
-from .database import Context as ContextModel
-from .database import DataBase
-
 from .active import sched
 from .clear import clear_sched
 
-DataBase.create_base()
+import pymongo
+
+mongo_client = pymongo.MongoClient('127.0.0.1', 27017)
+
+mongo_db = mongo_client["Pallas-Bot"]
+
+mongo_message = mongo_db["Message"]
+mongo_context = mongo_db["Context"]
+mongo_reply = mongo_db["Reply"]
+
 count_thres_default = 3
 image_pattern = ',subType=\d+'
 
@@ -155,9 +159,9 @@ def reply(bot: Bot, event: Event, state: T_State):
     else:
         count_thres = count_thres_default + 1
 
-    hist_msg = MessageModel.select().where(
-        MessageModel.group == group).order_by(
-        MessageModel.time.desc()).limit(count_thres)
+    hist_msg = mongo_message.find(
+        {"group": group}, sort=[("time", pymongo.DESCENDING)]
+    ).limit(count_thres)
     # 复读！
     if hist_msg:
         is_repeat = True
@@ -201,7 +205,7 @@ def reply(bot: Bot, event: Event, state: T_State):
         else:
             general_dict[item.below_raw_msg] += 1
             count = general_dict[item.below_raw_msg]
-            if count == count_thres_default: # count 个群友相同的回复，就作为全局回复
+            if count == count_thres_default:  # count 个群友相同的回复，就作为全局回复
                 reply_msg.append(item)
 
     if not reply_msg and is_pt and random.randint(0, 100) < 30:
@@ -220,7 +224,7 @@ def reply(bot: Bot, event: Event, state: T_State):
             ContextModel.count >= count_thres,
             ContextModel.group == group,
             conds
-            )  # .order_by(ContextModel.count.desc())
+        )  # .order_by(ContextModel.count.desc())
         reply_msg = all_context
 
     if reply_msg:
@@ -345,6 +349,7 @@ def is_plain_text(event: Event):
 
     return False
 
+
 def is_image(event: Event):
     msg = event.dict()['message']
     if len(msg) == 1:
@@ -353,9 +358,11 @@ def is_image(event: Event):
 
     return False
 
+
 def text_to_pinyin(text: str):
     return ''.join([item[0] for item in pypinyin.pinyin(
         text, style=pypinyin.NORMAL, errors='default')]).lower()
 
+
 def TRUE_condition():
-   return (Value(1) == Value(1))
+    return (Value(1) == Value(1))
