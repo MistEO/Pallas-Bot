@@ -53,10 +53,9 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     if will_ban:
         will_ban = will_ban[0]
         ContextModel.update(
-            count=-5,
+            count=-999,
         ).where(
             ContextModel.group == group,
-            ContextModel.above_raw_msg == will_ban.above_raw_msg,
             ContextModel.below_raw_msg.contains(will_ban.reply_raw_msg)
         ).execute()
         to_me_msg.block = True
