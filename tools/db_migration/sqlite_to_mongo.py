@@ -9,6 +9,9 @@ cur_count = 0
 
 started = False
 
+pallas_mongo.Chat.save_count_threshold = 10000
+pallas_mongo.Chat.save_time_threshold = 7 * 24 * 3600
+
 while True:
     message = pallas_db.Message.select().where(
         pallas_db.Message.id > message_id).limit(10000)
@@ -41,3 +44,6 @@ while True:
     cur_count += message_len
     print('cur:', cur_count, "all:", all_count)
     print(cur_count / all_count * 100, '%')
+
+pallas_mongo.Chat.sync()
+print('finished')

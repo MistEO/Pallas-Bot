@@ -1,3 +1,4 @@
+import threading
 from typing import List, Optional, Union
 from functools import cached_property
 from dataclasses import dataclass
@@ -12,14 +13,12 @@ import re
 
 from nonebot.adapters import Event
 
-mongo_client = pymongo.MongoClient('127.0.0.1', 27017)
+mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
 
 mongo_db = mongo_client['PallasBot']
 
-mongo_message = mongo_db['message']
-mongo_context = mongo_db['context']
-
-reply_dict = {}
+message_mongo = mongo_db['message']
+context_mongo = mongo_db['context']
 
 
 @dataclass
@@ -66,7 +65,18 @@ class ChatData:
 
 
 class Chat:
-    _count_threshold = 3
+    save_time_threshold = 600      # 每隔多久进行一次保存 ( 秒 )
+    save_count_threshold = 100     # 单个群超过多少条聊天记录就进行一次保存。与时间是或的关系
+
+    _count_threshold = 3            # answer 相关的阈值
+
+    _reply_dict = {}                # 牛牛回复的消息缓存，暂未做持久化
+    _message_dict = {}              # 群消息缓存
+
+    _save_reserve_size = 10         # 保存时，给内存中保留的大小
+    _late_save_time = 0             # 上次保存（消息数据持久化）的时刻 ( time.time(), 秒 )
+
+    _sync_lock = threading.Lock()
 
     def __init__(self, data: Union[ChatData, Event]):
 
@@ -92,21 +102,24 @@ class Chat:
         if len(self.chat_data.raw_message.strip()) == 0:
             return
 
-        # 群里的上一条发言
-        group_pre_msg = mongo_message.find_one({
-            'group_id': self.chat_data.group_id
-        }, sort=[('time', pymongo.DESCENDING)])
+        group_id = self.chat_data.group_id
+        if group_id in Chat._message_dict:
+            # 群里的上一条发言
+            group_msg = Chat._message_dict[group_id]
+            if group_msg:
+                group_pre_msg = group_msg[-1]
+            else:
+                group_pre_msg = None
 
-        self._context_insert(group_pre_msg)
+            self._context_insert(group_pre_msg)
 
-        if group_pre_msg and group_pre_msg['user_id'] != self.chat_data.user_id:
-            # 该用户在群里的上一条发言
-            user_pre_msg = mongo_message.find_one({
-                'group_id': self.chat_data.group_id,
-                'user_id': self.chat_data.user_id
-            }, sort=[('time', pymongo.DESCENDING)])
-
-            self._context_insert(user_pre_msg)
+            user_id = self.chat_data.user_id
+            if group_pre_msg and group_pre_msg['user_id'] != user_id:
+                # 该用户在群里的上一条发言（倒序）
+                for msg in group_msg[::-1]:
+                    if msg['user_id'] == user_id:
+                        self._context_insert(msg)
+                        break
 
         self._message_insert()
 
@@ -115,8 +128,8 @@ class Chat:
         回复这句话，可能会分多次回复（所以是List），也可能不回复
         '''
 
-        if self.chat_data.group_id in reply_dict:
-            latest_reply = reply_dict[self.chat_data.group_id]
+        if self.chat_data.group_id in Chat._reply_dict:
+            latest_reply = Chat._reply_dict[self.chat_data.group_id]
             # 限制发音频率，最多 5 秒一次
             if self.chat_data.time - latest_reply['time'] < 5:
                 return None
@@ -134,7 +147,7 @@ class Chat:
         result = self._context_find()
 
         if result:
-            reply_dict[self.chat_data.group_id] = {
+            Chat._reply_dict[self.chat_data.group_id] = {
                 'time': (int)(time.time()),
                 'cur_msg': result[-1],
                 'pre_msg': self.chat_data.raw_message
@@ -142,8 +155,15 @@ class Chat:
         return result
 
     def _message_insert(self):
-        mongo_message.insert_one({
-            'group_id': self.chat_data.group_id,
+        group_id = self.chat_data.group_id
+
+        # Chat._sync_lock.acquire()
+
+        if group_id not in Chat._message_dict:
+            Chat._message_dict[group_id] = []
+
+        Chat._message_dict[group_id].append({
+            'group_id': group_id,
             'user_id': self.chat_data.user_id,
             'raw_message': self.chat_data.raw_message,
             'is_plain_text': self.chat_data.is_plain_text,
@@ -151,6 +171,40 @@ class Chat:
             'keywords': self.chat_data.keywords,
             'time': self.chat_data.time,
         })
+
+        # Chat._sync_lock.release()
+
+        cur_time = self.chat_data.time
+        if Chat._late_save_time == 0:
+            Chat._late_save_time = cur_time - 1
+            return
+
+        if len(Chat._message_dict[group_id]) > Chat.save_count_threshold:
+            Chat.sync(cur_time)
+
+        elif cur_time - Chat._late_save_time > Chat.save_time_threshold:
+            Chat.sync(cur_time)
+
+    @staticmethod
+    def sync(cur_time: int = time.time()):
+        '''
+        持久化
+        '''
+        Chat._sync_lock.acquire()
+
+        save_list = [msg
+                     for group_msgs in Chat._message_dict.values()
+                     for msg in group_msgs
+                     if msg['time'] > Chat._late_save_time]
+
+        message_mongo.insert_many(save_list)
+
+        Chat._message_dict = {group_id: group_msgs[-Chat._save_reserve_size:]
+                              for group_id, group_msgs in Chat._message_dict.items()}
+
+        Chat._late_save_time = cur_time
+
+        Chat._sync_lock.release()
 
     def _context_insert(self, pre_msg):
         if not pre_msg:
@@ -204,7 +258,7 @@ class Chat:
                 'cur_raw_msg_options': self.chat_data.raw_message
             }
 
-        mongo_context.update_one(update_key, set_value, upsert=True)
+        context_mongo.update_one(update_key, set_value, upsert=True)
 
     def _context_find(self) -> Optional[List[str]]:
 
@@ -231,18 +285,18 @@ class Chat:
         #         return [self.chat_data.raw_message, ]
 
         if self.chat_data.is_plain_text:
-            all_answers = mongo_context.find({
+            all_answers = context_mongo.find({
                 'pre_keywords': self.chat_data.keywords,
                 'count': {'$gt': count_thres}
             })
         elif self.chat_data.is_image:
-            all_answers = mongo_context.find({
+            all_answers = context_mongo.find({
                 'pre_raw_msg': self.chat_data.raw_message,
                 'count': {'$gt': count_thres},
                 'cur_raw_msg': {'$regex': '^\[CQ:'}
             })
         else:
-            all_answers = mongo_context.find({
+            all_answers = context_mongo.find({
                 'pre_raw_msg': self.chat_data.raw_message,
                 'count': {'$gt': count_thres}
             })
@@ -293,26 +347,28 @@ class Chat:
 
 
 if __name__ == '__main__':
-    test_data: ChatData = ChatData(
-        group_id=1234567,
-        user_id=1111111,
-        raw_message='牛牛出来玩',
-        plain_text='牛牛出来玩',
-        time=time.time() - 1
-    )
 
-    test_chat: Chat = Chat(test_data)
+    while True:
+        test_data: ChatData = ChatData(
+            group_id=1234567,
+            user_id=1111111,
+            raw_message='牛牛出来玩',
+            plain_text='牛牛出来玩',
+            time=time.time()
+        )
 
-    print(test_chat.answer())
-    test_chat.learn()
+        test_chat: Chat = Chat(test_data)
 
-    test_answer_data: ChatData = ChatData(
-        group_id=1234567,
-        user_id=1111111,
-        raw_message='别烦，我学MySql啊',
-        plain_text='别烦，我学MySql啊',
-        time=time.time()
-    )
+        print(test_chat.answer())
+        test_chat.learn()
 
-    test_answer: Chat = Chat(test_answer_data)
-    test_answer.learn()
+        test_answer_data: ChatData = ChatData(
+            group_id=1234567,
+            user_id=1111111,
+            raw_message='别烦，我学MySql啊',
+            plain_text='别烦，我学MySql啊',
+            time=time.time()
+        )
+
+        test_answer: Chat = Chat(test_answer_data)
+        test_answer.learn()
