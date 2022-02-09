@@ -138,7 +138,7 @@ dmypy.json
 # pytype static type analyzer
 .pytype/
 
-repeater.db
+*.db
 
 # End of https://www.toptal.com/developers/gitignore/api/python
 resource/voices/1.wav

@@ -1,5 +1,5 @@
-import database
-import models
+import tools.db_migration.pallas_db as pallas_db
+import tools.db_migration.amiya_db as amiya_db
 
 import json
 import pypinyin
@@ -10,6 +10,8 @@ def text_to_pinyin(text: str):
         text, style=pypinyin.NORMAL, errors='default')]).lower()
 
 # return [cq_result: str, is_plain_text: bool, msg_text: str, msg_pinyin: str]
+
+
 def mirai2cq(msg: str):
     seg = json.loads(msg)
     is_plain_text = True
@@ -44,7 +46,7 @@ def mirai2cq(msg: str):
 
 
 def migrate_message():
-    all_msg = models.MsgRecord.select()
+    all_msg = amiya_db.MsgRecord.select()
 
     data = []
     for item in all_msg:
@@ -64,11 +66,11 @@ def migrate_message():
             )
     num = 30000
     for i in range(0, len(data), num):
-        database.Message.insert_many(data[i:i+num]).execute()
+        pallas_db.Message.insert_many(data[i:i+num]).execute()
 
 
 def migrate_context():
-    all_msg = models.ReplyRecord.select()
+    all_msg = amiya_db.ReplyRecord.select()
 
     data = []
     for item in all_msg:
@@ -92,42 +94,42 @@ def migrate_context():
                 'latest_time': 0})
     num = 30000
     for i in range(0, len(data), num):
-        database.Context.insert_many(
+        pallas_db.Context.insert_many(
             data[i:i+num]).on_conflict('replace').execute()
 
 
 def strip_message():
-    all_msg = database.Message.select()
+    all_msg = pallas_db.Message.select()
 
     for item in all_msg:
         if item.raw_msg.endswith(' ') or item.raw_msg.startswith(' '):
-            database.Message.update(
+            pallas_db.Message.update(
                 raw_msg=item.raw_msg.strip(),
                 text_msg=item.text_msg.strip(),
             ).where(
-                database.Message.id == item.id
+                pallas_db.Message.id == item.id
             ).execute()
 
 
 def strip_context():
-    all_msg = database.Context.select()
+    all_msg = pallas_db.Context.select()
     for item in all_msg:
         if item.above_raw_msg.endswith(' ') or item.above_raw_msg.startswith(' ') or item.below_raw_msg.endswith(' ') or item.below_raw_msg.startswith(' '):
-            database.Context.delete().where(
-                database.Context.group == item.group,
-                database.Context.above_raw_msg == item.above_raw_msg,
-                database.Context.above_is_plain_text == item.above_is_plain_text,
-                database.Context.above_text_msg == item.above_text_msg,
-                database.Context.above_pinyin_msg == item.above_pinyin_msg,
-                database.Context.below_raw_msg == item.below_raw_msg,
-                database.Context.count == item.count,
-                database.Context.latest_time == item.latest_time,).execute()
+            pallas_db.Context.delete().where(
+                pallas_db.Context.group == item.group,
+                pallas_db.Context.above_raw_msg == item.above_raw_msg,
+                pallas_db.Context.above_is_plain_text == item.above_is_plain_text,
+                pallas_db.Context.above_text_msg == item.above_text_msg,
+                pallas_db.Context.above_pinyin_msg == item.above_pinyin_msg,
+                pallas_db.Context.below_raw_msg == item.below_raw_msg,
+                pallas_db.Context.count == item.count,
+                pallas_db.Context.latest_time == item.latest_time,).execute()
 
             item.above_raw_msg = item.above_raw_msg.strip()
             item.above_text_msg = item.above_text_msg.strip()
             item.below_raw_msg = item.below_raw_msg.strip()
 
-            database.Context.insert(
+            pallas_db.Context.insert(
                 group=item.group,
                 above_raw_msg=item.above_raw_msg,
                 above_is_plain_text=item.above_is_plain_text,
@@ -140,27 +142,27 @@ def strip_context():
 
 
 def tutu2niuniu_context():
-    all_msg = database.Context.select().where(
-        (database.Context.above_raw_msg.contains('兔兔')) |
-        (database.Context.below_raw_msg.contains('兔兔'))
+    all_msg = pallas_db.Context.select().where(
+        (pallas_db.Context.above_raw_msg.contains('兔兔')) |
+        (pallas_db.Context.below_raw_msg.contains('兔兔'))
     )
     for item in all_msg:
-        database.Context.delete().where(
-            database.Context.group == item.group,
-            database.Context.above_raw_msg == item.above_raw_msg,
-            database.Context.above_is_plain_text == item.above_is_plain_text,
-            database.Context.above_text_msg == item.above_text_msg,
-            database.Context.above_pinyin_msg == item.above_pinyin_msg,
-            database.Context.below_raw_msg == item.below_raw_msg,
-            database.Context.count == item.count,
-            database.Context.latest_time == item.latest_time,).execute()
+        pallas_db.Context.delete().where(
+            pallas_db.Context.group == item.group,
+            pallas_db.Context.above_raw_msg == item.above_raw_msg,
+            pallas_db.Context.above_is_plain_text == item.above_is_plain_text,
+            pallas_db.Context.above_text_msg == item.above_text_msg,
+            pallas_db.Context.above_pinyin_msg == item.above_pinyin_msg,
+            pallas_db.Context.below_raw_msg == item.below_raw_msg,
+            pallas_db.Context.count == item.count,
+            pallas_db.Context.latest_time == item.latest_time,).execute()
 
         item.above_raw_msg = item.above_raw_msg.replace('兔兔', '牛牛')
         item.above_text_msg = item.above_text_msg.replace('兔兔', '牛牛')
         item.above_pinyin_msg = item.above_pinyin_msg.replace('tutu', 'niuniu')
         item.below_raw_msg = item.below_raw_msg.replace('兔兔', '牛牛')
 
-        database.Context.insert(
+        pallas_db.Context.insert(
             group=item.group,
             above_raw_msg=item.above_raw_msg,
             above_is_plain_text=item.above_is_plain_text,
@@ -171,9 +173,10 @@ def tutu2niuniu_context():
             latest_time=item.latest_time,
         ).on_conflict('ignore').execute()
 
+
 def text2pinyin_context():
-    all_plain = database.Context.select().where(
-        database.Context.above_is_plain_text == True)
+    all_plain = pallas_db.Context.select().where(
+        pallas_db.Context.above_is_plain_text == True)
 
     len = all_plain.count()
     count = 0
@@ -182,41 +185,42 @@ def text2pinyin_context():
         # for ch in ' ，。？！（）…—【】、“”：；《》‘’￥『』': # with space
         #     pinyin = pinyin.replace(ch, '')
         # print(pinyin)
-        database.Context.update(
+        pallas_db.Context.update(
             above_pinyin_msg=pinyin,
         ).where(
-            database.Context.group == item.group,
-            database.Context.above_raw_msg == item.above_raw_msg,
-            database.Context.below_raw_msg == item.below_raw_msg,
+            pallas_db.Context.group == item.group,
+            pallas_db.Context.above_raw_msg == item.above_raw_msg,
+            pallas_db.Context.below_raw_msg == item.below_raw_msg,
         ).execute()
 
         count = count + 1
         if count % 100 == 0:
             print('text2pinyin_context: ', count / len * 100, "%")
 
+
 def text2pinyin_message():
 
-    all_plain = database.Message.select().where(
-        database.Message.is_plain_text == True)
+    all_plain = pallas_db.Message.select().where(
+        pallas_db.Message.is_plain_text == True)
 
     len = all_plain.count()
     count = 0
     for item in all_plain:
         pinyin = text_to_pinyin(item.text_msg)
-        database.Message.update(
+        pallas_db.Message.update(
             pinyin_msg=pinyin,
         ).where(
-            database.Message.id == item.id,
+            pallas_db.Message.id == item.id,
         ).execute()
 
         count = count + 1
-        if count % 100 == 0:            
+        if count % 100 == 0:
             print('text2pinyin_message: ', count / len * 100, "%")
 
 
 if __name__ == '__main__':
-    models.AmiyaDataBase.create_base()
-    database.DataBase.create_base()
-    
+    amiya_db.AmiyaDataBase.create_base()
+    pallas_db.DataBase.create_base()
+
     text2pinyin_context()
     text2pinyin_message()
