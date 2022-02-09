@@ -13,13 +13,10 @@ while True:
     message = pallas_db.Message.select().where(
         pallas_db.Message.id > message_id).limit(10000)
 
-    cur_count += message.count()
-
     if not message:
         break
     message_id = message[-1].id
     message_len = message.count()
-    print('len:', message_len)
 
     prg: int = 0
     default_time = 1
@@ -39,6 +36,8 @@ while True:
 
         if not started:
             started = True
-            print('start')
+            print('started')
 
+    cur_count += message_len
+    print('cur:', cur_count, "all:", all_count)
     print(cur_count / all_count * 100, '%')
