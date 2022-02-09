@@ -13,7 +13,7 @@ while True:
     message = pallas_db.Message.select().where(
         pallas_db.Message.id > message_id).limit(10000)
 
-    cur_count += 10000
+    cur_count += message.count()
 
     if not message:
         break
@@ -41,4 +41,4 @@ while True:
             started = True
             print('start')
 
-    print((str)(int)(cur_count / all_count * 100) + '%')
+    print(cur_count / all_count * 100, '%')
