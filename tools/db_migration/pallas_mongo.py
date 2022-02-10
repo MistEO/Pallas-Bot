@@ -10,6 +10,7 @@ import pymongo
 import time
 import random
 import re
+import atexit
 
 from nonebot.adapters import Event
 
@@ -40,28 +41,22 @@ class ChatData:
         return '[CQ:image,' in self.raw_message or '[CQ:face,' in self.raw_message
 
     @cached_property
-    def keywords(self) -> List[str]:
+    def keywords(self) -> str:
         if not self.is_plain_text:
-            return []
+            return self.raw_message
 
         keywords_list = jieba_fast.analyse.extract_tags(
             self.plain_text, topK=ChatData._keywords_size)
-        keywords_list.sort()
         if len(keywords_list) < 2:
-            return [self.plain_text, ]
+            return self.plain_text
         else:
-            return keywords_list
+            keywords_list.sort()
+            return ' '.join(keywords_list)
 
     @cached_property
-    def keywords_pinyin(self) -> List[str]:
-        pinyin_list = []
-        for text in self.keywords:
-            text_pinyin = ''.join([item[0] for item in pypinyin.pinyin(
-                text, style=pypinyin.NORMAL, errors='default')]).lower()
-
-            pinyin_list.append(text_pinyin)
-
-        return pinyin_list
+    def keywords_pinyin(self) -> str:
+        return ''.join([item[0] for item in pypinyin.pinyin(
+            self.keywords, style=pypinyin.NORMAL, errors='default')]).lower()
 
 
 class Chat:
@@ -131,8 +126,8 @@ class Chat:
 
         if self.chat_data.group_id in Chat._reply_dict:
             latest_reply = Chat._reply_dict[self.chat_data.group_id]
-            # 限制发音频率，最多 5 秒一次
-            if self.chat_data.time - latest_reply['time'] < 5:
+            # 限制发音频率，最多 3 秒一次
+            if self.chat_data.time - latest_reply['time'] < 3:
                 return None
             # # 不要一直回复同一个内容
             # if self.chat_data.raw_message == latest_reply['pre_msg']:
@@ -195,6 +190,9 @@ class Chat:
                      for msg in group_msgs
                      if msg['time'] > Chat._late_save_time]
 
+        if not save_list:
+            return
+
         Chat._message_dict = {group_id: group_msgs[-Chat._save_reserve_size:]
                               for group_id, group_msgs in Chat._message_dict.items()}
 
@@ -222,25 +220,18 @@ class Chat:
             'pre_is_plain_text': pre_msg['is_plain_text'],
             'cur_is_plain_text': is_plain_text
         }
-        dict_key = update_key.copy()
 
         if is_plain_text:
             update_key['cur_keywords'] = self.chat_data.keywords
-            dict_key['cur_keywords'] = ''.join(
-                [kw for kw in self.chat_data.keywords])
         else:
             update_key['cur_raw_msg'] = raw_message
-            dict_key['cur_raw_msg'] = raw_message
 
         if pre_msg['is_plain_text']:
             update_key['pre_keywords'] = pre_msg['keywords']
-            dict_key['pre_keywords'] = ''.join(
-                [kw for kw in pre_msg['keywords']])
         else:
             update_key['pre_raw_msg'] = pre_msg['raw_message']
-            dict_key['pre_raw_msg'] = pre_msg['raw_message']
 
-        dict_key = tuple(sorted(dict_key.items()))
+        dict_key = tuple(sorted(update_key.items()))
         if dict_key not in Chat._context_dict:
             Chat._context_dict[dict_key] = [update_key, ]
 
@@ -315,9 +306,8 @@ class Chat:
                 filtered_answers.append(answer)
                 continue
             elif answer['cur_is_plain_text']:
-                keyswords_as_key = tuple(answer['cur_keywords'])
-                answers_count[keyswords_as_key] += 1
-                cur_count = answers_count[keyswords_as_key]
+                answers_count[answer['cur_keywords']] += 1
+                cur_count = answers_count[answer['cur_keywords']]
             elif '[CQ:at,' in answer['cur_raw_msg']:    # 别的群的 at, 过滤掉
                 continue
             else:
@@ -353,6 +343,14 @@ class Chat:
         if 0 < answer_str.count('，') <= 3 and random.randint(1, 10) < 5:
             return answer_str.split('，')
         return [answer_str, ]
+
+
+def _chat_sync():
+    Chat.sync()
+
+
+# Auto sync on program exit
+atexit.register(_chat_sync)
 
 
 if __name__ == '__main__':

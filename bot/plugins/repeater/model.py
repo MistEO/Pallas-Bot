@@ -41,28 +41,22 @@ class ChatData:
         return '[CQ:image,' in self.raw_message or '[CQ:face,' in self.raw_message
 
     @cached_property
-    def keywords(self) -> List[str]:
+    def keywords(self) -> str:
         if not self.is_plain_text:
-            return []
+            return self.raw_message
 
         keywords_list = jieba_fast.analyse.extract_tags(
             self.plain_text, topK=ChatData._keywords_size)
-        keywords_list.sort()
         if len(keywords_list) < 2:
-            return [self.plain_text, ]
+            return self.plain_text
         else:
-            return keywords_list
+            keywords_list.sort()
+            return ' '.join(keywords_list)
 
     @cached_property
-    def keywords_pinyin(self) -> List[str]:
-        pinyin_list = []
-        for text in self.keywords:
-            text_pinyin = ''.join([item[0] for item in pypinyin.pinyin(
-                text, style=pypinyin.NORMAL, errors='default')]).lower()
-
-            pinyin_list.append(text_pinyin)
-
-        return pinyin_list
+    def keywords_pinyin(self) -> str:
+        return ''.join([item[0] for item in pypinyin.pinyin(
+            self.keywords, style=pypinyin.NORMAL, errors='default')]).lower()
 
 
 class Chat:
@@ -73,6 +67,13 @@ class Chat:
 
     _reply_dict = {}                # 牛牛回复的消息缓存，暂未做持久化
     _message_dict = {}              # 群消息缓存
+    _context_cache = list(          # 学习的上下文缓存
+        context_mongo.find(
+            {"$or": [
+                {'count': {'$gt': _count_threshold - 1}},
+                {"time": {'$gt': time.time() - 7 * 24 * 3600}}
+            ]}
+        ))
 
     _save_reserve_size = 10         # 保存时，给内存中保留的大小
     _late_save_time = 0             # 上次保存（消息数据持久化）的时刻 ( time.time(), 秒 )
@@ -194,6 +195,8 @@ class Chat:
                          for group_msgs in Chat._message_dict.values()
                          for msg in group_msgs
                          if msg['time'] > Chat._late_save_time]
+            if not save_list:
+                return
 
             Chat._message_dict = {group_id: group_msgs[-Chat._save_reserve_size:]
                                   for group_id, group_msgs in Chat._message_dict.items()}
@@ -247,7 +250,23 @@ class Chat:
                 'cur_raw_msg_options': raw_message
             }
 
-        context_mongo.update_one(update_key, update_value, upsert=True)
+        context_mongo.update_one(
+            update_key, update_value, upsert=True)
+
+        cur_cache = next((pre_context
+                          for pre_context in Chat._context_cache
+                          if update_key.items() <= pre_context.items()), None)
+
+        if not cur_cache:
+            Chat._context_cache.append(update_key)
+            cur_cache = Chat._context_cache[-1]
+            cur_cache['count'] = 0
+            if is_plain_text:
+                cur_cache['cur_raw_msg_options'] = []
+
+        cur_cache['count'] += 1
+        if is_plain_text:
+            cur_cache['cur_raw_msg_options'].append(raw_message)
 
     def _context_find(self) -> Optional[List[str]]:
 
@@ -271,21 +290,26 @@ class Chat:
                     return [raw_message, ]
 
         if self.chat_data.is_plain_text:
-            all_answers = context_mongo.find({
-                'pre_keywords': self.chat_data.keywords,
-                'count': {'$gt': count_thres}
-            })
+            all_answers = [answer
+                           for answer in self._context_cache
+                           if 'pre_keywords' in answer
+                           and answer['pre_keywords'] == self.chat_data.keywords
+                           and answer['count'] >= count_thres]
         elif self.chat_data.is_image:
-            all_answers = context_mongo.find({
-                'pre_raw_msg': raw_message,
-                'count': {'$gt': count_thres},
-                'cur_raw_msg': {'$regex': '^\[CQ:'}
-            })
+            all_answers = [answer
+                           for answer in self._context_cache
+                           if 'pre_raw_msg' in answer
+                           and 'cur_raw_msg' in answer
+                           and answer['pre_raw_msg'] == raw_message
+                           and answer['count'] >= count_thres
+                           and answer['cur_raw_msg'].startswith('[CQ:')]
         else:
-            all_answers = context_mongo.find({
-                'pre_raw_msg': raw_message,
-                'count': {'$gt': count_thres}
-            })
+            all_answers = [answer
+                           for answer in self._context_cache
+                           if 'pre_raw_msg' in answer
+                           and answer['pre_raw_msg'] == raw_message
+                           and answer['count'] >= count_thres]
+
         filtered_answers = []
         answers_count = defaultdict(int)
         for answer in all_answers:
@@ -293,9 +317,8 @@ class Chat:
                 filtered_answers.append(answer)
                 continue
             elif answer['cur_is_plain_text']:
-                keyswords_as_key = tuple(answer['cur_keywords'])
-                answers_count[keyswords_as_key] += 1
-                cur_count = answers_count[keyswords_as_key]
+                answers_count[answer['cur_keywords']] += 1
+                cur_count = answers_count[answer['cur_keywords']]
             elif '[CQ:at,' in answer['cur_raw_msg']:    # 别的群的 at, 过滤掉
                 continue
             else:
@@ -333,37 +356,38 @@ class Chat:
         return [answer_str, ]
 
 
-if __name__ == '__main__':
-
-    while True:
-        test_data: ChatData = ChatData(
-            group_id=1234567,
-            user_id=1111111,
-            raw_message='牛牛出来玩',
-            plain_text='牛牛出来玩',
-            time=time.time()
-        )
-
-        test_chat: Chat = Chat(test_data)
-
-        print(test_chat.answer())
-        test_chat.learn()
-
-        test_answer_data: ChatData = ChatData(
-            group_id=1234567,
-            user_id=1111111,
-            raw_message='别烦，我学MySql啊',
-            plain_text='别烦，我学MySql啊',
-            time=time.time()
-        )
-
-        test_answer: Chat = Chat(test_answer_data)
-        test_answer.learn()
-
-
 def _chat_sync():
     Chat.sync()
 
 
 # Auto sync on program exit
 atexit.register(_chat_sync)
+
+
+if __name__ == '__main__':
+
+    # while True:
+    test_data: ChatData = ChatData(
+        group_id=1234567,
+        user_id=1111111,
+        raw_message='牛牛出来玩',
+        plain_text='牛牛出来玩',
+        time=time.time()
+    )
+
+    test_chat: Chat = Chat(test_data)
+
+    print(test_chat.answer())
+    test_chat.learn()
+
+    test_answer_data: ChatData = ChatData(
+        group_id=1234567,
+        user_id=1111111,
+        raw_message='别烦，我学MySql啊',
+        plain_text='别烦，我学MySql啊',
+        time=time.time()
+    )
+
+    test_answer: Chat = Chat(test_answer_data)
+    print(test_chat.answer())
+    test_answer.learn()
