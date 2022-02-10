@@ -10,6 +10,7 @@ import pymongo
 import time
 import random
 import re
+import atexit
 
 from nonebot.adapters import Event
 
@@ -130,8 +131,8 @@ class Chat:
 
         if self.chat_data.group_id in Chat._reply_dict:
             latest_reply = Chat._reply_dict[self.chat_data.group_id]
-            # 限制发音频率，最多 5 秒一次
-            if self.chat_data.time - latest_reply['time'] < 5:
+            # 限制发音频率，最多 3 秒一次
+            if self.chat_data.time - latest_reply['time'] < 3:
                 return None
             # # 不要一直回复同一个内容
             # if self.chat_data.raw_message == latest_reply['pre_msg']:
@@ -358,3 +359,11 @@ if __name__ == '__main__':
 
         test_answer: Chat = Chat(test_answer_data)
         test_answer.learn()
+
+
+def _chat_sync():
+    Chat.sync()
+
+
+# Auto sync on program exit
+atexit.register(_chat_sync)
