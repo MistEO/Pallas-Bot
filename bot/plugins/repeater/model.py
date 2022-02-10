@@ -205,34 +205,27 @@ class Chat:
         if not pre_msg:
             return
 
+        raw_message = self.chat_data.raw_message
+        is_plain_text = self.chat_data.is_plain_text
+
         # 在复读，不学
-        if pre_msg['raw_message'] == self.chat_data.raw_message:
+        if pre_msg['raw_message'] == raw_message:
             return
 
         # 回复别人的，不学
-        if '[CQ:reply,' in self.chat_data.raw_message:
+        if '[CQ:reply,' in raw_message:
             return
-
-        # # 如果有反过来的，直接退出，说明可能是两句话在轮流复读。只取正向的（先达到阈值的）
-        # reverse = mongo_context.find_one({
-        #     'group_id': self.chat_data.group_id,
-        #     'pre_raw_msg': self.chat_data.raw_message,
-        #     'cur_raw_msg': pre_msg.raw_message,
-        #     'count': {'$gt': ChatData._count_threshold}
-        # })
-        # if reverse:
-        #     return
 
         update_key = {
             'group_id': self.chat_data.group_id,
             'pre_is_plain_text': pre_msg['is_plain_text'],
-            'cur_is_plain_text': self.chat_data.is_plain_text
+            'cur_is_plain_text': is_plain_text
         }
 
-        if self.chat_data.is_plain_text:
+        if is_plain_text:
             update_key['cur_keywords'] = self.chat_data.keywords
         else:
-            update_key['cur_raw_msg'] = self.chat_data.raw_message
+            update_key['cur_raw_msg'] = raw_message
 
         if pre_msg['is_plain_text']:
             update_key['pre_keywords'] = pre_msg['keywords']
@@ -248,9 +241,9 @@ class Chat:
         update_value['$inc'] = {
             'count': 1
         }
-        if self.chat_data.is_plain_text:
+        if is_plain_text:
             update_value['$push'] = {
-                'cur_raw_msg_options': self.chat_data.raw_message
+                'cur_raw_msg_options': raw_message
             }
 
         context_mongo.update_one(update_key, update_value, upsert=True)
@@ -265,19 +258,16 @@ class Chat:
         else:
             count_thres = Chat._count_threshold + 1
 
-        # hist_msg = mongo_message.find({
-        #     'group_id': self.chat_data.group_id,
-        # }, sort=[('time', pymongo.DESCENDING)]).limit(count_thres)
+        group_id = self.chat_data.group_id
+        raw_message = self.chat_data.raw_message
 
-        # # 复读！
-        # if hist_msg:
-        #     is_repeat = True
-        #     for item in hist_msg:
-        #         if self.chat_data.raw_message != item.raw_message:
-        #             is_repeat = False
-        #             break
-        #     if is_repeat:
-        #         return [self.chat_data.raw_message, ]
+        # 复读！
+        if group_id in Chat._message_dict:
+            group_msg = Chat._message_dict[group_id]
+            if group_msg:
+                if all(item['raw_message'] == raw_message
+                        for item in group_msg[:-count_thres:-1]):
+                    return [raw_message, ]
 
         if self.chat_data.is_plain_text:
             all_answers = context_mongo.find({
@@ -286,19 +276,19 @@ class Chat:
             })
         elif self.chat_data.is_image:
             all_answers = context_mongo.find({
-                'pre_raw_msg': self.chat_data.raw_message,
+                'pre_raw_msg': raw_message,
                 'count': {'$gt': count_thres},
                 'cur_raw_msg': {'$regex': '^\[CQ:'}
             })
         else:
             all_answers = context_mongo.find({
-                'pre_raw_msg': self.chat_data.raw_message,
+                'pre_raw_msg': raw_message,
                 'count': {'$gt': count_thres}
             })
         filtered_answers = []
         answers_count = defaultdict(int)
         for answer in all_answers:
-            if answer['group_id'] == self.chat_data.group_id:
+            if answer['group_id'] == group_id:
                 filtered_answers.append(answer)
                 continue
             elif answer['cur_is_plain_text']:
