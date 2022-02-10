@@ -47,7 +47,7 @@ class ChatData:
         keywords_list = jieba_fast.analyse.extract_tags(
             self.plain_text, topK=ChatData._keywords_size)
         keywords_list.sort()
-        if len(keywords_list) == 0:
+        if len(keywords_list) < 2:
             return [self.plain_text, ]
         else:
             return keywords_list

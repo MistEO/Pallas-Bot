@@ -47,7 +47,7 @@ class ChatData:
         keywords_list = jieba_fast.analyse.extract_tags(
             self.plain_text, topK=ChatData._keywords_size)
         keywords_list.sort()
-        if len(keywords_list) == 0:
+        if len(keywords_list) < 2:
             return [self.plain_text, ]
         else:
             return keywords_list
@@ -72,11 +72,12 @@ class Chat:
 
     _reply_dict = {}                # 牛牛回复的消息缓存，暂未做持久化
     _message_dict = {}              # 群消息缓存
+    _context_dict = {}              # 学习记录的缓存
 
     _save_reserve_size = 10         # 保存时，给内存中保留的大小
     _late_save_time = 0             # 上次保存（消息数据持久化）的时刻 ( time.time(), 秒 )
 
-    _sync_lock = threading.Lock()
+    # _sync_lock = threading.Lock()
 
     def __init__(self, data: Union[ChatData, Event]):
 
@@ -157,19 +158,19 @@ class Chat:
     def _message_insert(self):
         group_id = self.chat_data.group_id
 
-        with Chat._sync_lock:
-            if group_id not in Chat._message_dict:
-                Chat._message_dict[group_id] = []
+        # with Chat._sync_lock:
+        if group_id not in Chat._message_dict:
+            Chat._message_dict[group_id] = []
 
-            Chat._message_dict[group_id].append({
-                'group_id': group_id,
-                'user_id': self.chat_data.user_id,
-                'raw_message': self.chat_data.raw_message,
-                'is_plain_text': self.chat_data.is_plain_text,
-                'plain_text': self.chat_data.plain_text,
-                'keywords': self.chat_data.keywords,
-                'time': self.chat_data.time,
-            })
+        Chat._message_dict[group_id].append({
+            'group_id': group_id,
+            'user_id': self.chat_data.user_id,
+            'raw_message': self.chat_data.raw_message,
+            'is_plain_text': self.chat_data.is_plain_text,
+            'plain_text': self.chat_data.plain_text,
+            'keywords': self.chat_data.keywords,
+            'time': self.chat_data.time,
+        })
 
         cur_time = self.chat_data.time
         if Chat._late_save_time == 0:
@@ -188,16 +189,16 @@ class Chat:
         持久化
         '''
 
-        with Chat._sync_lock:
-            save_list = [msg
-                         for group_msgs in Chat._message_dict.values()
-                         for msg in group_msgs
-                         if msg['time'] > Chat._late_save_time]
+        # with Chat._sync_lock:
+        save_list = [msg
+                     for group_msgs in Chat._message_dict.values()
+                     for msg in group_msgs
+                     if msg['time'] > Chat._late_save_time]
 
-            Chat._message_dict = {group_id: group_msgs[-Chat._save_reserve_size:]
-                                  for group_id, group_msgs in Chat._message_dict.items()}
+        Chat._message_dict = {group_id: group_msgs[-Chat._save_reserve_size:]
+                              for group_id, group_msgs in Chat._message_dict.items()}
 
-            Chat._late_save_time = cur_time
+        Chat._late_save_time = cur_time
 
         message_mongo.insert_many(save_list)
 
@@ -205,55 +206,69 @@ class Chat:
         if not pre_msg:
             return
 
+        raw_message = self.chat_data.raw_message
+        is_plain_text = self.chat_data.is_plain_text
+
         # 在复读，不学
-        if pre_msg['raw_message'] == self.chat_data.raw_message:
+        if pre_msg['raw_message'] == raw_message:
             return
 
         # 回复别人的，不学
-        if '[CQ:reply,' in self.chat_data.raw_message:
+        if '[CQ:reply,' in raw_message:
             return
-
-        # # 如果有反过来的，直接退出，说明可能是两句话在轮流复读。只取正向的（先达到阈值的）
-        # reverse = mongo_context.find_one({
-        #     'group_id': self.chat_data.group_id,
-        #     'pre_raw_msg': self.chat_data.raw_message,
-        #     'cur_raw_msg': pre_msg.raw_message,
-        #     'count': {'$gt': ChatData._count_threshold}
-        # })
-        # if reverse:
-        #     return
 
         update_key = {
             'group_id': self.chat_data.group_id,
             'pre_is_plain_text': pre_msg['is_plain_text'],
-            'cur_is_plain_text': self.chat_data.is_plain_text
+            'cur_is_plain_text': is_plain_text
         }
+        dict_key = update_key.copy()
 
-        if self.chat_data.is_plain_text:
+        if is_plain_text:
             update_key['cur_keywords'] = self.chat_data.keywords
+            dict_key['cur_keywords'] = ''.join(
+                [kw for kw in self.chat_data.keywords])
         else:
-            update_key['cur_raw_msg'] = self.chat_data.raw_message
+            update_key['cur_raw_msg'] = raw_message
+            dict_key['cur_raw_msg'] = raw_message
 
         if pre_msg['is_plain_text']:
             update_key['pre_keywords'] = pre_msg['keywords']
+            dict_key['pre_keywords'] = ''.join(
+                [kw for kw in pre_msg['keywords']])
         else:
             update_key['pre_raw_msg'] = pre_msg['raw_message']
+            dict_key['pre_raw_msg'] = pre_msg['raw_message']
 
-        set_value = update_key.copy()
-        set_value['time'] = self.chat_data.time
-        # update_value['count'] = 1
+        dict_key = tuple(sorted(dict_key.items()))
+        if dict_key not in Chat._context_dict:
+            Chat._context_dict[dict_key] = [update_key, ]
 
-        update_value = {}
-        update_value['$set'] = set_value
-        update_value['$inc'] = {
-            'count': 1
-        }
-        if self.chat_data.is_plain_text:
-            update_value['$push'] = {
-                'cur_raw_msg_options': self.chat_data.raw_message
-            }
+        Chat._context_dict[dict_key].append({
+            'time': self.chat_data.time,
+            'raw_message': raw_message
+        })
 
-        context_mongo.update_one(update_key, update_value, upsert=True)
+        # context_mongo.update_one(update_key, update_value, upsert=True)
+
+    @staticmethod
+    def sync_context():
+
+        save_list = []
+        for value in Chat._context_dict.values():
+            if len(value) - 1 < Chat._count_threshold - 1:
+                continue
+            insert_value = value[0].copy()
+            insert_value['time'] = value[-1]['time']
+            insert_value['count'] = len(value) - 1
+            insert_value['cur_raw_msg_options'] = []
+            for item in value[1:]:
+                insert_value['cur_raw_msg_options'].append(item['raw_message'])
+
+            save_list.append(insert_value)
+
+        Chat._context_dict.clear()
+        context_mongo.insert_many(save_list)
 
     def _context_find(self) -> Optional[List[str]]:
 
@@ -265,19 +280,16 @@ class Chat:
         else:
             count_thres = Chat._count_threshold + 1
 
-        # hist_msg = mongo_message.find({
-        #     'group_id': self.chat_data.group_id,
-        # }, sort=[('time', pymongo.DESCENDING)]).limit(count_thres)
+        group_id = self.chat_data.group_id
+        raw_message = self.chat_data.raw_message
 
-        # # 复读！
-        # if hist_msg:
-        #     is_repeat = True
-        #     for item in hist_msg:
-        #         if self.chat_data.raw_message != item.raw_message:
-        #             is_repeat = False
-        #             break
-        #     if is_repeat:
-        #         return [self.chat_data.raw_message, ]
+        # 复读！
+        if group_id in Chat._message_dict:
+            group_msg = Chat._message_dict[group_id]
+            if group_msg:
+                if all(item['raw_message'] == raw_message
+                        for item in group_msg[:-count_thres:-1]):
+                    return [raw_message, ]
 
         if self.chat_data.is_plain_text:
             all_answers = context_mongo.find({
@@ -286,19 +298,19 @@ class Chat:
             })
         elif self.chat_data.is_image:
             all_answers = context_mongo.find({
-                'pre_raw_msg': self.chat_data.raw_message,
+                'pre_raw_msg': raw_message,
                 'count': {'$gt': count_thres},
                 'cur_raw_msg': {'$regex': '^\[CQ:'}
             })
         else:
             all_answers = context_mongo.find({
-                'pre_raw_msg': self.chat_data.raw_message,
+                'pre_raw_msg': raw_message,
                 'count': {'$gt': count_thres}
             })
         filtered_answers = []
         answers_count = defaultdict(int)
         for answer in all_answers:
-            if answer['group_id'] == self.chat_data.group_id:
+            if answer['group_id'] == group_id:
                 filtered_answers.append(answer)
                 continue
             elif answer['cur_is_plain_text']:
