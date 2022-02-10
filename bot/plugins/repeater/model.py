@@ -292,8 +292,9 @@ class Chat:
                 filtered_answers.append(answer)
                 continue
             elif answer['cur_is_plain_text']:
-                answers_count[answer['cur_keywords']] += 1
-                cur_count = answers_count[answer['cur_keywords']]
+                keyswords_as_key = tuple(answer['cur_keywords'])
+                answers_count[keyswords_as_key] += 1
+                cur_count = answers_count[keyswords_as_key]
             elif '[CQ:at,' in answer['cur_raw_msg']:    # 别的群的 at, 过滤掉
                 continue
             else:

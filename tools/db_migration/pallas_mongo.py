@@ -256,7 +256,8 @@ class Chat:
 
         save_list = []
         for value in Chat._context_dict.values():
-            if len(value) - 1 < Chat._count_threshold - 1:
+            if len(value) - 1 < Chat._count_threshold - 1   \
+                    and value[-1]['time'] < time.time() - 7 * 24 * 3600:
                 continue
             insert_value = value[0].copy()
             insert_value['time'] = value[-1]['time']
@@ -314,8 +315,9 @@ class Chat:
                 filtered_answers.append(answer)
                 continue
             elif answer['cur_is_plain_text']:
-                answers_count[answer['cur_keywords']] += 1
-                cur_count = answers_count[answer['cur_keywords']]
+                keyswords_as_key = tuple(answer['cur_keywords'])
+                answers_count[keyswords_as_key] += 1
+                cur_count = answers_count[keyswords_as_key]
             elif '[CQ:at,' in answer['cur_raw_msg']:    # 别的群的 at, 过滤掉
                 continue
             else:
