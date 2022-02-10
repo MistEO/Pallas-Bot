@@ -104,19 +104,19 @@ class Chat:
 
         group_id = self.chat_data.group_id
         if group_id in Chat._message_dict:
-            # 群里的上一条发言
             group_msg = Chat._message_dict[group_id]
             if group_msg:
                 group_pre_msg = group_msg[-1]
             else:
                 group_pre_msg = None
 
+            # 群里的上一条发言
             self._context_insert(group_pre_msg)
 
             user_id = self.chat_data.user_id
             if group_pre_msg and group_pre_msg['user_id'] != user_id:
                 # 该用户在群里的上一条发言（倒序）
-                for msg in group_msg[::-1]:
+                for msg in group_msg[:-Chat._save_reserve_size:-1]:
                     if msg['user_id'] == user_id:
                         self._context_insert(msg)
                         break
@@ -157,22 +157,19 @@ class Chat:
     def _message_insert(self):
         group_id = self.chat_data.group_id
 
-        # Chat._sync_lock.acquire()
+        with Chat._sync_lock:
+            if group_id not in Chat._message_dict:
+                Chat._message_dict[group_id] = []
 
-        if group_id not in Chat._message_dict:
-            Chat._message_dict[group_id] = []
-
-        Chat._message_dict[group_id].append({
-            'group_id': group_id,
-            'user_id': self.chat_data.user_id,
-            'raw_message': self.chat_data.raw_message,
-            'is_plain_text': self.chat_data.is_plain_text,
-            'plain_text': self.chat_data.plain_text,
-            'keywords': self.chat_data.keywords,
-            'time': self.chat_data.time,
-        })
-
-        # Chat._sync_lock.release()
+            Chat._message_dict[group_id].append({
+                'group_id': group_id,
+                'user_id': self.chat_data.user_id,
+                'raw_message': self.chat_data.raw_message,
+                'is_plain_text': self.chat_data.is_plain_text,
+                'plain_text': self.chat_data.plain_text,
+                'keywords': self.chat_data.keywords,
+                'time': self.chat_data.time,
+            })
 
         cur_time = self.chat_data.time
         if Chat._late_save_time == 0:
@@ -190,21 +187,19 @@ class Chat:
         '''
         持久化
         '''
-        Chat._sync_lock.acquire()
 
-        save_list = [msg
-                     for group_msgs in Chat._message_dict.values()
-                     for msg in group_msgs
-                     if msg['time'] > Chat._late_save_time]
+        with Chat._sync_lock:
+            save_list = [msg
+                         for group_msgs in Chat._message_dict.values()
+                         for msg in group_msgs
+                         if msg['time'] > Chat._late_save_time]
+
+            Chat._message_dict = {group_id: group_msgs[-Chat._save_reserve_size:]
+                                  for group_id, group_msgs in Chat._message_dict.items()}
+
+            Chat._late_save_time = cur_time
 
         message_mongo.insert_many(save_list)
-
-        Chat._message_dict = {group_id: group_msgs[-Chat._save_reserve_size:]
-                              for group_id, group_msgs in Chat._message_dict.items()}
-
-        Chat._late_save_time = cur_time
-
-        Chat._sync_lock.release()
 
     def _context_insert(self, pre_msg):
         if not pre_msg:
@@ -244,21 +239,21 @@ class Chat:
         else:
             update_key['pre_raw_msg'] = pre_msg['raw_message']
 
-        update_value = update_key.copy()
-        update_value['time'] = self.chat_data.time
+        set_value = update_key.copy()
+        set_value['time'] = self.chat_data.time
         # update_value['count'] = 1
 
-        set_value = {}
-        set_value['$set'] = update_value
-        set_value['$inc'] = {
+        update_value = {}
+        update_value['$set'] = set_value
+        update_value['$inc'] = {
             'count': 1
         }
         if self.chat_data.is_plain_text:
-            set_value['$push'] = {
+            update_value['$push'] = {
                 'cur_raw_msg_options': self.chat_data.raw_message
             }
 
-        context_mongo.update_one(update_key, set_value, upsert=True)
+        context_mongo.update_one(update_key, update_value, upsert=True)
 
     def _context_find(self) -> Optional[List[str]]:
 
