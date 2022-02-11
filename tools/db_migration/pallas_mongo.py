@@ -333,7 +333,7 @@ class Chat:
             all_answers = [answer
                            for answer in context['answers']
                            if answer['count'] >= count_thres
-                           and answer['keywords'].startwith('[CQ:')]
+                           and answer['keywords'].startswith('[CQ:')]
 
         filtered_answers = []
         answers_count = defaultdict(int)
