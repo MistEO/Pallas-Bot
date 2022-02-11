@@ -1,10 +1,10 @@
-import threading
 from typing import List, Optional, Union
 from functools import cached_property
 from dataclasses import dataclass
 from collections import defaultdict
 
 import jieba_fast.analyse
+import threading
 import pypinyin
 import pymongo
 import time
@@ -19,7 +19,11 @@ mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
 mongo_db = mongo_client['PallasBot']
 
 message_mongo = mongo_db['message']
+
 context_mongo = mongo_db['context']
+context_mongo.create_index([('keywords', pymongo.HASHED)])
+context_mongo.create_index([("answers.group_id", pymongo.ASCENDING),
+                            ("answers.keywords", pymongo.ASCENDING)])
 
 
 @dataclass
@@ -50,7 +54,7 @@ class ChatData:
         if len(keywords_list) < 2:
             return self.plain_text
         else:
-            keywords_list.sort()
+            # keywords_list.sort()
             return ' '.join(keywords_list)
 
     @cached_property
@@ -67,13 +71,6 @@ class Chat:
 
     _reply_dict = {}                # 牛牛回复的消息缓存，暂未做持久化
     _message_dict = {}              # 群消息缓存
-    _context_cache = list(          # 学习的上下文缓存
-        context_mongo.find(
-            {"$or": [
-                {'count': {'$gt': _count_threshold - 1}},
-                {"time": {'$gt': time.time() - 7 * 24 * 3600}}
-            ]}
-        ))
 
     _save_reserve_size = 10         # 保存时，给内存中保留的大小
     _late_save_time = 0             # 上次保存（消息数据持久化）的时刻 ( time.time(), 秒 )
@@ -210,7 +207,8 @@ class Chat:
             return
 
         raw_message = self.chat_data.raw_message
-        is_plain_text = self.chat_data.is_plain_text
+        keywords = self.chat_data.keywords
+        group_id = self.chat_data.group_id
 
         # 在复读，不学
         if pre_msg['raw_message'] == raw_message:
@@ -221,52 +219,20 @@ class Chat:
             return
 
         update_key = {
-            'group_id': self.chat_data.group_id,
-            'pre_is_plain_text': pre_msg['is_plain_text'],
-            'cur_is_plain_text': is_plain_text
+            'keywords': pre_msg['keywords'],
+            'answers.keywords': keywords,
+            'answers.group_id': group_id
         }
 
-        if is_plain_text:
-            update_key['cur_keywords'] = self.chat_data.keywords
-        else:
-            update_key['cur_raw_msg'] = raw_message
-
-        if pre_msg['is_plain_text']:
-            update_key['pre_keywords'] = pre_msg['keywords']
-        else:
-            update_key['pre_raw_msg'] = pre_msg['raw_message']
-
-        set_value = update_key.copy()
-        set_value['time'] = self.chat_data.time
-        # update_value['count'] = 1
-
-        update_value = {}
-        update_value['$set'] = set_value
-        update_value['$inc'] = {
-            'count': 1
+        update_value = {
+            '$set': {'time': self.chat_data.time},
+            '$inc': {'answers.$.count': 1},
+            '$push': {'answers.$.messages': raw_message}
         }
-        if is_plain_text:
-            update_value['$push'] = {
-                'cur_raw_msg_options': raw_message
-            }
+        # update_value.update(update_key)
 
         context_mongo.update_one(
             update_key, update_value, upsert=True)
-
-        cur_cache = next((pre_context
-                          for pre_context in Chat._context_cache
-                          if update_key.items() <= pre_context.items()), None)
-
-        if not cur_cache:
-            Chat._context_cache.append(update_key)
-            cur_cache = Chat._context_cache[-1]
-            cur_cache['count'] = 0
-            if is_plain_text:
-                cur_cache['cur_raw_msg_options'] = []
-
-        cur_cache['count'] += 1
-        if is_plain_text:
-            cur_cache['cur_raw_msg_options'].append(raw_message)
 
     def _context_find(self) -> Optional[List[str]]:
 
@@ -280,35 +246,30 @@ class Chat:
 
         group_id = self.chat_data.group_id
         raw_message = self.chat_data.raw_message
+        keywords = self.chat_data.keywords
 
         # 复读！
         if group_id in Chat._message_dict:
             group_msg = Chat._message_dict[group_id]
-            if group_msg:
+            if group_msg and len(group_msg) >= count_thres:
                 if all(item['raw_message'] == raw_message
                         for item in group_msg[:-count_thres:-1]):
                     return [raw_message, ]
 
-        if self.chat_data.is_plain_text:
+        context = context_mongo.find_one({'keywords': keywords})
+        if not context:
+            return None
+
+        if not self.chat_data.is_image:
             all_answers = [answer
-                           for answer in self._context_cache
-                           if 'pre_keywords' in answer
-                           and answer['pre_keywords'] == self.chat_data.keywords
-                           and answer['count'] >= count_thres]
-        elif self.chat_data.is_image:
-            all_answers = [answer
-                           for answer in self._context_cache
-                           if 'pre_raw_msg' in answer
-                           and 'cur_raw_msg' in answer
-                           and answer['pre_raw_msg'] == raw_message
-                           and answer['count'] >= count_thres
-                           and answer['cur_raw_msg'].startswith('[CQ:')]
+                           for answer in context['answers']
+                           if answer['count'] >= count_thres]
         else:
+            # 屏蔽图片后的纯文字回复，图片经常是表情包，后面的纯文字什么都有，很乱
             all_answers = [answer
-                           for answer in self._context_cache
-                           if 'pre_raw_msg' in answer
-                           and answer['pre_raw_msg'] == raw_message
-                           and answer['count'] >= count_thres]
+                           for answer in context['answers']
+                           if answer['count'] >= count_thres
+                           and answer['keywords'].startwith('[CQ:')]
 
         filtered_answers = []
         answers_count = defaultdict(int)
@@ -316,40 +277,18 @@ class Chat:
             if answer['group_id'] == group_id:
                 filtered_answers.append(answer)
                 continue
-            elif answer['cur_is_plain_text']:
-                answers_count[answer['cur_keywords']] += 1
-                cur_count = answers_count[answer['cur_keywords']]
-            elif '[CQ:at,' in answer['cur_raw_msg']:    # 别的群的 at, 过滤掉
-                continue
-            else:
-                answers_count[answer['cur_raw_msg']] += 1
-                cur_count = answers_count[answer['cur_raw_msg']]
+            else:   # 有这么 N 个群都有相同的回复，就作为全局回复
+                key = answer['keywords']
+                answers_count[key] += 1
+                if answers_count[key] == count_thres:
+                    filtered_answers.append(answer)
 
-            if cur_count == count_thres:    # 有这么多个群都有相同的回复，就作为全局回复
-                filtered_answers.append(answer)
-
-        if not len(filtered_answers):
+        if not filtered_answers:
             return None
 
-        # count 越大的结果，回复的概率越大
-        count_seg = []
-        count_sum = 0
-        for answer in filtered_answers:
-            count_sum += answer['count'] ** 2
-            count_seg.append(count_sum)
-        rand_value = random.randint(0, count_sum)
-        rand_index = 0
-        for index in range(len(count_seg)):
-            if rand_value < count_seg[index]:
-                rand_index = index
-                break
-
-        final_answer = filtered_answers[rand_index]
-        if final_answer['cur_is_plain_text']:
-            answer_str = random.choice(
-                final_answer['cur_raw_msg_options'])
-        else:
-            answer_str = final_answer['cur_raw_msg']
+        final_answer = random.choices(filtered_answers, weights=[
+            answer['count'] ** 2 for answer in filtered_answers])
+        answer_str = random.choice(final_answer['messages'])
 
         if 0 < answer_str.count('，') <= 3 and random.randint(1, 10) < 5:
             return answer_str.split('，')
