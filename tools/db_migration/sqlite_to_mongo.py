@@ -45,6 +45,7 @@ while True:
     print('cur:', cur_count, "all:", all_count)
     print(cur_count / all_count * 100, '%')
 
+print('sync')
 pallas_mongo.Chat.sync()
 pallas_mongo.Chat.sync_context()
 print('finished')

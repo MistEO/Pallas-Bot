@@ -19,11 +19,20 @@ mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
 mongo_db = mongo_client['PallasBot']
 
 message_mongo = mongo_db['message']
+message_mongo.create_index(name='time_index',
+                           keys=[('time', pymongo.DESCENDING)])
 
 context_mongo = mongo_db['context']
-context_mongo.create_index([('keywords', pymongo.HASHED)])
-context_mongo.create_index([("answers.group_id", pymongo.ASCENDING),
-                            ("answers.keywords", pymongo.ASCENDING)])
+context_mongo.create_index(name='keywords_index',
+                           keys=[('keywords', pymongo.HASHED)])
+context_mongo.create_index(name='count_index',
+                           keys=[('count', pymongo.DESCENDING)])
+context_mongo.create_index(name='time_index',
+                           keys=[('time', pymongo.DESCENDING)])
+context_mongo.create_index(name='answers_index',
+                           keys=[("answers.group_id", pymongo.TEXT),
+                                 ("answers.keywords", pymongo.TEXT)],
+                           default_language='none')
 
 
 @dataclass
@@ -140,7 +149,7 @@ class Chat:
                 return None
 
         # 不回复太短的对话，大部分是“？”、“草”
-        if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
+        if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 3:
             return None
 
         result = self._context_find()
@@ -218,21 +227,72 @@ class Chat:
         if '[CQ:reply,' in raw_message:
             return
 
-        update_key = {
-            'keywords': pre_msg['keywords'],
-            'answers.keywords': keywords,
-            'answers.group_id': group_id
-        }
+        # update_key = {
+        #     'keywords': pre_msg['keywords'],
+        #     'answers.keywords': keywords,
+        #     'answers.group_id': group_id
+        # }
 
-        update_value = {
-            '$set': {'time': self.chat_data.time},
-            '$inc': {'answers.$.count': 1},
-            '$push': {'answers.$.messages': raw_message}
-        }
-        # update_value.update(update_key)
+        # update_value = {
+        #     '$set': {'time': self.chat_data.time},
+        #     '$inc': {'answers.$[count]': 1},
+        #     '$push': {'answers.$[messages]': raw_message}
+        # }
+        # # update_value.update(update_key)
 
-        context_mongo.update_one(
-            update_key, update_value, upsert=True)
+        # context_mongo.update_one(
+        #     update_key, update_value, upsert=True)
+
+        # 这个 upsert 太难写了，搞不定_(:з」∠)_
+        # 先用 find + insert or update 凑合了
+        find_key = {'keywords': pre_msg['keywords']}
+        context = context_mongo.find_one(find_key)
+        if context:
+            update_value = {
+                '$set': {
+                    'time': self.chat_data.time
+                },
+                '$inc': {'count': 1}
+            }
+            all_answers = context['answers']
+            answer_index = next((idx for idx in range(len(all_answers))
+                                 if all_answers[idx]['group_id'] == group_id
+                                 and all_answers[idx]['keywords'] == keywords), -1)
+            if answer_index < 0:
+                update_value['$push'] = {
+                    'answers': {
+                        'keywords': keywords,
+                        'group_id': group_id,
+                        'count': 1,
+                        'messages': [
+                            raw_message
+                        ]
+                    }
+                }
+            else:
+                answer = all_answers[answer_index]
+                answer['count'] += 1
+                answer['messages'].append(raw_message)
+                update_value['$set']['answers.' + (str)(answer_index)] = answer
+
+            context_mongo.update_one(find_key, update_value)
+        else:
+            context = {
+                'keywords': pre_msg['keywords'],
+                'time': self.chat_data.time,
+                'count': 1,
+                'answers': [
+                    {
+                        'keywords': keywords,
+                        'group_id': group_id,
+                        'count': 1,
+                        'messages': [
+                            raw_message
+                        ]
+                    }
+                ]
+            }
+            context_mongo.insert_one(context)
 
     def _context_find(self) -> Optional[List[str]]:
 
@@ -287,7 +347,7 @@ class Chat:
             return None
 
         final_answer = random.choices(filtered_answers, weights=[
-            answer['count'] ** 2 for answer in filtered_answers])
+            answer['count'] ** 2 for answer in filtered_answers])[0]
         answer_str = random.choice(final_answer['messages'])
 
         if 0 < answer_str.count('，') <= 3 and random.randint(1, 10) < 5:
@@ -322,8 +382,8 @@ if __name__ == '__main__':
     test_answer_data: ChatData = ChatData(
         group_id=1234567,
         user_id=1111111,
-        raw_message='别烦，我学MySql啊',
-        plain_text='别烦，我学MySql啊',
+        raw_message='别烦',
+        plain_text='别烦',
         time=time.time()
     )
 
