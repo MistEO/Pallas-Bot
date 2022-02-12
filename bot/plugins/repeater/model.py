@@ -30,8 +30,8 @@ context_mongo.create_index(name='count_index',
 context_mongo.create_index(name='time_index',
                            keys=[('time', pymongo.DESCENDING)])
 context_mongo.create_index(name='answers_index',
-                           keys=[("answers.group_id", pymongo.TEXT),
-                                 ("answers.keywords", pymongo.TEXT)],
+                           keys=[('answers.group_id', pymongo.TEXT),
+                                 ('answers.keywords', pymongo.TEXT)],
                            default_language='none')
 
 
@@ -78,7 +78,7 @@ class Chat:
 
     _count_threshold = 3            # answer 相关的阈值
 
-    _reply_dict = {}                # 牛牛回复的消息缓存，暂未做持久化
+    _reply_dict = defaultdict(list)  # 牛牛回复的消息缓存，暂未做持久化
     _message_dict = {}              # 群消息缓存
 
     _save_reserve_size = 10         # 保存时，给内存中保留的大小
@@ -96,7 +96,7 @@ class Chat:
                 group_id=event_dict['group_id'],
                 user_id=event_dict['user_id'],
                 # 删除图片子类型字段，同一张图子类型经常不一样，影响判断
-                raw_message=re.sub(',subType=\d+', '',
+                raw_message=re.sub(r'(\[CQ\:image.+)(?:,subType=\d+)(\])', r'\1\2',
                                    event_dict['raw_message']),
                 plain_text=data.get_plaintext(),
                 time=event_dict['time']
@@ -137,30 +137,69 @@ class Chat:
         '''
 
         if self.chat_data.group_id in Chat._reply_dict:
-            latest_reply = Chat._reply_dict[self.chat_data.group_id]
+            group_reply = Chat._reply_dict[self.chat_data.group_id]
+            latest_reply = group_reply[-1]
             # 限制发音频率，最多 3 秒一次
             if self.chat_data.time - latest_reply['time'] < 3:
                 return None
             # # 不要一直回复同一个内容
-            # if self.chat_data.raw_message == latest_reply['pre_msg']:
+            # if self.chat_data.raw_message == latest_reply['pre_raw_message']:
             #     return None
             # 有人复读了牛牛的回复，不继续回复
-            if self.chat_data.raw_message == latest_reply['cur_msg']:
+            if self.chat_data.raw_message == latest_reply['reply']:
+                return None
+
+            # 如果连续三次回复同样的内容，就不再回复。这种情况很可能是和别的 bot 死循环了
+            repeat_times = 3
+            if len(group_reply) >= repeat_times \
+                and all(reply['pre_raw_message'] == self.chat_data.raw_message
+                        for reply in group_reply[-repeat_times:]):
                 return None
 
         # 不回复太短的对话，大部分是“？”、“草”
-        if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 3:
+        if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
             return None
 
         result = self._context_find()
 
         if result:
-            Chat._reply_dict[self.chat_data.group_id] = {
-                'time': (int)(time.time()),
-                'cur_msg': result[-1],
-                'pre_msg': self.chat_data.raw_message
-            }
+            group_reply = Chat._reply_dict[self.chat_data.group_id]
+            for item in result:
+                group_reply.append({
+                    'time': (int)(time.time()),
+                    'pre_raw_message': self.chat_data.raw_message,
+                    'pre_keywords': self.chat_data.keywords,
+                    'reply': item,
+                })
+            group_reply = group_reply[-Chat._save_reserve_size:]
         return result
+
+    def ban(self) -> bool:
+        '''
+        禁止以后回复这句话，仅对该群有效果
+        '''
+        group_id = self.chat_data.group_id
+        if group_id not in Chat._reply_dict:
+            return False
+
+        reply_list = Chat._reply_dict[group_id]
+        for reply in reply_list[::-1]:
+            print(reply['reply'])
+            print(self.chat_data.raw_message)
+            if reply['reply'] in self.chat_data.raw_message:
+                context_mongo.update_one({
+                    'keywords': reply['pre_keywords']
+                }, {
+                    '$push': {
+                        'ban': {
+                            'keywords': self.chat_data.keywords,
+                            'group_id': group_id
+                        }
+                    }
+                })
+                return True
+
+        return False
 
     def _message_insert(self):
         group_id = self.chat_data.group_id
@@ -317,8 +356,15 @@ class Chat:
                     return [raw_message, ]
 
         context = context_mongo.find_one({'keywords': keywords})
+
         if not context:
             return None
+
+        if 'ban' in context:
+            ban_keywords = [ban['keywords'] for ban in context['ban']
+                            if ban['group_id'] == group_id]
+        else:
+            ban_keywords = []
 
         if not self.chat_data.is_image:
             all_answers = [answer
@@ -334,9 +380,10 @@ class Chat:
         filtered_answers = []
         answers_count = defaultdict(int)
         for answer in all_answers:
-            if answer['group_id'] == group_id:
+            if answer['keywords'] in ban_keywords:
+                pass
+            elif answer['group_id'] == group_id:
                 filtered_answers.append(answer)
-                continue
             else:   # 有这么 N 个群都有相同的回复，就作为全局回复
                 key = answer['keywords']
                 answers_count[key] += 1
