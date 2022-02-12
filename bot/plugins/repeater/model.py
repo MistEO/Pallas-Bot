@@ -74,10 +74,12 @@ class ChatData:
 
 
 class Chat:
-    save_time_threshold = 600      # 每隔多久进行一次保存 ( 秒 )
-    save_count_threshold = 100     # 单个群超过多少条聊天记录就进行一次保存。与时间是或的关系
+    answer_threshold = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
+    cross_group_threshold = 3       # N 个群有相同的回复，就跨群作为全局回复
+    split_probability = 0.5         # 按逗号分割回复语的概率
 
-    _count_threshold = 3            # answer 相关的阈值
+    save_time_threshold = 600      # 每隔多久进行一次持久化 ( 秒 )
+    save_count_threshold = 100     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
 
     _reply_dict = defaultdict(list)  # 牛牛回复的消息缓存，暂未做持久化
     _message_dict = {}              # 群消息缓存
@@ -97,19 +99,21 @@ class Chat:
                 group_id=event_dict['group_id'],
                 user_id=event_dict['user_id'],
                 # 删除图片子类型字段，同一张图子类型经常不一样，影响判断
-                raw_message=re.sub(r'(\[CQ\:image.+)(?:,subType=\d+)(\])', r'\1\2',
-                                   event_dict['raw_message']),
+                raw_message=re.sub(
+                    r'(\[CQ\:image.+)(?:,subType=\d+)(\])',
+                    r'\1\2',
+                    event_dict['raw_message']),
                 plain_text=data.get_plaintext(),
                 time=event_dict['time']
             )
 
-    def learn(self):
+    def learn(self) -> bool:
         '''
         学习这句话
         '''
 
         if len(self.chat_data.raw_message.strip()) == 0:
-            return
+            return False
 
         group_id = self.chat_data.group_id
         if group_id in Chat._message_dict:
@@ -131,6 +135,7 @@ class Chat:
                         break
 
         self._message_insert()
+        return True
 
     def answer(self) -> Optional[Generator[Message, None, None]]:
         '''
@@ -150,8 +155,8 @@ class Chat:
             if self.chat_data.raw_message == latest_reply['reply']:
                 return None
 
-            # 如果连续三次回复同样的内容，就不再回复。这种情况很可能是和别的 bot 死循环了
-            repeat_times = 3
+            # 如果连续 5 次回复同样的内容，就不再回复。这种情况很可能是和别的 bot 死循环了
+            repeat_times = 5
             if len(group_reply) >= repeat_times \
                 and all(reply['pre_raw_message'] == self.chat_data.raw_message
                         for reply in group_reply[-repeat_times:]):
@@ -339,13 +344,13 @@ class Chat:
 
     def _context_find(self) -> Optional[List[str]]:
 
-        rand = random.randint(0, 100)
-        if rand < 30:
-            count_thres = Chat._count_threshold - 1
-        elif rand < 60:
-            count_thres = Chat._count_threshold
+        rand = random.random()
+        if rand < 0.4:
+            rand_threshold = Chat.answer_threshold - 1
+        elif rand < 0.7:
+            rand_threshold = Chat.answer_threshold
         else:
-            count_thres = Chat._count_threshold + 1
+            rand_threshold = Chat.answer_threshold + 1
 
         group_id = self.chat_data.group_id
         raw_message = self.chat_data.raw_message
@@ -354,9 +359,9 @@ class Chat:
         # 复读！
         if group_id in Chat._message_dict:
             group_msg = Chat._message_dict[group_id]
-            if group_msg and len(group_msg) >= count_thres:
+            if group_msg and len(group_msg) >= rand_threshold:
                 if all(item['raw_message'] == raw_message
-                        for item in group_msg[:-count_thres:-1]):
+                        for item in group_msg[:-rand_threshold:-1]):
                     return [raw_message, ]
 
         context = context_mongo.find_one({'keywords': keywords})
@@ -373,12 +378,12 @@ class Chat:
         if not self.chat_data.is_image:
             all_answers = [answer
                            for answer in context['answers']
-                           if answer['count'] >= count_thres]
+                           if answer['count'] >= rand_threshold]
         else:
             # 屏蔽图片后的纯文字回复，图片经常是表情包，后面的纯文字什么都有，很乱
             all_answers = [answer
                            for answer in context['answers']
-                           if answer['count'] >= count_thres
+                           if answer['count'] >= rand_threshold
                            and answer['keywords'].startswith('[CQ:')]
 
         filtered_answers = []
@@ -391,7 +396,7 @@ class Chat:
             else:   # 有这么 N 个群都有相同的回复，就作为全局回复
                 key = answer['keywords']
                 answers_count[key] += 1
-                if answers_count[key] == count_thres:
+                if answers_count[key] == Chat.cross_group_threshold:
                     filtered_answers.append(answer)
 
         if not filtered_answers:
@@ -401,7 +406,7 @@ class Chat:
             answer['count'] ** 2 for answer in filtered_answers])[0]
         answer_str = random.choice(final_answer['messages'])
 
-        if 0 < answer_str.count('，') <= 3 and random.randint(1, 10) < 5:
+        if 0 < answer_str.count('，') <= 3 and random.random() < Chat.split_probability:
             return answer_str.split('，')
         return [answer_str, ]
 

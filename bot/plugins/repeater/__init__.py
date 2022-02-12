@@ -16,6 +16,9 @@ any_msg = on_message(
     permission=permission.GROUP
 )
 
+Chat.answer_threshold = 3
+Chat.cross_group_threshold = 2
+
 
 @any_msg.handle()
 async def _(bot: Bot, event: Event, state: T_State):
