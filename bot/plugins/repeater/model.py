@@ -281,8 +281,6 @@ class Chat:
             return
 
         raw_message = self.chat_data.raw_message
-        keywords = self.chat_data.keywords
-        group_id = self.chat_data.group_id
 
         # 在复读，不学
         if pre_msg['raw_message'] == raw_message:
@@ -292,16 +290,20 @@ class Chat:
         if '[CQ:reply,' in raw_message:
             return
 
+        keywords = self.chat_data.keywords
+        group_id = self.chat_data.group_id
+        pre_keywords = pre_msg['keywords']
+        
+
         # update_key = {
-        #     'keywords': pre_msg['keywords'],
+        #     'keywords': pre_keywords,
         #     'answers.keywords': keywords,
         #     'answers.group_id': group_id
         # }
-
         # update_value = {
         #     '$set': {'time': self.chat_data.time},
-        #     '$inc': {'answers.$[count]': 1},
-        #     '$push': {'answers.$[messages]': raw_message}
+        #     '$inc': {'answers.$count': 1},
+        #     '$push': {'answers.$messages': raw_message}
         # }
         # # update_value.update(update_key)
 
@@ -310,7 +312,7 @@ class Chat:
 
         # 这个 upsert 太难写了，搞不定_(:з」∠)_
         # 先用 find + insert or update 凑合了
-        find_key = {'keywords': pre_msg['keywords']}
+        find_key = {'keywords': pre_keywords}
         context = context_mongo.find_one(find_key)
         if context:
             update_value = {
@@ -319,11 +321,17 @@ class Chat:
                 },
                 '$inc': {'count': 1}
             }
-            all_answers = context['answers']
-            answer_index = next((idx for idx in range(len(all_answers))
-                                 if all_answers[idx]['group_id'] == group_id
-                                 and all_answers[idx]['keywords'] == keywords), -1)
-            if answer_index < 0:
+            answer_index = next((idx for idx, answer in enumerate(context['answers'])
+                                 if answer['group_id'] == group_id
+                                 and answer['keywords'] == keywords), -1)
+            if answer_index != -1:
+                update_value['$inc'].update({
+                    f'answers.{answer_index}.count': 1
+                })
+                update_value['$push'] = {
+                    f'answers.{answer_index}.messages': raw_message
+                }
+            else:
                 update_value['$push'] = {
                     'answers': {
                         'keywords': keywords,
@@ -334,11 +342,6 @@ class Chat:
                         ]
                     }
                 }
-            else:
-                answer = all_answers[answer_index]
-                answer['count'] += 1
-                answer['messages'].append(raw_message)
-                update_value['$set']['answers.' + (str)(answer_index)] = answer
 
             context_mongo.update_one(find_key, update_value)
         else:
