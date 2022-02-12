@@ -1,10 +1,13 @@
+from .config import Config
 from typing import Generator, List, Optional, Union
 from functools import cached_property
 from dataclasses import dataclass
 from collections import defaultdict
+from aip import AipSpeech
 
 import jieba_fast.analyse
 import threading
+import nonebot
 import pypinyin
 import pymongo
 import time
@@ -13,7 +16,7 @@ import re
 import atexit
 
 from nonebot.adapters import Event
-from nonebot.adapters.cqhttp import Message
+from nonebot.adapters.cqhttp import Message, MessageSegment
 
 mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
 
@@ -34,6 +37,15 @@ context_mongo.create_index(name='answers_index',
                            keys=[('answers.group_id', pymongo.TEXT),
                                  ('answers.keywords', pymongo.TEXT)],
                            default_language='none')
+
+
+global_config = nonebot.get_driver().config
+plugin_config = Config(**global_config.dict())
+
+if plugin_config.enable_voice:
+    client = AipSpeech(plugin_config.APP_ID,
+                       plugin_config.API_KEY,
+                       plugin_config.SECRET_KEY)
 
 
 @dataclass
@@ -77,6 +89,7 @@ class Chat:
     answer_threshold = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
     cross_group_threshold = 3       # N 个群有相同的回复，就跨群作为全局回复
     split_probability = 0.5         # 按逗号分割回复语的概率
+    voice_probability = 0           # 回复语音的概率（仅纯文字）
 
     save_time_threshold = 600      # 每隔多久进行一次持久化 ( 秒 )
     save_count_threshold = 100     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
@@ -178,7 +191,11 @@ class Chat:
                         'pre_keywords': self.chat_data.keywords,
                         'reply': item,
                     })
-                    yield Message(item)
+                    if '[CQ:' not in item and len(item) > 1 \
+                            and random.random() < Chat.voice_probability:
+                        yield Chat._text_to_speech(item)
+                    else:
+                        yield Message(item)
                 group_reply = group_reply[-Chat._save_reserve_size:]
 
             return yield_results(results)
@@ -409,6 +426,15 @@ class Chat:
         if 0 < answer_str.count('，') <= 3 and random.random() < Chat.split_probability:
             return answer_str.split('，')
         return [answer_str, ]
+
+    @staticmethod
+    def _text_to_speech(text: str) -> Optional[Message]:
+        if plugin_config.enable_voice:
+            result = client.synthesis(text, options={'per': 111})  # 度小萌
+            if not isinstance(result, dict):  # error message
+                return MessageSegment.record(result)
+
+        return Message(text)
 
 
 def _chat_sync():
