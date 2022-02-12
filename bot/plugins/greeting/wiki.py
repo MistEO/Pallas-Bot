@@ -50,17 +50,6 @@ class Wiki(DownloadTools):
         req = self.wiki_session.get(url)
         return getattr(req, 'html')
 
-    def get_voice_urls(self, name):
-        html = self.get_page(f'http://prts.wiki/w/{name}/语音记录')
-        files = {}
-        for item in html.find('a[download]'):
-            url = urllib.parse.unquote(item.attrs['href'])
-            if not 'http:' in url:
-                url = 'http:' + url
-            file_name = url.split('/')[-1]
-            files[file_name] = url
-        return files
-
     def request_pic_from_wiki(self, name):
         # noinspection PyBroadException
         try:
@@ -86,28 +75,25 @@ class Wiki(DownloadTools):
 
     def download_operator_voices(self, operator, name):
         try:
-            urls = self.get_voice_urls(operator)
             filename = f'{operator}_{name}.wav'
-            if filename in urls:
-                return self.request_voice_from_wiki(operator, urls[filename], filename)
+            url = 'https://static.prts.wiki/voice/char_485_pallas/'
+            print('Downing', filename)
+            return self.request_voice_from_wiki(
+                name, url + filename, filename)
         except Exception as e:
             print(repr(e))
         return False
 
     def download_pallas_voices(self):
         try:
-            voices = {
-                'Pallas': '帕拉斯',
-            }
-            for en, name in voices.items():
-                urls = self.get_voice_urls(name)
-                talks = [f'{name}_{item}.wav' for item in nudge]
+            name = '帕拉斯'
+            url = 'https://static.prts.wiki/voice/char_485_pallas/'
+            talks = [f'{name}_{item}.wav' for item in nudge]
 
-                for filename in urls:
-                    print('Downing', filename)
-                    if filename in talks:
-                        res = self.request_voice_from_wiki(
-                            name, urls[filename], filename)
+            for filename in talks:
+                print('Downing', filename)
+                self.request_voice_from_wiki(
+                    name, url + filename, filename)
 
         except Exception as e:
             print(repr(e))
