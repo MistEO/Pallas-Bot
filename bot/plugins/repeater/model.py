@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Generator, List, Optional, Union
 from functools import cached_property
 from dataclasses import dataclass
 from collections import defaultdict
@@ -13,6 +13,7 @@ import re
 import atexit
 
 from nonebot.adapters import Event
+from nonebot.adapters.cqhttp import Message
 
 mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
 
@@ -131,9 +132,9 @@ class Chat:
 
         self._message_insert()
 
-    def answer(self) -> Optional[List[str]]:
+    def answer(self) -> Optional[Generator[Message, None, None]]:
         '''
-        回复这句话，可能会分多次回复（所以是List），也可能不回复
+        回复这句话，可能会分多次回复，也可能不回复
         '''
 
         if self.chat_data.group_id in Chat._reply_dict:
@@ -160,19 +161,24 @@ class Chat:
         if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
             return None
 
-        result = self._context_find()
+        results = self._context_find()
 
-        if result:
-            group_reply = Chat._reply_dict[self.chat_data.group_id]
-            for item in result:
-                group_reply.append({
-                    'time': (int)(time.time()),
-                    'pre_raw_message': self.chat_data.raw_message,
-                    'pre_keywords': self.chat_data.keywords,
-                    'reply': item,
-                })
-            group_reply = group_reply[-Chat._save_reserve_size:]
-        return result
+        if results:
+            def yield_results(str_list: List[str]) -> Generator[Message, None, None]:
+                group_reply = Chat._reply_dict[self.chat_data.group_id]
+                for item in str_list:
+                    group_reply.append({
+                        'time': (int)(time.time()),
+                        'pre_raw_message': self.chat_data.raw_message,
+                        'pre_keywords': self.chat_data.keywords,
+                        'reply': item,
+                    })
+                    yield Message(item)
+                group_reply = group_reply[-Chat._save_reserve_size:]
+
+            return yield_results(results)
+
+        return None
 
     def ban(self) -> bool:
         '''
@@ -184,8 +190,6 @@ class Chat:
 
         reply_list = Chat._reply_dict[group_id]
         for reply in reply_list[::-1]:
-            print(reply['reply'])
-            print(self.chat_data.raw_message)
             if reply['reply'] in self.chat_data.raw_message:
                 context_mongo.update_one({
                     'keywords': reply['pre_keywords']

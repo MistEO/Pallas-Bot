@@ -6,7 +6,7 @@ from nonebot import on_message
 from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me
 from nonebot.adapters import Bot, Event
-from nonebot.adapters.cqhttp import Message, permission
+from nonebot.adapters.cqhttp import permission
 
 from .model import Chat, ChatData
 
@@ -31,7 +31,7 @@ async def _(bot: Bot, event: Event, state: T_State):
     delay = random.randint(2, 5)
     for item in answers:
         await asyncio.sleep(delay)
-        await any_msg.send(Message(item))
+        await any_msg.send(item)
         delay = random.randint(1, 3)
 
 
