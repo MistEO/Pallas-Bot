@@ -1,3 +1,5 @@
+from .github import Release, get_latest_release
+from .weibo import Weibo
 from datetime import datetime
 from nonebot import require, get_bot, get_driver
 from nonebot.adapters.cqhttp import MessageSegment, Message
@@ -14,13 +16,14 @@ plugin_config = Config(**global_config.dict())
 
 bili_status = {}
 
+
 @sched.scheduled_job('interval', seconds=30)
 async def push_bili():
     global bili_status
     for item in plugin_config.bili_user:
-        pre:bool = bili_status.get(item, True)  # 避免bot启动时正在直播，又推送了，默认True
+        pre: bool = bili_status.get(item, True)  # 避免bot启动时正在直播，又推送了，默认True
         user = bili_api.user(item)
-        now:bool = user.room.liveStatus == 1
+        now: bool = user.room.liveStatus == 1
         bili_status[item] = now
         if now and not pre:
             msg: Message = MessageSegment.text('开播啦！') \
@@ -33,8 +36,6 @@ async def push_bili():
                     'group_id': group})
                 await asyncio.sleep(5)
 
-
-from .weibo import Weibo
 
 weibo_list = []
 for weibo_id in plugin_config.weibo_id:
@@ -55,7 +56,7 @@ async def push_weibo():
             return
 
         weibo_pushed.append(created_at)
-        
+
         created_time = parser.parse(created_at).replace(tzinfo=None)
         duration = abs((datetime.now() - created_time).total_seconds())
         if duration > 600:  # 一直在轮询，新发的微博不可能有超过十分钟的。如果有，说明本次获取的有问题
@@ -67,15 +68,16 @@ async def push_weibo():
         if pics_list:
             for pic in pics_list:
                 msg += MessageSegment.image(pic)
-            
+
         for group in plugin_config.weibo_push_groups:
-            await get_bot().call_api('send_group_msg', **{
-                'message': msg,
-                'group_id': group})
+            try:
+                await get_bot().call_api('send_group_msg', **{
+                    'message': msg,
+                    'group_id': group})
+            except:  # 微博推送有时候图片太大了容易报错，不要影响别的群
+                pass
             await asyncio.sleep(5)
 
-
-from .github import Release, get_latest_release
 
 repo_status = {}
 
@@ -88,7 +90,7 @@ async def push_repo():
         repo_status[repo] = now.id
 
         if pre_id and pre_id != now.id:
-        # if True:
+            # if True:
             pre_rel = ''
             if now.prerelease:
                 pre_rel = ' (测试版本)'
