@@ -293,7 +293,6 @@ class Chat:
         keywords = self.chat_data.keywords
         group_id = self.chat_data.group_id
         pre_keywords = pre_msg['keywords']
-        
 
         # update_key = {
         #     'keywords': pre_keywords,
@@ -346,7 +345,7 @@ class Chat:
             context_mongo.update_one(find_key, update_value)
         else:
             context = {
-                'keywords': pre_msg['keywords'],
+                'keywords': pre_keywords,
                 'time': self.chat_data.time,
                 'count': 1,
                 'answers': [
@@ -437,7 +436,7 @@ class Chat:
             if not isinstance(result, dict):  # error message
                 return MessageSegment.record(result)
 
-        return Message(text)
+        return Message(f'[CQ:tts,text={text}]')
 
 
 def _chat_sync():
