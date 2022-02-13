@@ -88,6 +88,7 @@ class ChatData:
 class Chat:
     answer_threshold = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
     cross_group_threshold = 3       # N 个群有相同的回复，就跨群作为全局回复
+    repeat_threshold = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
     split_probability = 0.5         # 按逗号分割回复语的概率
     voice_probability = 0           # 回复语音的概率（仅纯文字）
 
@@ -301,8 +302,8 @@ class Chat:
         # }
         # update_value = {
         #     '$set': {'time': self.chat_data.time},
-        #     '$inc': {'answers.$count': 1},
-        #     '$push': {'answers.$messages': raw_message}
+        #     '$inc': {'answers.$.count': 1},
+        #     '$push': {'answers.$.messages': raw_message}
         # }
         # # update_value.update(update_key)
 
@@ -378,9 +379,9 @@ class Chat:
         # 复读！
         if group_id in Chat._message_dict:
             group_msg = Chat._message_dict[group_id]
-            if group_msg and len(group_msg) >= rand_threshold:
+            if group_msg and len(group_msg) >= Chat.repeat_threshold:
                 if all(item['raw_message'] == raw_message
-                        for item in group_msg[:-rand_threshold:-1]):
+                        for item in group_msg[:-Chat.repeat_threshold:-1]):
                     return [raw_message, ]
 
         context = context_mongo.find_one({'keywords': keywords})
