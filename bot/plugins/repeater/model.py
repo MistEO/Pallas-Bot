@@ -43,9 +43,9 @@ global_config = nonebot.get_driver().config
 plugin_config = Config(**global_config.dict())
 
 if plugin_config.enable_voice:
-    client = AipSpeech(plugin_config.APP_ID,
-                       plugin_config.API_KEY,
-                       plugin_config.SECRET_KEY)
+    tts_client = AipSpeech(plugin_config.APP_ID,
+                           plugin_config.API_KEY,
+                           plugin_config.SECRET_KEY)
 
 
 @dataclass
@@ -94,16 +94,8 @@ class Chat:
     split_probability = 0.5         # 按逗号分割回复语的概率
     voice_probability = 0           # 回复语音的概率（仅纯文字）
 
-    save_time_threshold = 600      # 每隔多久进行一次持久化 ( 秒 )
-    save_count_threshold = 100     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
-
-    _reply_dict = defaultdict(list)  # 牛牛回复的消息缓存，暂未做持久化
-    _message_dict = {}              # 群消息缓存
-
-    _save_reserve_size = 10         # 保存时，给内存中保留的大小
-    _late_save_time = 0             # 上次保存（消息数据持久化）的时刻 ( time.time(), 秒 )
-
-    _sync_lock = threading.Lock()
+    save_time_threshold = 3600      # 每隔多久进行一次持久化 ( 秒 )
+    save_count_threshold = 1000     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
 
     def __init__(self, data: Union[ChatData, Event]):
 
@@ -213,15 +205,27 @@ class Chat:
         if group_id not in Chat._reply_dict:
             return False
 
-        reply_list = Chat._reply_dict[group_id]
-        for reply in reply_list[::-1]:
+        for reply in Chat._reply_dict[group_id][::-1]:
             if reply['reply'] in self.chat_data.raw_message:
+                pre_keywords = reply['pre_keywords']
+                keywords = self.chat_data.keywords
+
+                # 考虑这句回复是从别的群捞过来的情况，所以这里要分两次 update
                 context_mongo.update_one({
-                    'keywords': reply['pre_keywords']
+                    'keywords': pre_keywords,
+                    'answers.keywords': keywords,
+                    'answers.group_id': group_id
+                }, {
+                    '$set': {
+                        'answers.$.count': -99999
+                    }
+                })
+                context_mongo.update_one({
+                    'keywords': pre_keywords
                 }, {
                     '$push': {
                         'ban': {
-                            'keywords': self.chat_data.keywords,
+                            'keywords': keywords,
                             'group_id': group_id
                         }
                     }
@@ -229,6 +233,15 @@ class Chat:
                 return True
 
         return False
+
+# private:
+    _reply_dict = defaultdict(list)  # 牛牛回复的消息缓存，暂未做持久化
+    _message_dict = {}              # 群消息缓存
+
+    _save_reserve_size = 100        # 保存时，给内存中保留的大小
+    _late_save_time = 0             # 上次保存（消息数据持久化）的时刻 ( time.time(), 秒 )
+
+    _sync_lock = threading.Lock()
 
     def _message_insert(self):
         group_id = self.chat_data.group_id
@@ -253,13 +266,13 @@ class Chat:
             return
 
         if len(Chat._message_dict[group_id]) > Chat.save_count_threshold:
-            Chat.sync(cur_time)
+            Chat._sync(cur_time)
 
         elif cur_time - Chat._late_save_time > Chat.save_time_threshold:
-            Chat.sync(cur_time)
+            Chat._sync(cur_time)
 
     @staticmethod
-    def sync(cur_time: int = time.time()):
+    def _sync(cur_time: int = time.time()):
         '''
         持久化
         '''
@@ -432,7 +445,7 @@ class Chat:
     @staticmethod
     def _text_to_speech(text: str) -> Optional[Message]:
         if plugin_config.enable_voice:
-            result = client.synthesis(text, options={'per': 111})  # 度小萌
+            result = tts_client.synthesis(text, options={'per': 111})  # 度小萌
             if not isinstance(result, dict):  # error message
                 return MessageSegment.record(result)
 
@@ -440,7 +453,7 @@ class Chat:
 
 
 def _chat_sync():
-    Chat.sync()
+    Chat._sync()
 
 
 # Auto sync on program exit
