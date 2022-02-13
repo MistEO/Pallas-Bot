@@ -89,6 +89,8 @@ class Chat:
     answer_threshold = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
     cross_group_threshold = 3       # N 个群有相同的回复，就跨群作为全局回复
     repeat_threshold = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
+
+    lose_sanity_probability = 0.1   # 精神错乱（回复没达到阈值的话）的概率
     split_probability = 0.5         # 按逗号分割回复语的概率
     voice_probability = 0           # 回复语音的概率（仅纯文字）
 
@@ -364,14 +366,6 @@ class Chat:
 
     def _context_find(self) -> Optional[List[str]]:
 
-        rand = random.random()
-        if rand < 0.4:
-            rand_threshold = Chat.answer_threshold - 1
-        elif rand < 0.7:
-            rand_threshold = Chat.answer_threshold
-        else:
-            rand_threshold = Chat.answer_threshold + 1
-
         group_id = self.chat_data.group_id
         raw_message = self.chat_data.raw_message
         keywords = self.chat_data.keywords
@@ -388,6 +382,11 @@ class Chat:
 
         if not context:
             return None
+
+        if random.random() < Chat.lose_sanity_probability:
+            rand_threshold = 1
+        else:
+            rand_threshold = Chat.answer_threshold
 
         if 'ban' in context:
             ban_keywords = [ban['keywords'] for ban in context['ban']
