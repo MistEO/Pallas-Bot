@@ -343,9 +343,11 @@ class Chat:
                 update_value['$inc'].update({
                     f'answers.{answer_index}.count': 1
                 })
-                update_value['$push'] = {
-                    f'answers.{answer_index}.messages': raw_message
-                }
+                # 不是纯文本的时候，raw_message 是完全一样的，没必要 push
+                if self.chat_data.is_plain_text:
+                    update_value['$push'] = {
+                        f'answers.{answer_index}.messages': raw_message
+                    }
             else:
                 update_value['$push'] = {
                     'answers': {
