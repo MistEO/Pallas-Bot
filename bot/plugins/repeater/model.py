@@ -177,29 +177,32 @@ class Chat:
         results = self._context_find()
 
         if results:
-            Chat._reply_dict[self.chat_data.group_id].append({
-                'time': (int)(time.time()),
-                'pre_raw_message': self.chat_data.raw_message,
-                'pre_keywords': self.chat_data.keywords,
-                'reply': "[PallasBot: Reply]",  # flag
-            })
+            with Chat._reply_lock:
+                Chat._reply_dict[self.chat_data.group_id].append({
+                    'time': (int)(time.time()),
+                    'pre_raw_message': self.chat_data.raw_message,
+                    'pre_keywords': self.chat_data.keywords,
+                    'reply': "[PallasBot: Reply]",  # flag
+                })
 
             def yield_results(str_list: List[str]) -> Generator[Message, None, None]:
                 group_reply = Chat._reply_dict[self.chat_data.group_id]
                 for item in str_list:
-                    group_reply.append({
-                        'time': (int)(time.time()),
-                        'pre_raw_message': self.chat_data.raw_message,
-                        'pre_keywords': self.chat_data.keywords,
-                        'reply': item,
-                    })
+                    with Chat._reply_lock:
+                        group_reply.append({
+                            'time': (int)(time.time()),
+                            'pre_raw_message': self.chat_data.raw_message,
+                            'pre_keywords': self.chat_data.keywords,
+                            'reply': item,
+                        })
                     if '[CQ:' not in item and len(item) > 1 \
                             and random.random() < Chat.voice_probability:
                         yield Chat._text_to_speech(item)
                     else:
                         yield Message(item)
 
-                group_reply = group_reply[-Chat._save_reserve_size:]
+                with Chat._reply_lock:
+                    group_reply = group_reply[-Chat._save_reserve_size:]
 
             return yield_results(results)
 
@@ -249,6 +252,7 @@ class Chat:
     _save_reserve_size = 100        # 保存时，给内存中保留的大小
     _late_save_time = 0             # 上次保存（消息数据持久化）的时刻 ( time.time(), 秒 )
 
+    _reply_lock = threading.Lock()
     _message_lock = threading.Lock()
 
     def _message_insert(self):
