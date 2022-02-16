@@ -150,6 +150,10 @@ class Chat:
         回复这句话，可能会分多次回复，也可能不回复
         '''
 
+        # 不回复太短的对话，大部分是“？”、“草”
+        if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
+            return None
+
         if self.chat_data.group_id in Chat._reply_dict:
             group_reply = Chat._reply_dict[self.chat_data.group_id]
             latest_reply = group_reply[-1]
@@ -169,10 +173,6 @@ class Chat:
                 and all(reply['pre_raw_message'] == self.chat_data.raw_message
                         for reply in group_reply[-repeat_times:]):
                 return None
-
-        # 不回复太短的对话，大部分是“？”、“草”
-        if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
-            return None
 
         with Chat._reply_lock:
             group_reply.append({
