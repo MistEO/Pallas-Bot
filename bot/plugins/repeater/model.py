@@ -174,24 +174,35 @@ class Chat:
         if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
             return None
 
+        with Chat._reply_lock:
+            group_reply.append({
+                'time': (int)(time.time()),
+                'pre_raw_message': self.chat_data.raw_message,
+                'pre_keywords': self.chat_data.keywords,
+                'reply': "[PallasBot: Reply]",  # flag
+            })
+
         results = self._context_find()
 
         if results:
             def yield_results(str_list: List[str]) -> Generator[Message, None, None]:
                 group_reply = Chat._reply_dict[self.chat_data.group_id]
                 for item in str_list:
-                    group_reply.append({
-                        'time': (int)(time.time()),
-                        'pre_raw_message': self.chat_data.raw_message,
-                        'pre_keywords': self.chat_data.keywords,
-                        'reply': item,
-                    })
+                    with Chat._reply_lock:
+                        group_reply.append({
+                            'time': (int)(time.time()),
+                            'pre_raw_message': self.chat_data.raw_message,
+                            'pre_keywords': self.chat_data.keywords,
+                            'reply': item,
+                        })
                     if '[CQ:' not in item and len(item) > 1 \
                             and random.random() < Chat.voice_probability:
                         yield Chat._text_to_speech(item)
                     else:
                         yield Message(item)
-                group_reply = group_reply[-Chat._save_reserve_size:]
+
+                with Chat._reply_lock:
+                    group_reply = group_reply[-Chat._save_reserve_size:]
 
             return yield_results(results)
 
@@ -241,12 +252,13 @@ class Chat:
     _save_reserve_size = 100        # 保存时，给内存中保留的大小
     _late_save_time = 0             # 上次保存（消息数据持久化）的时刻 ( time.time(), 秒 )
 
-    _sync_lock = threading.Lock()
+    _reply_lock = threading.Lock()
+    _message_lock = threading.Lock()
 
     def _message_insert(self):
         group_id = self.chat_data.group_id
 
-        with Chat._sync_lock:
+        with Chat._message_lock:
             if group_id not in Chat._message_dict:
                 Chat._message_dict[group_id] = []
 
@@ -277,7 +289,7 @@ class Chat:
         持久化
         '''
 
-        with Chat._sync_lock:
+        with Chat._message_lock:
             save_list = [msg
                          for group_msgs in Chat._message_dict.values()
                          for msg in group_msgs
