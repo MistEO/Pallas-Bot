@@ -16,9 +16,9 @@ any_msg = on_message(
     permission=permission.GROUP
 )
 
-Chat.answer_threshold = 2
+Chat.answer_threshold = 3
 Chat.cross_group_threshold = 2
-Chat.voice_probability = 0.1
+Chat.voice_probability = 0.05
 
 
 @any_msg.handle()

@@ -412,7 +412,8 @@ class Chat:
         if not self.chat_data.is_image:
             all_answers = [answer
                            for answer in context['answers']
-                           if answer['count'] >= rand_threshold]
+                           if answer['count'] >= rand_threshold
+                           and len(answer['keywords']) > 1]     # 屏蔽特别短的回复内容，大部分是“？”、“草”之类的
         else:
             # 屏蔽图片后的纯文字回复，图片经常是表情包，后面的纯文字什么都有，很乱
             all_answers = [answer
