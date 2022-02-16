@@ -174,17 +174,17 @@ class Chat:
                         for reply in group_reply[-repeat_times:]):
                 return None
 
-        with Chat._reply_lock:
-            Chat._reply_dict[self.chat_data.group_id].append({
-                'time': (int)(time.time()),
-                'pre_raw_message': self.chat_data.raw_message,
-                'pre_keywords': self.chat_data.keywords,
-                'reply': "[PallasBot: Reply]",  # flag
-            })
-
         results = self._context_find()
 
         if results:
+            with Chat._reply_lock:
+                Chat._reply_dict[self.chat_data.group_id].append({
+                    'time': (int)(time.time()),
+                    'pre_raw_message': self.chat_data.raw_message,
+                    'pre_keywords': self.chat_data.keywords,
+                    'reply': "[PallasBot: Reply]",  # flag
+                })
+
             def yield_results(str_list: List[str]) -> Generator[Message, None, None]:
                 group_reply = Chat._reply_dict[self.chat_data.group_id]
                 for item in str_list:
