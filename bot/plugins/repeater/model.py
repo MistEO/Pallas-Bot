@@ -175,7 +175,7 @@ class Chat:
                 return None
 
         with Chat._reply_lock:
-            group_reply.append({
+            Chat._reply_dict[self.chat_data.group_id].append({
                 'time': (int)(time.time()),
                 'pre_raw_message': self.chat_data.raw_message,
                 'pre_keywords': self.chat_data.keywords,
