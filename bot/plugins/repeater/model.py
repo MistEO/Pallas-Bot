@@ -1,9 +1,9 @@
-from .config import Config
-from typing import Generator, List, Optional, Union
-from functools import cached_property
+# from .config import Config
+from typing import Generator, List, Optional, Union, Tuple, Dict, Any
+from functools import cached_property, cmp_to_key
 from dataclasses import dataclass
 from collections import defaultdict
-from aip import AipSpeech
+# from aip import AipSpeech
 
 import jieba_fast.analyse
 import threading
@@ -39,13 +39,13 @@ context_mongo.create_index(name='answers_index',
                            default_language='none')
 
 
-global_config = nonebot.get_driver().config
-plugin_config = Config(**global_config.dict())
+# global_config = nonebot.get_driver().config
+# plugin_config = Config(**global_config.dict())
 
-if plugin_config.enable_voice:
-    tts_client = AipSpeech(plugin_config.APP_ID,
-                           plugin_config.API_KEY,
-                           plugin_config.SECRET_KEY)
+# if plugin_config.enable_voice:
+#     tts_client = AipSpeech(plugin_config.APP_ID,
+#                            plugin_config.API_KEY,
+#                            plugin_config.SECRET_KEY)
 
 
 @dataclass
@@ -89,10 +89,12 @@ class Chat:
     answer_threshold = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
     cross_group_threshold = 3       # N 个群有相同的回复，就跨群作为全局回复
     repeat_threshold = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
+    speak_threshold = 10            # 主动发言的阈值，越小废话越多
 
     lose_sanity_probability = 0.1   # 精神错乱（回复没达到阈值的话）的概率
     split_probability = 0.5         # 按逗号分割回复语的概率
     voice_probability = 0           # 回复语音的概率（仅纯文字）
+    speak_continuously_probability = 0.5  # 连续主动说话的概率
 
     save_time_threshold = 3600      # 每隔多久进行一次持久化 ( 秒 )
     save_count_threshold = 1000     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
@@ -125,9 +127,9 @@ class Chat:
 
         group_id = self.chat_data.group_id
         if group_id in Chat._message_dict:
-            group_msg = Chat._message_dict[group_id]
-            if group_msg:
-                group_pre_msg = group_msg[-1]
+            group_msgs = Chat._message_dict[group_id]
+            if group_msgs:
+                group_pre_msg = group_msgs[-1]
             else:
                 group_pre_msg = None
 
@@ -137,7 +139,7 @@ class Chat:
             user_id = self.chat_data.user_id
             if group_pre_msg and group_pre_msg['user_id'] != user_id:
                 # 该用户在群里的上一条发言（倒序）
-                for msg in group_msg[:-Chat._save_reserve_size:-1]:
+                for msg in group_msgs[:-Chat._save_reserve_size:-1]:
                     if msg['user_id'] == user_id:
                         self._context_insert(msg)
                         break
@@ -155,8 +157,8 @@ class Chat:
             return None
 
         if self.chat_data.group_id in Chat._reply_dict:
-            group_reply = Chat._reply_dict[self.chat_data.group_id]
-            latest_reply = group_reply[-1]
+            group_replies = Chat._reply_dict[self.chat_data.group_id]
+            latest_reply = group_replies[-1]
             # 限制发音频率，最多 3 秒一次
             if self.chat_data.time - latest_reply['time'] < 3:
                 return None
@@ -169,9 +171,9 @@ class Chat:
 
             # 如果连续 5 次回复同样的内容，就不再回复。这种情况很可能是和别的 bot 死循环了
             repeat_times = 5
-            if len(group_reply) >= repeat_times \
+            if len(group_replies) >= repeat_times \
                 and all(reply['pre_raw_message'] == self.chat_data.raw_message
-                        for reply in group_reply[-repeat_times:]):
+                        for reply in group_replies[-repeat_times:]):
                 return None
 
         results = self._context_find()
@@ -179,18 +181,18 @@ class Chat:
         if results:
             with Chat._reply_lock:
                 Chat._reply_dict[self.chat_data.group_id].append({
-                    'time': (int)(time.time()),
+                    'time': int(time.time()),
                     'pre_raw_message': self.chat_data.raw_message,
                     'pre_keywords': self.chat_data.keywords,
                     'reply': "[PallasBot: Reply]",  # flag
                 })
 
             def yield_results(str_list: List[str]) -> Generator[Message, None, None]:
-                group_reply = Chat._reply_dict[self.chat_data.group_id]
+                group_replies = Chat._reply_dict[self.chat_data.group_id]
                 for item in str_list:
                     with Chat._reply_lock:
-                        group_reply.append({
-                            'time': (int)(time.time()),
+                        group_replies.append({
+                            'time': int(time.time()),
                             'pre_raw_message': self.chat_data.raw_message,
                             'pre_keywords': self.chat_data.keywords,
                             'reply': item,
@@ -202,9 +204,106 @@ class Chat:
                         yield Message(item)
 
                 with Chat._reply_lock:
-                    group_reply = group_reply[-Chat._save_reserve_size:]
+                    group_replies = group_replies[-Chat._save_reserve_size:]
 
             return yield_results(results)
+
+        return None
+
+    @staticmethod
+    def speak() -> Optional[Tuple[int, List[Message]]]:
+        '''
+        主动发言，返回当前最希望发言的群号、发言消息 List，也有可能不发言
+        '''
+
+        def group_popularity_cmp(lhs: Tuple[int, List[Dict[str, Any]]],
+                                 rhs: Tuple[int, List[Dict[str, Any]]]) -> int:
+
+            def cmp(a: Any, b: Any):
+                return (a > b) - (a < b)
+
+            _, lhs_msgs = lhs
+            _, rhs_msgs = rhs
+
+            lhs_len = len(lhs_msgs)
+            rhs_len = len(rhs_msgs)
+            if lhs_len < 2 or rhs_len < 2:
+                return cmp(lhs_len, rhs_len)
+
+            lhs_duration = lhs_msgs[-1]['time'] - lhs_msgs[0]['time']
+            rhs_duration = rhs_msgs[-1]['time'] - rhs_msgs[0]['time']
+
+            return cmp(lhs_len / lhs_duration, rhs_len / rhs_duration)
+
+        # 按群聊热度排序
+        popularity = sorted(Chat._message_dict.items(),
+                            key=cmp_to_key(group_popularity_cmp))
+
+        cur_time = time.time()
+        for group_id, group_msgs in popularity:
+            if group_id not in Chat._reply_dict or not group_msgs:
+                continue
+            if Chat._reply_dict[group_id][-1]["time"] > group_msgs[-1]["time"]:
+                continue
+
+            msgs_len = len(group_msgs)
+            latest_time = group_msgs[-1]['time']
+            duration = latest_time - group_msgs[0]['time']
+            avg_interval = duration / msgs_len
+
+            # 已经超过平均发言间隔 N 倍的时间没有人说话了，才主动发言
+            if cur_time - latest_time < avg_interval * Chat.speak_threshold:
+                continue
+
+            # append 一个 flag, 防止这个群热度特别高，但压根就没有可用的 context 时，每次 speak 都查这个群，浪费时间
+            with Chat._reply_lock:
+                Chat._reply_dict[group_id].append({
+                    'time': int(cur_time),
+                    'pre_raw_message': '[PallasBot: Speak]',
+                    'pre_keywords': '[PallasBot: Speak]',
+                    'reply': "[PallasBot: Speak]"
+                })
+
+            speak_context = context_mongo.aggregate([
+                {
+                    '$match': {
+                        'time': {
+                            '$gt': cur_time - 24 * 3600
+                        },
+                        'count': {
+                            '$gt': Chat.answers_threshold
+                        },
+                        'answers.group_id': group_id
+                    }
+                }, {
+                    '$sample': {'size': 1}  # 随机一条
+                }
+            ])
+
+            if not speak_context:
+                continue
+
+            speak = random.choice([answer['messages']
+                                   for answer in speak_context['answers']
+                                   if answer['count'] >= Chat.answers_threshold
+                                   and answer['group_id'] == group_id])
+
+            with Chat._reply_lock:
+                Chat._reply_dict[group_id].append({
+                    'time': int(cur_time),
+                    'pre_raw_message': '[PallasBot: Speak]',
+                    'pre_keywords': '[PallasBot: Speak]',
+                    'reply': speak
+                })
+
+            speak_list = [Message(speak), ]
+            while random.random() < Chat.speak_continuously_probability:
+                pre_msg = str(speak_list[-1])
+                answer = Chat(ChatData(group_id, 0, pre_msg, pre_msg)).answer()
+                if not answer:
+                    break
+                speak.extend(answer)
+            return (group_id, speak_list)
 
         return None
 
@@ -212,6 +311,7 @@ class Chat:
         '''
         禁止以后回复这句话，仅对该群有效果
         '''
+
         group_id = self.chat_data.group_id
         if group_id not in Chat._reply_dict:
             return False
@@ -350,8 +450,8 @@ class Chat:
             }
             answer_index = next((idx for idx, answer in enumerate(context['answers'])
                                  if answer['group_id'] == group_id
-                                 and answer['keywords'] == keywords), -1)
-            if answer_index != -1:
+                                 and answer['keywords'] == keywords), None)
+            if answer_index:
                 update_value['$inc'].update({
                     f'answers.{answer_index}.count': 1
                 })
@@ -399,10 +499,10 @@ class Chat:
 
         # 复读！
         if group_id in Chat._message_dict:
-            group_msg = Chat._message_dict[group_id]
-            if group_msg and len(group_msg) >= Chat.repeat_threshold:
+            group_msgs = Chat._message_dict[group_id]
+            if group_msgs and len(group_msgs) >= Chat.repeat_threshold:
                 if all(item['raw_message'] == raw_message
-                        for item in group_msg[:-Chat.repeat_threshold:-1]):
+                        for item in group_msgs[:-Chat.repeat_threshold:-1]):
                     return [raw_message, ]
 
         context = context_mongo.find_one({'keywords': keywords})
@@ -437,7 +537,7 @@ class Chat:
         answers_count = defaultdict(int)
         for answer in all_answers:
             if answer['keywords'] in ban_keywords:
-                pass
+                continue
             elif answer['group_id'] == group_id:
                 filtered_answers.append(answer)
             else:   # 有这么 N 个群都有相同的回复，就作为全局回复
@@ -459,10 +559,10 @@ class Chat:
 
     @staticmethod
     def _text_to_speech(text: str) -> Optional[Message]:
-        if plugin_config.enable_voice:
-            result = tts_client.synthesis(text, options={'per': 111})  # 度小萌
-            if not isinstance(result, dict):  # error message
-                return MessageSegment.record(result)
+        # if plugin_config.enable_voice:
+        #     result = tts_client.synthesis(text, options={'per': 111})  # 度小萌
+        #     if not isinstance(result, dict):  # error message
+        #         return MessageSegment.record(result)
 
         return Message(f'[CQ:tts,text={text}]')
 
@@ -502,3 +602,5 @@ if __name__ == '__main__':
     test_answer: Chat = Chat(test_answer_data)
     print(test_chat.answer())
     test_answer.learn()
+
+    print(Chat.speak())
