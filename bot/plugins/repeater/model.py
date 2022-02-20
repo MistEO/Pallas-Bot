@@ -89,7 +89,7 @@ class Chat:
     answer_threshold = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
     cross_group_threshold = 3       # N 个群有相同的回复，就跨群作为全局回复
     repeat_threshold = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
-    speak_threshold = 10            # 主动发言的阈值，越小废话越多
+    speak_threshold = 5             # 主动发言的阈值，越小废话越多
 
     lose_sanity_probability = 0.1   # 精神错乱（回复没达到阈值的话）的概率
     split_probability = 0.5         # 按逗号分割回复语的概率
@@ -243,7 +243,7 @@ class Chat:
 
         cur_time = time.time()
         for group_id, group_msgs in popularity:
-            if group_id not in Chat._reply_dict or len(group_msgs) < 20:
+            if group_id not in Chat._reply_dict or len(group_msgs) < 10:
                 continue
             if Chat._reply_dict[group_id][-1]["time"] > group_msgs[-1]["time"]:
                 continue

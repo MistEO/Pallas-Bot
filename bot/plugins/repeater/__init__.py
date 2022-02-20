@@ -1,4 +1,3 @@
-import datetime
 import random
 import asyncio
 import re
@@ -79,11 +78,6 @@ speak_sched = require('nonebot_plugin_apscheduler').scheduler
 
 @speak_sched.scheduled_job('interval', seconds=5)
 async def speak_up():
-
-    # 牛牛睡觉了（
-    hour = datetime.datetime.now().hour
-    if hour > 1 and hour < 8:
-        return
 
     ret = Chat.speak()
     if not ret:
