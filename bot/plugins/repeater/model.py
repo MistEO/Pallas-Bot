@@ -271,7 +271,7 @@ class Chat:
                             '$gt': cur_time - 24 * 3600
                         },
                         'count': {
-                            '$gt': Chat.answers_threshold
+                            '$gt': Chat.answer_threshold
                         },
                         'answers.group_id': group_id
                     }
@@ -280,13 +280,15 @@ class Chat:
                 }
             ])
 
+            speak_context = list(speak_context)
             if not speak_context:
                 continue
 
-            speak = random.choice([answer['messages']
-                                   for answer in speak_context['answers']
-                                   if answer['count'] >= Chat.answers_threshold
-                                   and answer['group_id'] == group_id])
+            speak = random.choice(
+                random.choice([answer['messages']
+                               for answer in speak_context[0]['answers']
+                               if answer['count'] >= Chat.answer_threshold
+                               and answer['group_id'] == group_id]))
 
             with Chat._reply_lock:
                 Chat._reply_dict[group_id].append({
@@ -299,7 +301,8 @@ class Chat:
             speak_list = [Message(speak), ]
             while random.random() < Chat.speak_continuously_probability:
                 pre_msg = str(speak_list[-1])
-                answer = Chat(ChatData(group_id, 0, pre_msg, pre_msg)).answer()
+                answer = Chat(ChatData(group_id, 0, pre_msg,
+                                       pre_msg, cur_time)).answer()
                 if not answer:
                     break
                 speak.extend(answer)
@@ -450,8 +453,8 @@ class Chat:
             }
             answer_index = next((idx for idx, answer in enumerate(context['answers'])
                                  if answer['group_id'] == group_id
-                                 and answer['keywords'] == keywords), None)
-            if answer_index:
+                                 and answer['keywords'] == keywords), -1)
+            if answer_index != -1:
                 update_value['$inc'].update({
                     f'answers.{answer_index}.count': 1
                 })
@@ -603,4 +606,5 @@ if __name__ == '__main__':
     print(test_chat.answer())
     test_answer.learn()
 
+    time.sleep(5)
     print(Chat.speak())
