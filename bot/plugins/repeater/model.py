@@ -95,6 +95,7 @@ class Chat:
     split_probability = 0.5         # 按逗号分割回复语的概率
     voice_probability = 0           # 回复语音的概率（仅纯文字）
     speak_continuously_probability = 0.5  # 连续主动说话的概率
+    speak_continuously_max_len = 4  # 连续主动发言最多几句话
 
     save_time_threshold = 3600      # 每隔多久进行一次持久化 ( 秒 )
     save_count_threshold = 1000     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
@@ -147,34 +148,35 @@ class Chat:
         self._message_insert()
         return True
 
-    def answer(self) -> Optional[Generator[Message, None, None]]:
+    def answer(self, with_limit: bool = True) -> Optional[Generator[Message, None, None]]:
         '''
         回复这句话，可能会分多次回复，也可能不回复
         '''
 
-        # 不回复太短的对话，大部分是“？”、“草”
-        if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
-            return None
-
-        if self.chat_data.group_id in Chat._reply_dict:
-            group_replies = Chat._reply_dict[self.chat_data.group_id]
-            latest_reply = group_replies[-1]
-            # 限制发音频率，最多 3 秒一次
-            if self.chat_data.time - latest_reply['time'] < 3:
-                return None
-            # # 不要一直回复同一个内容
-            # if self.chat_data.raw_message == latest_reply['pre_raw_message']:
-            #     return None
-            # 有人复读了牛牛的回复，不继续回复
-            if self.chat_data.raw_message == latest_reply['reply']:
+        if with_limit:
+            # 不回复太短的对话，大部分是“？”、“草”
+            if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
                 return None
 
-            # 如果连续 5 次回复同样的内容，就不再回复。这种情况很可能是和别的 bot 死循环了
-            repeat_times = 5
-            if len(group_replies) >= repeat_times \
-                and all(reply['pre_raw_message'] == self.chat_data.raw_message
-                        for reply in group_replies[-repeat_times:]):
-                return None
+            if self.chat_data.group_id in Chat._reply_dict:
+                group_replies = Chat._reply_dict[self.chat_data.group_id]
+                latest_reply = group_replies[-1]
+                # 限制发音频率，最多 3 秒一次
+                if int(time.time()) - latest_reply['time'] < 3:
+                    return None
+                # # 不要一直回复同一个内容
+                # if self.chat_data.raw_message == latest_reply['pre_raw_message']:
+                #     return None
+                # 有人复读了牛牛的回复，不继续回复
+                if self.chat_data.raw_message == latest_reply['reply']:
+                    return None
+
+                # 如果连续 5 次回复同样的内容，就不再回复。这种情况很可能是和别的 bot 死循环了
+                repeat_times = 5
+                if len(group_replies) >= repeat_times \
+                    and all(reply['pre_raw_message'] == self.chat_data.raw_message
+                            for reply in group_replies[-repeat_times:]):
+                    return None
 
         results = self._context_find()
 
@@ -241,7 +243,7 @@ class Chat:
 
         cur_time = time.time()
         for group_id, group_msgs in popularity:
-            if group_id not in Chat._reply_dict or not group_msgs:
+            if group_id not in Chat._reply_dict or len(group_msgs) < 20:
                 continue
             if Chat._reply_dict[group_id][-1]["time"] > group_msgs[-1]["time"]:
                 continue
@@ -299,13 +301,14 @@ class Chat:
                 })
 
             speak_list = [Message(speak), ]
-            while random.random() < Chat.speak_continuously_probability:
+            while random.random() < Chat.speak_continuously_probability \
+                    and len(speak_list) < Chat.speak_continuously_max_len:
                 pre_msg = str(speak_list[-1])
                 answer = Chat(ChatData(group_id, 0, pre_msg,
-                                       pre_msg, cur_time)).answer()
+                                       pre_msg, cur_time)).answer(False)
                 if not answer:
                     break
-                speak.extend(answer)
+                speak_list.extend(answer)
             return (group_id, speak_list)
 
         return None

@@ -2,7 +2,7 @@ import random
 import asyncio
 import re
 
-from nonebot import on_message
+from nonebot import on_message, require, get_bot
 from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me
 from nonebot.adapters import Bot, Event
@@ -41,7 +41,7 @@ async def _(bot: Bot, event: Event, state: T_State):
 
 
 ban_msg = on_message(
-    rule=to_me() & keyword('不可以', '不准'),
+    rule=to_me() & keyword('不可以'),
     priority=5,
     block=False,
     permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
@@ -71,3 +71,23 @@ async def _(bot: Bot, event: Event, state: T_State):
     if banned:
         ban_msg.block = True
         await ban_msg.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
+
+
+speak_sched = require('nonebot_plugin_apscheduler').scheduler
+
+
+@speak_sched.scheduled_job('interval', seconds=5)
+async def speak_up():
+
+    ret = Chat.speak()
+    if not ret:
+        return
+
+    group_id, messages = ret
+
+    for msg in messages:
+        await get_bot().call_api('send_group_msg', **{
+            'message': msg,
+            'group_id': group_id
+        })
+        await asyncio.sleep(random.randint(2, 5))
