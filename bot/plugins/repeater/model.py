@@ -218,6 +218,9 @@ class Chat:
         主动发言，返回当前最希望发言的群号、发言消息 List，也有可能不发言
         '''
 
+        basic_msgs_len = 10
+        basic_delay = 600
+
         def group_popularity_cmp(lhs: Tuple[int, List[Dict[str, Any]]],
                                  rhs: Tuple[int, List[Dict[str, Any]]]) -> int:
 
@@ -229,11 +232,14 @@ class Chat:
 
             lhs_len = len(lhs_msgs)
             rhs_len = len(rhs_msgs)
-            if lhs_len < 2 or rhs_len < 2:
+            if lhs_len < basic_msgs_len or rhs_len < basic_msgs_len:
                 return cmp(lhs_len, rhs_len)
 
             lhs_duration = lhs_msgs[-1]['time'] - lhs_msgs[0]['time']
             rhs_duration = rhs_msgs[-1]['time'] - rhs_msgs[0]['time']
+
+            if not lhs_duration or not rhs_duration:
+                return cmp(lhs_len, rhs_len)
 
             return cmp(lhs_len / lhs_duration, rhs_len / rhs_duration)
 
@@ -243,7 +249,7 @@ class Chat:
 
         cur_time = time.time()
         for group_id, group_msgs in popularity:
-            if group_id not in Chat._reply_dict or len(group_msgs) < 10:
+            if group_id not in Chat._reply_dict or len(group_msgs) < basic_msgs_len:
                 continue
             if Chat._reply_dict[group_id][-1]["time"] > group_msgs[-1]["time"]:
                 continue
@@ -254,7 +260,7 @@ class Chat:
             avg_interval = duration / msgs_len
 
             # 已经超过平均发言间隔 N 倍的时间没有人说话了，才主动发言
-            if cur_time - latest_time < avg_interval * Chat.speak_threshold:
+            if cur_time - latest_time < avg_interval * Chat.speak_threshold + basic_delay:
                 continue
 
             # append 一个 flag, 防止这个群热度特别高，但压根就没有可用的 context 时，每次 speak 都查这个群，浪费时间
@@ -286,11 +292,15 @@ class Chat:
             if not speak_context:
                 continue
 
-            speak = random.choice(
-                random.choice([answer['messages']
-                               for answer in speak_context[0]['answers']
-                               if answer['count'] >= Chat.answer_threshold
-                               and answer['group_id'] == group_id]))
+            messages = [answer['messages']
+                        for answer in speak_context[0]['answers']
+                        if answer['count'] >= Chat.answer_threshold
+                        and answer['group_id'] == group_id]
+
+            if not messages:
+                continue
+
+            speak = random.choice(random.choice(messages))
 
             with Chat._reply_lock:
                 Chat._reply_dict[group_id].append({
