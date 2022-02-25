@@ -55,9 +55,15 @@ async def _(bot: Bot, event: Event, state: T_State):
     if '[CQ:reply,' not in event_dict['raw_message']:
         return False
 
-    raw_reply = str(event.dict()['reply']['message'][0])
-    # 去掉图片消息中的 url, subType 等字段
-    raw_message = re.sub(r'(\[CQ\:image.+)(?:,url=.+)(\])', r'\1\2', raw_reply)
+    raw_message = ''
+    for item in event.dict()['reply']['message']:
+        raw_reply = str(item)
+        # 去掉图片消息中的 url, subType 等字段
+        raw_message += re.sub(r'(\[CQ\:image.+)(?:,url=.+)(\])',
+                              r'\1\2', raw_reply)
+
+    if not raw_message:
+        return
 
     ban_data = ChatData(
         group_id=event_dict['group_id'],

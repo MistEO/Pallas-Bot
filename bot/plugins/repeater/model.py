@@ -111,8 +111,8 @@ class Chat:
                 user_id=event_dict['user_id'],
                 # 删除图片子类型字段，同一张图子类型经常不一样，影响判断
                 raw_message=re.sub(
-                    r'(\[CQ\:image.+)(?:,subType=\d+)(\])',
-                    r'\1\2',
+                    r',subType=\d+\]',
+                    r']',
                     event_dict['raw_message']),
                 plain_text=data.get_plaintext(),
                 time=event_dict['time']
