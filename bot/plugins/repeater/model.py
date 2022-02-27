@@ -139,8 +139,8 @@ class Chat:
 
             user_id = self.chat_data.user_id
             if group_pre_msg and group_pre_msg['user_id'] != user_id:
-                # 该用户在群里的上一条发言（倒序）
-                for msg in group_msgs[:-Chat._save_reserve_size:-1]:
+                # 该用户在群里的上一条发言（倒序三句之内）
+                for msg in group_msgs[:-3:-1]:
                     if msg['user_id'] == user_id:
                         self._context_insert(msg)
                         break
