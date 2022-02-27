@@ -334,7 +334,7 @@ class Chat:
             return False
 
         for reply in Chat._reply_dict[group_id][::-1]:
-            if reply['reply'] in self.chat_data.raw_message:
+            if self.chat_data.raw_message in reply['reply']:
                 pre_keywords = reply['pre_keywords']
                 keywords = self.chat_data.keywords
 
