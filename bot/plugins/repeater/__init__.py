@@ -42,7 +42,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     answers = chat.answer()
     chat.learn()
 
-    chat_answer(answers)
+    await chat_answer(answers)
 
 
 @any_msg.handle()
@@ -53,7 +53,7 @@ async def _(bot: Bot, event: PrivateMessageEvent, state: T_State):
     answers = chat.answer()
     # chat.learn()  # 不学习私聊的
 
-    chat_answer(answers)
+    await chat_answer(answers)
 
 
 ban_msg = on_message(
