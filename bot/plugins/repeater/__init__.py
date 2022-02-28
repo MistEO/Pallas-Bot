@@ -5,15 +5,14 @@ import re
 from nonebot import on_message, require, get_bot
 from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me
-from nonebot.adapters import Bot, Event
+from nonebot.adapters import Bot, Event, GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.cqhttp import permission
 
 from .model import Chat, ChatData
 
 any_msg = on_message(
     priority=15,
-    block=False,
-    permission=permission.GROUP
+    block=False
 )
 
 Chat.answer_threshold = 3
@@ -22,14 +21,7 @@ Chat.lose_sanity_probability = 0.05
 Chat.voice_probability = 0
 
 
-@any_msg.handle()
-async def _(bot: Bot, event: Event, state: T_State):
-
-    chat: Chat = Chat(event)
-
-    answers = chat.answer()
-    chat.learn()
-
+async def chat_answer(answers):
     if not answers:
         return
 
@@ -38,6 +30,28 @@ async def _(bot: Bot, event: Event, state: T_State):
         await asyncio.sleep(delay)
         await any_msg.send(item)
         delay = random.randint(1, 3)
+
+
+@any_msg.handle()
+async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
+
+    chat: Chat = Chat(event)
+
+    answers = chat.answer()
+    chat.learn()
+
+    chat_answer(answers)
+
+
+@any_msg.handle()
+async def _(bot: Bot, event: PrivateMessageEvent, state: T_State):
+
+    chat: Chat = Chat(event)
+
+    answers = chat.answer()
+    # chat.learn()  # 不学习私聊的
+
+    chat_answer(answers)
 
 
 ban_msg = on_message(

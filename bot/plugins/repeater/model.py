@@ -15,7 +15,7 @@ import random
 import re
 import atexit
 
-from nonebot.adapters import Event
+from nonebot.adapters.cqhttp import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.cqhttp import Message, MessageSegment
 
 mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
@@ -101,14 +101,27 @@ class Chat:
     save_time_threshold = 3600      # 每隔多久进行一次持久化 ( 秒 )
     save_count_threshold = 1000     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
 
-    def __init__(self, data: Union[ChatData, Event]):
+    def __init__(self, data: Union[ChatData, GroupMessageEvent, PrivateMessageEvent]):
 
         if (isinstance(data, ChatData)):
             self.chat_data = data
-        elif (isinstance(data, Event)):
+        elif (isinstance(data, GroupMessageEvent)):
             event_dict = data.dict()
             self.chat_data = ChatData(
                 group_id=event_dict['group_id'],
+                user_id=event_dict['user_id'],
+                # 删除图片子类型字段，同一张图子类型经常不一样，影响判断
+                raw_message=re.sub(
+                    r',subType=\d+\]',
+                    r']',
+                    event_dict['raw_message']),
+                plain_text=data.get_plaintext(),
+                time=event_dict['time']
+            )
+        elif (isinstance(data, PrivateMessageEvent)):
+            event_dict = data.dict()
+            self.chat_data = ChatData(
+                group_id=0,
                 user_id=event_dict['user_id'],
                 # 删除图片子类型字段，同一张图子类型经常不一样，影响判断
                 raw_message=re.sub(
