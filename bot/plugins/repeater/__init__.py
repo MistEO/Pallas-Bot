@@ -5,7 +5,9 @@ import re
 from nonebot import on_message, require, get_bot
 from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me
-from nonebot.adapters import Bot, Event, GroupMessageEvent, PrivateMessageEvent
+from nonebot.adapters import Bot, Event
+from nonebot.adapters.cqhttp import GroupMessageEvent, PrivateMessageEvent
+
 from nonebot.adapters.cqhttp import permission
 
 from .model import Chat, ChatData
@@ -63,7 +65,7 @@ ban_msg = on_message(
 
 
 @ban_msg.handle()
-async def _(bot: Bot, event: Event, state: T_State):
+async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     event_dict = event.dict()
     if '[CQ:reply,' not in event_dict['raw_message']:
