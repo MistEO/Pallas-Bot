@@ -121,7 +121,7 @@ class Chat:
         elif (isinstance(data, PrivateMessageEvent)):
             event_dict = data.dict()
             self.chat_data = ChatData(
-                group_id=0,
+                group_id=-event_dict['user_id'],    # 故意加个负号，和群号区分开来
                 user_id=event_dict['user_id'],
                 # 删除图片子类型字段，同一张图子类型经常不一样，影响判断
                 raw_message=re.sub(
