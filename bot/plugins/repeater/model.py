@@ -534,7 +534,7 @@ class Chat:
                 if all(item['raw_message'] == raw_message
                         for item in group_msgs[:-Chat.repeat_threshold:-1]):
                     # 复读过一次就不复读了
-                    if group_id in Chat._reply_dict and Chat._reply_dict[group_id][-1]['reply'] != raw_message:
+                    if group_id not in Chat._reply_dict or Chat._reply_dict[group_id][-1]['reply'] != raw_message:
                         return [raw_message, ]
 
         context = context_mongo.find_one({'keywords': keywords})
