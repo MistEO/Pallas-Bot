@@ -96,7 +96,7 @@ class Chat:
     split_probability = 0.5         # 按逗号分割回复语的概率
     voice_probability = 0           # 回复语音的概率（仅纯文字）
     speak_continuously_probability = 0.5  # 连续主动说话的概率
-    speak_continuously_max_len = 4  # 连续主动发言最多几句话
+    speak_continuously_max_len = 2  # 连续主动发言最多几句话
 
     save_time_threshold = 3600      # 每隔多久进行一次持久化 ( 秒 )
     save_count_threshold = 1000     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
@@ -182,8 +182,8 @@ class Chat:
                 # if self.chat_data.raw_message == latest_reply['pre_raw_message']:
                 #     return None
                 # 有人复读了牛牛的回复，不继续回复
-                if self.chat_data.raw_message == latest_reply['reply']:
-                    return None
+                # if self.chat_data.raw_message == latest_reply['reply']:
+                #    return None
 
                 # 如果连续 5 次回复同样的内容，就不再回复。这种情况很可能是和别的 bot 死循环了
                 repeat_times = 5
@@ -545,11 +545,18 @@ class Chat:
         else:
             rand_threshold = Chat.answer_threshold
 
+        ban_keywords = []
         if 'ban' in context:
-            ban_keywords = [ban['keywords'] for ban in context['ban']
-                            if ban['group_id'] == group_id or ban['group_id'] == 114514]
-        else:
-            ban_keywords = []
+            ban_count = defaultdict(int)
+            for ban in context['ban']:
+                ban_key = ban['keywords']
+                if ban['group_id'] == group_id or ban['group_id'] == 114514:
+                    ban_keywords.append(ban_key)
+                else:
+                    # 超过 N 个群都把这句话 ban 了，那就全局 ban 掉
+                    ban_count[ban_key] += 1
+                    if ban_count[ban_key] == Chat.cross_group_threshold:
+                        ban_keywords.append(ban_key)
 
         if not self.chat_data.is_image:
             all_answers = [answer
