@@ -576,7 +576,7 @@ class Chat:
         answers_count = defaultdict(int)
         for answer in all_answers:
             answer_key = answer['keywords']
-            if answer_key in ban_keywords or answer_key == keywords:
+            if answer_key in ban_keywords:
                 continue
             # # 正常一句话说不了这么多遍，一般都是其他 bot 一直发的
             # elif answer['count'] > Chat.answer_limit_threshold:
