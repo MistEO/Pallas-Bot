@@ -87,7 +87,7 @@ class ChatData:
 
 class Chat:
     answer_threshold = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
-    answer_limit_threshold = 50     # 上限阈值，一般正常的上下文不可能发 50 遍，一般是其他 bot 的回复，禁了！
+    # answer_limit_threshold = 50     # 上限阈值，一般正常的上下文不可能发 50 遍，一般是其他 bot 的回复，禁了！
     cross_group_threshold = 3       # N 个群有相同的回复，就跨群作为全局回复
     repeat_threshold = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
     speak_threshold = 5             # 主动发言的阈值，越小废话越多
@@ -573,17 +573,17 @@ class Chat:
         filtered_answers = []
         answers_count = defaultdict(int)
         for answer in all_answers:
-            if answer['keywords'] in ban_keywords:
+            answer_key = answer['keywords']
+            if answer_key in ban_keywords or answer_key == keywords:
                 continue
-            # 正常一句话说不了这么多遍，一般都是其他 bot 一直发的
-            elif answer['count'] > Chat.answer_limit_threshold:
-                continue
+            # # 正常一句话说不了这么多遍，一般都是其他 bot 一直发的
+            # elif answer['count'] > Chat.answer_limit_threshold:
+            #     continue
             elif answer['group_id'] == group_id:
                 filtered_answers.append(answer)
             else:   # 有这么 N 个群都有相同的回复，就作为全局回复
-                key = answer['keywords']
-                answers_count[key] += 1
-                if answers_count[key] == Chat.cross_group_threshold:
+                answers_count[answer_key] += 1
+                if answers_count[answer_key] == Chat.cross_group_threshold:
                     filtered_answers.append(answer)
 
         if not filtered_answers:
