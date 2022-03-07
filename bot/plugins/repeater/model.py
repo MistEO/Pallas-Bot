@@ -583,6 +583,9 @@ class Chat:
             #     continue
             elif answer['group_id'] == group_id:
                 filtered_answers.append(answer)
+            # 别的群的 at, 忽略
+            elif '[CQ:at,qq=' in answer_key:
+                continue
             else:   # 有这么 N 个群都有相同的回复，就作为全局回复
                 answers_count[answer_key] += 1
                 if answers_count[answer_key] == Chat.cross_group_threshold:
