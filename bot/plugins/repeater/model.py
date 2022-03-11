@@ -572,8 +572,9 @@ class Chat:
                            if answer['count'] >= rand_threshold
                            and answer['keywords'].startswith('[CQ:')]
 
-        filtered_answers = []
+        candidate_strs = []
         answers_count = defaultdict(int)
+        other_group_cache = defaultdict(list)
         for answer in all_answers:
             answer_key = answer['keywords']
             if answer_key in ban_keywords:
@@ -582,21 +583,26 @@ class Chat:
             # elif answer['count'] > Chat.answer_limit_threshold:
             #     continue
             elif answer['group_id'] == group_id:
-                filtered_answers.append(answer)
+                candidate_strs += answer['messages']
             # 别的群的 at, 忽略
             elif '[CQ:at,qq=' in answer_key:
                 continue
             else:   # 有这么 N 个群都有相同的回复，就作为全局回复
                 answers_count[answer_key] += 1
-                if answers_count[answer_key] == Chat.cross_group_threshold:
-                    filtered_answers.append(answer)
+                cur_count = answers_count[answer_key]
+                cur_strs = answer['messages']
+                if cur_count < Chat.cross_group_threshold:      # 没达到阈值前，先缓存
+                    other_group_cache[answer_key] += cur_strs
+                elif cur_count == Chat.cross_group_threshold:   # 刚达到阈值时，将缓存加入
+                    candidate_strs += cur_strs
+                    candidate_strs += other_group_cache[answer_key]
+                else:                                           # 超过阈值后，加入
+                    candidate_strs += cur_strs
 
-        if not filtered_answers:
+        if not candidate_strs:
             return None
 
-        final_answer = random.choices(filtered_answers, weights=[
-            answer['count'] ** 2 for answer in filtered_answers])[0]
-        answer_str = random.choice(final_answer['messages'])
+        answer_str = random.choice(candidate_strs)
 
         if 0 < answer_str.count('，') <= 3 and random.random() < Chat.split_probability:
             return answer_str.split('，')
