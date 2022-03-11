@@ -602,7 +602,8 @@ class Chat:
             return None
 
         final_answer = random.choices(candidate_answers, weights=[
-            answer['count'] for answer in candidate_answers])[0]
+            # 防止某个回复权重太大，别的都 Roll 不到了
+            min(answer['count'], 10) for answer in candidate_answers])[0]
         answer_str = random.choice(final_answer['messages'])
 
         if 0 < answer_str.count('，') <= 3 and random.random() < Chat.split_probability:
