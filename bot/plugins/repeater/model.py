@@ -572,7 +572,7 @@ class Chat:
                            if answer['count'] >= rand_threshold
                            and answer['keywords'].startswith('[CQ:')]
 
-        candidate_strs = []
+        candidate_answers = []
         answers_count = defaultdict(int)
         other_group_cache = defaultdict(list)
         for answer in all_answers:
@@ -583,26 +583,27 @@ class Chat:
             # elif answer['count'] > Chat.answer_limit_threshold:
             #     continue
             elif answer['group_id'] == group_id:
-                candidate_strs += answer['messages']
+                candidate_answers.append(answer)
             # 别的群的 at, 忽略
             elif '[CQ:at,qq=' in answer_key:
                 continue
             else:   # 有这么 N 个群都有相同的回复，就作为全局回复
                 answers_count[answer_key] += 1
                 cur_count = answers_count[answer_key]
-                cur_strs = answer['messages']
                 if cur_count < Chat.cross_group_threshold:      # 没达到阈值前，先缓存
-                    other_group_cache[answer_key] += cur_strs
+                    other_group_cache[answer_key].append(answer)
                 elif cur_count == Chat.cross_group_threshold:   # 刚达到阈值时，将缓存加入
-                    candidate_strs += cur_strs
-                    candidate_strs += other_group_cache[answer_key]
+                    candidate_answers.append(answer)
+                    candidate_answers += other_group_cache[answer_key]
                 else:                                           # 超过阈值后，加入
-                    candidate_strs += cur_strs
+                    candidate_answers.append(answer)
 
-        if not candidate_strs:
+        if not candidate_answers:
             return None
 
-        answer_str = random.choice(candidate_strs)
+        final_answer = random.choices(candidate_answers, weights=[
+            answer['count'] for answer in candidate_answers])[0]
+        answer_str = random.choice(final_answer['messages'])
 
         if 0 < answer_str.count('，') <= 3 and random.random() < Chat.split_probability:
             return answer_str.split('，')
