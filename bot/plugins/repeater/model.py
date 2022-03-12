@@ -628,11 +628,14 @@ class Chat:
         return Message(f'[CQ:tts,text={text}]')
 
     @staticmethod
-    def genreate_blacklist() -> None:
-        all_context = context_mongo.find({'answers.count': {'$gt': 20}})
+    def generate_blacklist() -> None:
+        blacklist_threshold = 10
+
+        all_context = context_mongo.find(
+            {'answers.count': {'$gt': blacklist_threshold}})
         blacklist = list({answer['keywords'] for context in all_context
                           for answer in context['answers']
-                          if answer['count'] > 20 and '[CQ:' not in answer['keywords']})
+                          if answer['count'] > blacklist_threshold and '[CQ:' not in answer['keywords']})
 
         blacklist_mongo.update_one(
             {'group_id': Chat._blacklist_flag},
@@ -691,4 +694,4 @@ if __name__ == '__main__':
     time.sleep(5)
     print(Chat.speak())
 
-    Chat.genreate_blacklist()
+    Chat.generate_blacklist()
