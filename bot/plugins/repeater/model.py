@@ -646,7 +646,7 @@ class Chat:
             {'group_id': Chat._blacklist_flag})
         if not global_black:
             return
-        Chat.blacklist_global_answer |= global_black['answers']
+        Chat.blacklist_global_answer |= set(global_black['answers'])
 
 
 Chat.update_blacklist()
