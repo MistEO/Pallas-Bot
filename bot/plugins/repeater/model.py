@@ -554,7 +554,8 @@ class Chat:
             rand_threshold = Chat.answer_threshold
 
         # 全局的黑名单
-        ban_keywords = Chat.blacklist_group_answer[group_id] | Chat.blacklist_global_answer
+        # Chat.blacklist_group_answer[group_id] | Chat.blacklist_global_answer
+        ban_keywords = set()
         # 针对单条回复的黑名单
         if 'ban' in context:
             ban_count = defaultdict(int)
@@ -572,20 +573,24 @@ class Chat:
             all_answers = [answer
                            for answer in context['answers']
                            if answer['count'] >= rand_threshold
-                           and len(answer['keywords']) > 1]     # 屏蔽特别短的回复内容，大部分是“？”、“草”之类的
+                           and len(answer['keywords']) > 1]  # 屏蔽特别短的回复内容，大部分是“？”、“草”之类的
+
         else:
-            # 屏蔽图片后的纯文字回复，图片经常是表情包，后面的纯文字什么都有，很乱
             all_answers = [answer
                            for answer in context['answers']
                            if answer['count'] >= rand_threshold
-                           and answer['keywords'].startswith('[CQ:')]
+                           and answer['keywords'].startswith('[CQ:')]   # 屏蔽图片后的纯文字回复，图片经常是表情包，后面的纯文字什么都有，很乱
 
         candidate_answers = []
         answers_count = defaultdict(int)
         other_group_cache = defaultdict(list)
+        on_call = '牛牛' in keywords
+
         for answer in all_answers:
             answer_key = answer['keywords']
             if answer_key in ban_keywords:
+                continue
+            if on_call and '牛牛' in answer_key:    # 呼叫牛牛还回复牛牛的，有点笨，ban了
                 continue
             # # 正常一句话说不了这么多遍，一般都是其他 bot 一直发的
             # elif answer['count'] > Chat.answer_limit_threshold:
@@ -652,7 +657,7 @@ class Chat:
         Chat.blacklist_global_answer |= set(global_black['answers'])
 
 
-Chat.update_blacklist()
+# Chat.update_blacklist()
 
 
 def _chat_sync():
