@@ -38,7 +38,9 @@ context_mongo.create_index(name='answers_index',
                                  ('answers.keywords', pymongo.TEXT)],
                            default_language='none')
 
-
+blacklist_mongo = mongo_db['blacklist']
+blacklist_mongo.create_index(name='group_index',
+                             keys=[('group_id', pymongo.TEXT)])
 # global_config = nonebot.get_driver().config
 # plugin_config = Config(**global_config.dict())
 
@@ -100,6 +102,9 @@ class Chat:
 
     save_time_threshold = 3600      # 每隔多久进行一次持久化 ( 秒 )
     save_count_threshold = 1000     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
+
+    blacklist_global_answer = set()
+    blacklist_group_answer = defaultdict(set)
 
     def __init__(self, data: Union[ChatData, GroupMessageEvent, PrivateMessageEvent]):
 
@@ -186,11 +191,11 @@ class Chat:
                 #    return None
 
                 # 如果连续 5 次回复同样的内容，就不再回复。这种情况很可能是和别的 bot 死循环了
-                repeat_times = 5
-                if len(group_replies) >= repeat_times \
-                    and all(reply['pre_raw_message'] == self.chat_data.raw_message
-                            for reply in group_replies[-repeat_times:]):
-                    return None
+                # repeat_times = 5
+                # if len(group_replies) >= repeat_times \
+                #     and all(reply['pre_raw_message'] == self.chat_data.raw_message
+                #             for reply in group_replies[-repeat_times:]):
+                #     return None
 
         results = self._context_find()
 
@@ -384,6 +389,7 @@ class Chat:
 
     _reply_lock = threading.Lock()
     _message_lock = threading.Lock()
+    _blacklist_flag = 114514
 
     def _message_insert(self):
         group_id = self.chat_data.group_id
@@ -547,12 +553,14 @@ class Chat:
         else:
             rand_threshold = Chat.answer_threshold
 
-        ban_keywords = []
+        # 全局的黑名单
+        ban_keywords = Chat.blacklist_group_answer[group_id] | Chat.blacklist_global_answer
+        # 针对单条回复的黑名单
         if 'ban' in context:
             ban_count = defaultdict(int)
             for ban in context['ban']:
                 ban_key = ban['keywords']
-                if ban['group_id'] == group_id or ban['group_id'] == 114514:
+                if ban['group_id'] == group_id or ban['group_id'] == Chat._blacklist_flag:
                     ban_keywords.append(ban_key)
                 else:
                     # 超过 N 个群都把这句话 ban 了，那就全局 ban 掉
@@ -619,6 +627,27 @@ class Chat:
 
         return Message(f'[CQ:tts,text={text}]')
 
+    @staticmethod
+    def genreate_blacklist() -> None:
+        all_context = context_mongo.find({'answers.count': {'$gt': 20}})
+        blacklist = list({answer['keywords'] for context in all_context
+                          for answer in context['answers']
+                          if answer['count'] > 20})
+
+        blacklist_mongo.update_one(
+            {'group_id': Chat._blacklist_flag},
+            {'$push': {'answers': blacklist}},
+            upsert=True
+        )
+
+    @staticmethod
+    def update_blacklist() -> None:
+        global_black = blacklist_mongo.find_one(
+            {'group_id': Chat._blacklist_flag})
+        if not global_black:
+            return
+        Chat.blacklist_global_answer |= global_black['answers']
+
 
 def _chat_sync():
     Chat._sync()
@@ -658,3 +687,5 @@ if __name__ == '__main__':
 
     time.sleep(5)
     print(Chat.speak())
+
+    Chat.genreate_blacklist()
