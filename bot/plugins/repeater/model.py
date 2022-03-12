@@ -632,11 +632,11 @@ class Chat:
         all_context = context_mongo.find({'answers.count': {'$gt': 20}})
         blacklist = list({answer['keywords'] for context in all_context
                           for answer in context['answers']
-                          if answer['count'] > 20})
+                          if answer['count'] > 20 and '[CQ:' not in answer['keywords']})
 
         blacklist_mongo.update_one(
             {'group_id': Chat._blacklist_flag},
-            {'$push': {'answers': blacklist}},
+            {'answers': blacklist},
             upsert=True
         )
 
