@@ -649,6 +649,9 @@ class Chat:
         Chat.blacklist_global_answer |= global_black['answers']
 
 
+Chat.update_blacklist()
+
+
 def _chat_sync():
     Chat._sync()
 
