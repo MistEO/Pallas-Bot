@@ -593,9 +593,10 @@ class Chat:
             if on_call and '牛牛' in answer_key:    # 呼叫牛牛还回复牛牛的，有点笨，ban了
                 continue
             # # 正常一句话说不了这么多遍，一般都是其他 bot 一直发的
-            # elif answer['count'] > Chat.answer_limit_threshold:
+            # if answer['count'] > Chat.answer_limit_threshold:
             #     continue
-            elif answer['group_id'] == group_id:
+
+            if answer['group_id'] == group_id:
                 candidate_answers.append(answer)
             # 别的群的 at, 忽略
             elif '[CQ:at,qq=' in answer_key:
