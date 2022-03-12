@@ -49,6 +49,9 @@ blacklist_mongo.create_index(name='group_index',
 #                            plugin_config.API_KEY,
 #                            plugin_config.SECRET_KEY)
 
+# 请修改成 bot 自身的 QQ 号（
+self_qq = '1234657'
+
 
 @dataclass
 class ChatData:
@@ -85,6 +88,10 @@ class ChatData:
     def keywords_pinyin(self) -> str:
         return ''.join([item[0] for item in pypinyin.pinyin(
             self.keywords, style=pypinyin.NORMAL, errors='default')]).lower()
+
+    @cached_property
+    def to_me(self) -> str:
+        return '牛牛' in self.keywords or '帕拉斯' in self.raw_message or '[CQ:at,qq={}]'.format(self_qq) in self.raw_message
 
 
 class Chat:
@@ -584,14 +591,14 @@ class Chat:
         candidate_answers = []
         answers_count = defaultdict(int)
         other_group_cache = defaultdict(list)
-        on_call = '牛牛' in keywords
 
         for answer in all_answers:
             answer_key = answer['keywords']
             if answer_key in ban_keywords:
                 continue
-            if on_call and '牛牛' in answer_key:    # 呼叫牛牛还回复牛牛的，有点笨，ban了
-                continue
+            if self.chat_data.to_me:
+                if '牛牛' in answer_key:    # 呼叫牛牛还回复牛牛的，有点笨，ban了
+                    continue
             # # 正常一句话说不了这么多遍，一般都是其他 bot 一直发的
             # if answer['count'] > Chat.answer_limit_threshold:
             #     continue
