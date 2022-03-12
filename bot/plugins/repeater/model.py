@@ -597,7 +597,7 @@ class Chat:
             if answer_key in ban_keywords:
                 continue
             if self.chat_data.to_me:
-                if '牛牛' in answer_key:    # 呼叫牛牛还回复牛牛的，有点笨，ban了
+                if '牛牛' in answer_key or '帕拉斯' in answer_key:    # 呼叫牛牛还回复牛牛的，有点笨，ban了
                     continue
             # # 正常一句话说不了这么多遍，一般都是其他 bot 一直发的
             # if answer['count'] > Chat.answer_limit_threshold:
