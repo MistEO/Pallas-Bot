@@ -561,12 +561,12 @@ class Chat:
             for ban in context['ban']:
                 ban_key = ban['keywords']
                 if ban['group_id'] == group_id or ban['group_id'] == Chat._blacklist_flag:
-                    ban_keywords.append(ban_key)
+                    ban_keywords.add(ban_key)
                 else:
                     # 超过 N 个群都把这句话 ban 了，那就全局 ban 掉
                     ban_count[ban_key] += 1
                     if ban_count[ban_key] == Chat.cross_group_threshold:
-                        ban_keywords.append(ban_key)
+                        ban_keywords.add(ban_key)
 
         if not self.chat_data.is_image:
             all_answers = [answer
