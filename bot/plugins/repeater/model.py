@@ -636,7 +636,7 @@ class Chat:
 
         blacklist_mongo.update_one(
             {'group_id': Chat._blacklist_flag},
-            {'answers': blacklist},
+            {'$set': {'answers': blacklist}},
             upsert=True
         )
 
