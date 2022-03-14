@@ -112,6 +112,7 @@ class Chat:
     save_count_threshold = 1000     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
 
     blacklist_answer = defaultdict(set)
+    blacklist_answer_reserve = defaultdict(set)
 
     def __init__(self, data: Union[ChatData, GroupMessageEvent, PrivateMessageEvent]):
 
@@ -383,6 +384,11 @@ class Chat:
                         }
                     }
                 })
+                if keywords in Chat.blacklist_answer_reserve[group_id]:
+                    Chat.blacklist_answer[group_id].add(keywords)
+                else:
+                    Chat.blacklist_answer_reserve[group_id].add(keywords)
+
                 return True
 
         return False
@@ -639,36 +645,50 @@ class Chat:
 
         return Message(f'[CQ:tts,text={text}]')
 
-    # @staticmethod
-    # def generate_blacklist() -> None:
-    #     blacklist_threshold = 10
+    @staticmethod
+    def update_global_blacklist() -> None:
+        keywords_dict = defaultdict(int)
+        global_blacklist = {}
+        for _, keywords_list in Chat.blacklist_answer:
+            for keywords in keywords_list:
+                keywords_dict[keywords] += 1
+                if keywords_list[keywords] == Chat.cross_group_threshold:
+                    global_blacklist.add(keywords)
 
-    #     all_context = context_mongo.find(
-    #         {'answers.count': {'$gt': blacklist_threshold}})
-    #     blacklist = list({answer['keywords'] for context in all_context
-    #                       for answer in context['answers']
-    #                       if answer['count'] > blacklist_threshold and '[CQ:' not in answer['keywords']})
-
-    #     blacklist_mongo.update_one(
-    #         {'group_id': Chat._blacklist_flag},
-    #         {'$set': {'answers': blacklist}},
-    #         upsert=True
-    #     )
+        Chat.blacklist_answer[Chat._blacklist_flag] |= global_blacklist
 
     @staticmethod
-    def update_blacklist() -> None:
+    def _select_blacklist() -> None:
         all_blacklist = blacklist_mongo.find()
 
         for item in all_blacklist:
-            Chat.blacklist_answer[item['group_id']] |= set(
-                item['answers'])
+            group_id = item['group_id']
+            Chat.blacklist_answer[group_id] = set(item['answers'])
+            Chat.blacklist_answer_reserve[group_id] = set(
+                item['answers_reserve'])
+
+    @staticmethod
+    def _sync_blacklist() -> None:
+        for group_id, answers in Chat.blacklist_answer.items():
+            blacklist_mongo.update_one(
+                {"group_id": group_id},
+                {"$set": {"answers": answers}},
+                upsert=True)
+
+        for group_id, answers in Chat.blacklist_answer_reserve.items():
+            blacklist_mongo.update_one(
+                {"group_id": group_id},
+                {"$set": {"answers_reserve": answers}},
+                upsert=True)
 
 
-Chat.update_blacklist()
+# Auto sync on program start
+Chat._select_blacklist()
 
 
 def _chat_sync():
     Chat._sync()
+    Chat._sync_blacklist()
 
 
 # Auto sync on program exit

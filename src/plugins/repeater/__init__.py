@@ -113,3 +113,10 @@ async def speak_up():
             'group_id': group_id
         })
         await asyncio.sleep(random.randint(2, 5))
+
+
+update_sched = require('nonebot_plugin_apscheduler').scheduler
+
+@update_sched.scheduled_job("cron", hour="*/2")
+def update_data():
+    Chat.update_global_blacklist()
