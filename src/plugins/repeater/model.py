@@ -40,7 +40,7 @@ context_mongo.create_index(name='answers_index',
 
 blacklist_mongo = mongo_db['blacklist']
 blacklist_mongo.create_index(name='group_index',
-                             keys=[('group_id', pymongo.TEXT)])
+                             keys=[('group_id', pymongo.HASHED)])
 # global_config = nonebot.get_driver().config
 # plugin_config = Config(**global_config.dict())
 

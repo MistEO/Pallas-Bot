@@ -40,7 +40,7 @@ context_mongo.create_index(name='answers_index',
 
 blacklist_mongo = mongo_db['blacklist']
 blacklist_mongo.create_index(name='group_index',
-                             keys=[('group_id', pymongo.TEXT)])
+                             keys=[('group_id', pymongo.HASHED)])
 # global_config = nonebot.get_driver().config
 # plugin_config = Config(**global_config.dict())
 
@@ -667,10 +667,10 @@ class Chat:
                     continue
                 global_ban_dict[keywords] += 1
                 blacklist_answer.append(keywords)
-
-            blacklist_mongo.update_one({"group_id": group_id},
-                                       {"$set": {"answers": blacklist_answer}},
-                                       upsert=True)
+            if blacklist_answer:
+                blacklist_mongo.update_one({"group_id": group_id},
+                                           {"$set": {"answers": blacklist_answer}},
+                                           upsert=True)
 
         blacklist_answer = []
         for keywords, count in global_ban_dict.items():
