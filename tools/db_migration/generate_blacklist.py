@@ -668,7 +668,7 @@ class Chat:
                 global_ban_dict[keywords] += 1
                 blacklist_answer.append(keywords)
 
-            blacklist_mongo.insert_one({"group_id": group_id},
+            blacklist_mongo.update_one({"group_id": group_id},
                                        {"$set": {"answers": blacklist_answer}},
                                        update=True)
 
@@ -677,7 +677,7 @@ class Chat:
             if count < 2:
                 continue
             blacklist_answer.append(keywords)
-        blacklist_mongo.insert_one({"group_id": Chat._blacklist_flag},
+        blacklist_mongo.update_one({"group_id": Chat._blacklist_flag},
                                    {"$set": {"answers": blacklist_answer}},
                                    update=True)
 
