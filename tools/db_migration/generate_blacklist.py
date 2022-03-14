@@ -661,27 +661,25 @@ class Chat:
 
         global_ban_dict = defaultdict(int)
         for group_id, keywords_dict in group_blacklist.items():
-            insert_data = {
-                "group_id": group_id,
-                "answers": []
-            }
+            blacklist_answer = []
             for keywords, count in keywords_dict.items():
                 if count < 2:
                     continue
                 global_ban_dict[keywords] += 1
-                insert_data["answers"].append(keywords)
+                blacklist_answer.append(keywords)
 
-            blacklist_mongo.insert_one(insert_data)
+            blacklist_mongo.insert_one({"group_id": group_id},
+                                       {"$set": {"answers": blacklist_answer}},
+                                       update=True)
 
-        insert_data = {
-            "group_id": Chat._blacklist_flag,
-            "answers": []
-        }
+        blacklist_answer = []
         for keywords, count in global_ban_dict.items():
             if count < 2:
                 continue
-            insert_data["answers"].append(keywords)
-        blacklist_mongo.insert_one(insert_data)
+            blacklist_answer.append(keywords)
+        blacklist_mongo.insert_one({"group_id": Chat._blacklist_flag},
+                                   {"$set": {"answers": blacklist_answer}},
+                                   update=True)
 
     @staticmethod
     def update_blacklist() -> None:
