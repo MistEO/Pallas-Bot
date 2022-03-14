@@ -56,7 +56,7 @@
 1. 配置并启动 [go-cqhttp](https://github.com/Mrs4s/go-cqhttp), 选择反向 WS
 2. 安装 [nonebot2](https://github.com/nonebot/nonebot2)
 3. clone 本仓库，并安装 requirements
-4. 部分 [插件](bot/plugins) 需要额外安装依赖或配置，请自行查阅对应的 README ~
+4. 依次安装每个 [插件](bot/plugins) 的额外依赖或配置，请查阅对应的 README ~
 5. run your bot using `nb run` .
 
 ## QQ群
