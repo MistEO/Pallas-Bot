@@ -90,8 +90,9 @@ class ChatData:
             self.keywords, style=pypinyin.NORMAL, errors='default')]).lower()
 
     @cached_property
-    def to_me(self) -> str:
-        return '牛牛' in self.keywords or '帕拉斯' in self.raw_message or '[CQ:at,qq={}]'.format(self_qq) in self.raw_message
+    def to_me(self) -> bool:
+        return '牛牛' in self.keywords or '帕拉斯' in self.keywords \
+            or f'[CQ:at,qq={self_qq}]' in self.raw_message
 
 
 class Chat:
@@ -110,8 +111,7 @@ class Chat:
     save_time_threshold = 3600      # 每隔多久进行一次持久化 ( 秒 )
     save_count_threshold = 1000     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
 
-    blacklist_global_answer = set()
-    blacklist_group_answer = defaultdict(set)
+    blacklist_answer = defaultdict(set)
 
     def __init__(self, data: Union[ChatData, GroupMessageEvent, PrivateMessageEvent]):
 
@@ -304,7 +304,7 @@ class Chat:
                         'time': {
                             '$gt': cur_time - 24 * 3600
                         },
-                        'count': {
+                        'answers.count': {
                             '$gt': Chat.answer_threshold
                         },
                         'answers.group_id': group_id
@@ -561,8 +561,7 @@ class Chat:
             rand_threshold = Chat.answer_threshold
 
         # 全局的黑名单
-        # Chat.blacklist_group_answer[group_id] | Chat.blacklist_global_answer
-        ban_keywords = set()
+        ban_keywords = Chat.blacklist_answer[Chat._blacklist_flag] | Chat.blacklist_answer[group_id]
         # 针对单条回复的黑名单
         if 'ban' in context:
             ban_count = defaultdict(int)
@@ -640,32 +639,32 @@ class Chat:
 
         return Message(f'[CQ:tts,text={text}]')
 
-    @staticmethod
-    def generate_blacklist() -> None:
-        blacklist_threshold = 10
+    # @staticmethod
+    # def generate_blacklist() -> None:
+    #     blacklist_threshold = 10
 
-        all_context = context_mongo.find(
-            {'answers.count': {'$gt': blacklist_threshold}})
-        blacklist = list({answer['keywords'] for context in all_context
-                          for answer in context['answers']
-                          if answer['count'] > blacklist_threshold and '[CQ:' not in answer['keywords']})
+    #     all_context = context_mongo.find(
+    #         {'answers.count': {'$gt': blacklist_threshold}})
+    #     blacklist = list({answer['keywords'] for context in all_context
+    #                       for answer in context['answers']
+    #                       if answer['count'] > blacklist_threshold and '[CQ:' not in answer['keywords']})
 
-        blacklist_mongo.update_one(
-            {'group_id': Chat._blacklist_flag},
-            {'$set': {'answers': blacklist}},
-            upsert=True
-        )
+    #     blacklist_mongo.update_one(
+    #         {'group_id': Chat._blacklist_flag},
+    #         {'$set': {'answers': blacklist}},
+    #         upsert=True
+    #     )
 
     @staticmethod
     def update_blacklist() -> None:
-        global_black = blacklist_mongo.find_one(
-            {'group_id': Chat._blacklist_flag})
-        if not global_black:
-            return
-        Chat.blacklist_global_answer |= set(global_black['answers'])
+        all_blacklist = blacklist_mongo.find()
+
+        for item in all_blacklist:
+            Chat.blacklist_answer[item['group_id']] |= set(
+                item['answers'])
 
 
-# Chat.update_blacklist()
+Chat.update_blacklist()
 
 
 def _chat_sync():
@@ -706,5 +705,3 @@ if __name__ == '__main__':
 
     time.sleep(5)
     print(Chat.speak())
-
-    Chat.generate_blacklist()
