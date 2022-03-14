@@ -4,7 +4,7 @@ import asyncio
 
 from pathlib import Path
 from nonebot import on_command, on_message, on_notice, get_driver
-from nonebot.adapters.cqhttp import MessageSegment, Message, permission, GroupMessageEvent
+from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 from nonebot.rule import keyword, startswith, to_me
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event

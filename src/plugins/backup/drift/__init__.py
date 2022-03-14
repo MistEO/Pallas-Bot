@@ -1,7 +1,7 @@
 import re
 
 from nonebot import on_message
-from nonebot.adapters.cqhttp import MessageSegment, Message, permission, GroupMessageEvent
+from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 from nonebot.rule import keyword, startswith, endswith, Rule
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event

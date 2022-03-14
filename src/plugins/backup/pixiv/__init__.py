@@ -1,7 +1,7 @@
 import re
 
-from nonebot import on_command , on_message
-from nonebot.adapters.cqhttp import MessageSegment, Message, permission, GroupMessageEvent
+from nonebot import on_command, on_message
+from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 from nonebot.rule import keyword, startswith
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
@@ -11,8 +11,9 @@ from .pixiv import a60
 status = {}
 
 can = on_message(rule=startswith('牛牛涩涩'),
-                priority=10,
-                permission=permission.GROUP)
+                 priority=10,
+                 permission=permission.GROUP)
+
 
 @can.handle()
 async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_State):
@@ -23,15 +24,16 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
             return False
         can.block = True
         url = f'https://www.pixiv.net/artworks/{p.id}'
-        msg: Message = MessageSegment.text(url) + MessageSegment.image(file=p.pic)
+        msg: Message = MessageSegment.text(
+            url) + MessageSegment.image(file=p.pic)
         await can.finish(msg)
     else:
         can.block = False
 
 
 tags = on_message(rule=startswith('牛牛我要看'),
-                priority=10,
-                permission=permission.GROUP)
+                  priority=10,
+                  permission=permission.GROUP)
 
 
 @tags.handle()
@@ -49,7 +51,8 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
                 await tags.finish("呃......咳嗯，下次不能喝、喝这么多了......呀，博士。你今天走起路来，怎么看着摇摇晃晃的？")
                 return
             url = f'https://www.pixiv.net/artworks/{p.id}'
-            msg: Message = MessageSegment.text(url) + MessageSegment.image(file=p.pic)
+            msg: Message = MessageSegment.text(
+                url) + MessageSegment.image(file=p.pic)
             await tags.finish(msg)
         else:
             await tags.finish("听啊，悲鸣停止了。这是幸福的和平到来前的宁静。")
@@ -58,8 +61,8 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
 
 
 cannot = on_message(rule=startswith('牛牛涩涩'),
-                  priority=17,
-                  permission=permission.GROUP)
+                    priority=17,
+                    permission=permission.GROUP)
 
 
 @cannot.handle()
@@ -73,10 +76,11 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
 status = {}
 
 switch = on_message(
-    rule=keyword("牛牛可以涩涩", "牛牛不可以涩涩"), 
+    rule=keyword("牛牛可以涩涩", "牛牛不可以涩涩"),
     block=True,
     priority=5,
     permission=permission.GROUP_ADMIN | permission.GROUP_OWNER)
+
 
 @switch.handle()
 async def sw(bot: Bot, event: GroupMessageEvent, state: T_State):

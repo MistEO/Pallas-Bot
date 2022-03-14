@@ -3,8 +3,8 @@ account:
   password: "机器人密码"
 
 message:
-  post-format: array
+  post-format: string
 
 servers:
   - ws-reverse:
-      universal: ws://127.0.0.1:8080/cqhttp/ws
+      universal: ws://127.0.0.1:8080/onebot/v11/ws

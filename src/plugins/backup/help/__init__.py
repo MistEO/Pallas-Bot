@@ -1,6 +1,6 @@
 from nonebot import on_command
-from nonebot.adapters.cqhttp import Bot, GroupMessageEvent, PrivateMessageEvent
-from nonebot.adapters.cqhttp.permission import GROUP_ADMIN, GROUP_OWNER
+from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, PrivateMessageEvent
+from nonebot.adapters.onebot.v11.permission import GROUP_ADMIN, GROUP_OWNER
 
 status = {}
 help_text = r'''“战争女神”的故事经历，就交给前赴后继渴望解放的人们好好使用吧！
@@ -14,10 +14,12 @@ help_text = r'''“战争女神”的故事经历，就交给前赴后继渴望�
 
 help = on_command("牛牛帮助", aliases={'牛牛功能', '帕拉斯帮助', '帕拉斯功能'})
 
+
 @help.handle()
 async def _(bot: Bot, event: GroupMessageEvent):
     if status.get(event.group_id, True):
         await help.finish(help_text)
+
 
 @help.handle()
 async def _(bot: Bot, event: PrivateMessageEvent):
@@ -26,8 +28,9 @@ async def _(bot: Bot, event: PrivateMessageEvent):
 
 help_mode_switch = on_command(
     "牛牛开启帮助", aliases={"牛牛关闭帮助"},
-    permission=GROUP_ADMIN|GROUP_OWNER
+    permission=GROUP_ADMIN | GROUP_OWNER
 )
+
 
 @help_mode_switch.handle()
 async def _(bot: Bot, event: GroupMessageEvent):

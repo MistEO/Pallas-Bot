@@ -6,9 +6,9 @@ from nonebot import on_message, require, get_bot
 from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me
 from nonebot.adapters import Bot, Event
-from nonebot.adapters.cqhttp import GroupMessageEvent, PrivateMessageEvent
+from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 
-from nonebot.adapters.cqhttp import permission
+from nonebot.adapters.onebot.v11 import permission
 
 from .model import Chat, ChatData
 

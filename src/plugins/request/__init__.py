@@ -1,6 +1,6 @@
 import nonebot
 from nonebot import on_command, on_request, on_notice, get_driver
-from nonebot.adapters.cqhttp import MessageSegment, Message, FriendRequestEvent, GroupRequestEvent, Bot
+from nonebot.adapters.onebot.v11 import MessageSegment, Message, FriendRequestEvent, GroupRequestEvent, Bot
 from nonebot.rule import keyword, startswith, to_me
 from nonebot.typing import T_State
 from typing import Union

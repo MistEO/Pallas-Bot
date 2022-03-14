@@ -4,7 +4,7 @@ from PIL import Image
 from io import BytesIO
 
 from nonebot import on_message, logger
-from nonebot.adapters.cqhttp import MessageSegment, Message, permission, GroupMessageEvent
+from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 
@@ -31,7 +31,7 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
             hash_value = dhash.dhash_int(image)
             diff = dhash.get_num_bits_different(hash_value, hash_templ)
             logger.info(f'dHash diff: {diff}')
-            
+
             if diff <= hash_diff_thres:
                 ocr = OCR(response.content)
                 ocr_result = ocr.ocr()
@@ -46,6 +46,5 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
                         await hello.finish(msg)
                     else:
                         await hello.finish('转身吧，勇士们。我们已经获得了完美的胜利，现在是该回去享受庆祝的盛典了。')
-    
+
     hello.block = False
-    

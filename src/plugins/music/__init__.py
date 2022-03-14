@@ -3,10 +3,11 @@ import os
 
 from pathlib import Path
 from nonebot import on_command, on_message, on_notice, get_driver
-from nonebot.adapters.cqhttp import MessageSegment, Message, permission, GroupMessageEvent
+from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 from nonebot.rule import keyword, startswith, to_me
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
+
 
 def get_music_name():
     resource_path = "resource/music/"
@@ -15,9 +16,9 @@ def get_music_name():
     return resource_path + music
 
 
-music_cmd = on_command("牛牛唱歌", 
-    aliases={'牛牛唱首歌', '帕拉斯唱歌', '帕拉斯唱首歌'}
-    )
+music_cmd = on_command("牛牛唱歌",
+                       aliases={'牛牛唱首歌', '帕拉斯唱歌', '帕拉斯唱首歌'}
+                       )
 
 
 @music_cmd.handle()

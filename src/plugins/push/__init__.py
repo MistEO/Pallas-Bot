@@ -2,7 +2,7 @@ from .github import Release, get_latest_release
 from .weibo import Weibo
 from datetime import datetime
 from nonebot import require, get_bot, get_driver
-from nonebot.adapters.cqhttp import MessageSegment, Message
+from nonebot.adapters.onebot.v11 import MessageSegment, Message
 import asyncio
 from dateutil import parser
 

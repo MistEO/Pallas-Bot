@@ -15,8 +15,8 @@ import random
 import re
 import atexit
 
-from nonebot.adapters.cqhttp import GroupMessageEvent, PrivateMessageEvent
-from nonebot.adapters.cqhttp import Message, MessageSegment
+from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
+from nonebot.adapters.onebot.v11 import Message, MessageSegment
 
 mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
 
