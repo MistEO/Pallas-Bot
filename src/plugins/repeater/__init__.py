@@ -117,6 +117,7 @@ async def speak_up():
 
 update_sched = require('nonebot_plugin_apscheduler').scheduler
 
-@update_sched.scheduled_job("cron", hour="*/2")
+
+@update_sched.scheduled_job("cron", hour="4")
 def update_data():
     Chat.update_global_blacklist()
