@@ -670,7 +670,7 @@ class Chat:
 
             blacklist_mongo.update_one({"group_id": group_id},
                                        {"$set": {"answers": blacklist_answer}},
-                                       update=True)
+                                       upsert=True)
 
         blacklist_answer = []
         for keywords, count in global_ban_dict.items():
@@ -679,7 +679,7 @@ class Chat:
             blacklist_answer.append(keywords)
         blacklist_mongo.update_one({"group_id": Chat._blacklist_flag},
                                    {"$set": {"answers": blacklist_answer}},
-                                   update=True)
+                                   upsert=True)
 
     @staticmethod
     def update_blacklist() -> None:
