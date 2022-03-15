@@ -677,12 +677,16 @@ class Chat:
         Chat._select_blacklist()
 
         for group_id, answers in Chat.blacklist_answer.items():
+            if not len(answers):
+                continue
             blacklist_mongo.update_one(
                 {"group_id": group_id},
                 {"$set": {"answers": list(answers)}},
                 upsert=True)
 
         for group_id, answers in Chat.blacklist_answer_reserve.items():
+            if not len(answers):
+                continue
             blacklist_mongo.update_one(
                 {"group_id": group_id},
                 {"$set": {"answers_reserve": list(answers)}},
