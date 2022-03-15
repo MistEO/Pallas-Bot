@@ -386,6 +386,9 @@ class Chat:
                 })
                 if keywords in Chat.blacklist_answer_reserve[group_id]:
                     Chat.blacklist_answer[group_id].add(keywords)
+                    if keywords in Chat.blacklist_answer_reserve[Chat._blacklist_flag]:
+                        Chat.blacklist_answer[Chat._blacklist_flag].add(
+                            keywords)
                 else:
                     Chat.blacklist_answer_reserve[group_id].add(keywords)
 
