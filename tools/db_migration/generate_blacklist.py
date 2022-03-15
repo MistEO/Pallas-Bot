@@ -659,6 +659,11 @@ class Chat:
                     cur_group_bl[keywords] = 0
                 cur_group_bl[keywords] += 1
 
+        # 让全局的位于第一条记录，手动管理的时候好查一些
+        blacklist_mongo.update_one({"group_id": Chat._blacklist_flag},
+                                   {"$set": {"answers": []}},
+                                   upsert=True)
+
         global_ban_dict = defaultdict(int)
         for group_id, keywords_dict in group_blacklist.items():
             blacklist_answer = []
@@ -667,7 +672,7 @@ class Chat:
                     continue
                 global_ban_dict[keywords] += 1
                 blacklist_answer.append(keywords)
-            if blacklist_answer:
+            if len(blacklist_answer):
                 blacklist_mongo.update_one({"group_id": group_id},
                                            {"$set": {"answers": blacklist_answer}},
                                            upsert=True)
@@ -677,9 +682,22 @@ class Chat:
             if count < 2:
                 continue
             blacklist_answer.append(keywords)
-        blacklist_mongo.update_one({"group_id": Chat._blacklist_flag},
-                                   {"$set": {"answers": blacklist_answer}},
-                                   upsert=True)
+
+        blacklist_threshold = 50
+
+        all_context = context_mongo.find(
+            {'count': {'$gt': blacklist_threshold},
+             'answers.count': {'$gt': blacklist_threshold}})
+        blacklist_answer += list({answer['keywords'] for context in all_context
+                                  for answer in context['answers']
+                                  if answer['count'] > blacklist_threshold})
+
+        blacklist_answer = list(set(blacklist_answer))
+        blacklist_mongo.update_one(
+            {'group_id': Chat._blacklist_flag},
+            {'$set': {'answers': blacklist_answer}},
+            upsert=True
+        )
 
     @staticmethod
     def update_blacklist() -> None:

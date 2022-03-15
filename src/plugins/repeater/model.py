@@ -647,6 +647,8 @@ class Chat:
 
     @staticmethod
     def update_global_blacklist() -> None:
+        Chat._select_blacklist()
+
         keywords_dict = defaultdict(int)
         global_blacklist = set()
         for _, keywords_list in Chat.blacklist_answer.items():
@@ -665,13 +667,15 @@ class Chat:
         for item in all_blacklist:
             group_id = item['group_id']
             if 'answers' in item:
-                Chat.blacklist_answer[group_id] = set(item['answers'])
+                Chat.blacklist_answer[group_id] |= set(item['answers'])
             if 'answers_reserve' in item:
-                Chat.blacklist_answer_reserve[group_id] = set(
+                Chat.blacklist_answer_reserve[group_id] |= set(
                     item['answers_reserve'])
 
     @staticmethod
     def _sync_blacklist() -> None:
+        Chat._select_blacklist()
+
         for group_id, answers in Chat.blacklist_answer.items():
             blacklist_mongo.update_one(
                 {"group_id": group_id},
@@ -686,7 +690,7 @@ class Chat:
 
 
 # Auto sync on program start
-Chat._select_blacklist()
+Chat.update_global_blacklist()
 
 
 def _chat_sync():
@@ -699,4 +703,32 @@ atexit.register(_chat_sync)
 
 
 if __name__ == '__main__':
-    Chat.update_global_blacklist()
+
+    # while True:
+    test_data: ChatData = ChatData(
+        group_id=1234567,
+        user_id=1111111,
+        raw_message='牛牛出来玩',
+        plain_text='牛牛出来玩',
+        time=time.time()
+    )
+
+    test_chat: Chat = Chat(test_data)
+
+    print(test_chat.answer())
+    test_chat.learn()
+
+    test_answer_data: ChatData = ChatData(
+        group_id=1234567,
+        user_id=1111111,
+        raw_message='别烦',
+        plain_text='别烦',
+        time=time.time()
+    )
+
+    test_answer: Chat = Chat(test_answer_data)
+    print(test_chat.answer())
+    test_answer.learn()
+
+    time.sleep(5)
+    print(Chat.speak())
