@@ -667,21 +667,37 @@ class Chat:
         global_ban_dict = defaultdict(int)
         for group_id, keywords_dict in group_blacklist.items():
             blacklist_answer = []
+            blacklist_answer_reserve = []
             for keywords, count in keywords_dict.items():
                 if count < 2:
+                    blacklist_answer_reserve.append(keywords)
                     continue
                 global_ban_dict[keywords] += 1
                 blacklist_answer.append(keywords)
+            if len(blacklist_answer_reserve):
+                blacklist_mongo.update_one({"group_id": group_id},
+                                           {"$set": {
+                                               "answers_reserve": blacklist_answer_reserve}},
+                                           upsert=True)
             if len(blacklist_answer):
                 blacklist_mongo.update_one({"group_id": group_id},
                                            {"$set": {"answers": blacklist_answer}},
                                            upsert=True)
 
         blacklist_answer = []
+        blacklist_answer_reserve = []
         for keywords, count in global_ban_dict.items():
             if count < 2:
+                blacklist_answer_reserve.append(keywords)
                 continue
             blacklist_answer.append(keywords)
+
+        if len(blacklist_answer_reserve):
+            blacklist_mongo.update_one(
+                {'group_id': Chat._blacklist_flag},
+                {'$set': {'answers_reserve': blacklist_answer_reserve}},
+                upsert=True
+            )
 
         blacklist_threshold = 50
 
@@ -693,11 +709,12 @@ class Chat:
                                   if answer['count'] > blacklist_threshold})
 
         blacklist_answer = list(set(blacklist_answer))
-        blacklist_mongo.update_one(
-            {'group_id': Chat._blacklist_flag},
-            {'$set': {'answers': blacklist_answer}},
-            upsert=True
-        )
+        if len(blacklist_answer):
+            blacklist_mongo.update_one(
+                {'group_id': Chat._blacklist_flag},
+                {'$set': {'answers': blacklist_answer}},
+                upsert=True
+            )
 
     @staticmethod
     def update_blacklist() -> None:
