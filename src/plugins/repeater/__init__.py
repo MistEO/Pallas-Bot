@@ -14,7 +14,8 @@ from .model import Chat, ChatData
 
 any_msg = on_message(
     priority=15,
-    block=False
+    block=False,
+    permission=permission.GROUP | permission.PRIVATE_FRIEND
 )
 
 Chat.answer_threshold = 3
