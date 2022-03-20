@@ -5,7 +5,7 @@ import asyncio
 from pathlib import Path
 from nonebot import on_command, on_message, on_notice, get_driver
 from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
-from nonebot.rule import keyword, startswith, to_me
+from nonebot.rule import keyword, startswith, to_me, Rule
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 
@@ -30,19 +30,27 @@ def get_rand_voice():
     return get_voice(name)
 
 
-any_cmd = on_message(
-    rule=keyword('牛牛', '帕拉斯'),
+target_msgs = ['牛牛', '帕拉斯']
+
+
+async def message_equal(bot: "Bot", event: "Event", state: T_State) -> bool:
+    raw_msg = event.dict()['raw_message']
+    for target in target_msgs:
+        if target == raw_msg:
+            return True
+    return False
+
+
+call_me_cmd = on_message(
+    rule=Rule(message_equal),
     priority=13,
     block=False,
     permission=permission.GROUP)
 
-
-@any_cmd.handle()
+@call_me_cmd.handle()
 async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_State):
-    plain = event.get_plaintext().strip()
-    if plain == '牛牛' or plain == '帕拉斯':
-        msg: Message = MessageSegment.record(file=Path(get_rand_voice()))
-        await any_cmd.finish(msg)
+    msg: Message = MessageSegment.record(file=Path(get_rand_voice()))
+    await call_me_cmd.finish(msg)
 
 to_me_cmd = on_message(
     rule=to_me(),
