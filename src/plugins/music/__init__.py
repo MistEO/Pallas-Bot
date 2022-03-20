@@ -17,7 +17,7 @@ def get_music_name():
 
 
 music_cmd = on_command("牛牛唱歌",
-                       aliases={'牛牛唱首歌', '帕拉斯唱歌', '帕拉斯唱首歌'}
+                       aliases={'欢乐水牛'}
                        )
 
 
