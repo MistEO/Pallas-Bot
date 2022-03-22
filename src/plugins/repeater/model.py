@@ -1,9 +1,7 @@
-# from .config import Config
 from typing import Generator, List, Optional, Union, Tuple, Dict, Any
 from functools import cached_property, cmp_to_key
 from dataclasses import dataclass
 from collections import defaultdict
-# from aip import AipSpeech
 
 import jieba_fast.analyse
 import threading
@@ -41,16 +39,6 @@ context_mongo.create_index(name='answers_index',
 blacklist_mongo = mongo_db['blacklist']
 blacklist_mongo.create_index(name='group_index',
                              keys=[('group_id', pymongo.HASHED)])
-# global_config = nonebot.get_driver().config
-# plugin_config = Config(**global_config.dict())
-
-# if plugin_config.enable_voice:
-#     tts_client = AipSpeech(plugin_config.APP_ID,
-#                            plugin_config.API_KEY,
-#                            plugin_config.SECRET_KEY)
-
-# 请修改成 bot 自身的 QQ 号（
-self_qq = '1234657'
 
 
 @dataclass
@@ -91,18 +79,17 @@ class ChatData:
 
     @cached_property
     def to_me(self) -> bool:
-        return '牛牛' in self.keywords or '帕拉斯' in self.keywords \
-            or f'[CQ:at,qq={self_qq}]' in self.raw_message
+        return '牛牛' in self.keywords or '帕拉斯' in self.keywords
 
 
 class Chat:
     answer_threshold = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
     # answer_limit_threshold = 50     # 上限阈值，一般正常的上下文不可能发 50 遍，一般是其他 bot 的回复，禁了！
-    cross_group_threshold = 3       # N 个群有相同的回复，就跨群作为全局回复
+    cross_group_threshold = 2       # N 个群有相同的回复，就跨群作为全局回复
     repeat_threshold = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
     speak_threshold = 5             # 主动发言的阈值，越小废话越多
 
-    lose_sanity_probability = 0.1   # 精神错乱（回复没达到阈值的话）的概率
+    drunk_probability = 0.07        # 牛牛喝醉的概率（回复没达到阈值的话）
     split_probability = 0.5         # 按逗号分割回复语的概率
     voice_probability = 0           # 回复语音的概率（仅纯文字）
     speak_continuously_probability = 0.5  # 连续主动说话的概率
@@ -188,8 +175,8 @@ class Chat:
             if self.chat_data.group_id in Chat._reply_dict:
                 group_replies = Chat._reply_dict[self.chat_data.group_id]
                 latest_reply = group_replies[-1]
-                # 限制发音频率，最多 3 秒一次
-                if int(time.time()) - latest_reply['time'] < 3:
+                # 限制发音频率，最多 6 秒一次
+                if int(time.time()) - latest_reply['time'] < 6:
                     return None
                 # # 不要一直回复同一个内容
                 # if self.chat_data.raw_message == latest_reply['pre_raw_message']:
@@ -564,7 +551,7 @@ class Chat:
         if not context:
             return None
 
-        if random.random() < Chat.lose_sanity_probability:
+        if random.random() < Chat.drunk_probability:
             rand_threshold = 1
         else:
             rand_threshold = Chat.answer_threshold

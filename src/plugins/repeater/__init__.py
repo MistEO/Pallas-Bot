@@ -15,13 +15,8 @@ from .model import Chat, ChatData
 any_msg = on_message(
     priority=15,
     block=False,
-    permission=permission.GROUP | permission.PRIVATE_FRIEND
+    permission=permission.GROUP  # | permission.PRIVATE_FRIEND
 )
-
-Chat.answer_threshold = 3
-Chat.cross_group_threshold = 2
-Chat.lose_sanity_probability = 0.05
-Chat.voice_probability = 0
 
 
 async def chat_answer(answers):
