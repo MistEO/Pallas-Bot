@@ -692,8 +692,8 @@ class Chat:
         清理所有超过 30 天没人说、且没有学会的话
         """
         context_mongo.delete_many({
-            "count": {"$lt", Chat.answer_threshold - 1},
-            "time": {"$lt": int(time.time()) - 30 * 24 * 3600}  # 三十天前
+            "time": {"$lt": int(time.time()) - 30 * 24 * 3600},  # 三十天前
+            "count": {"$lt", Chat.answer_threshold}    # lt 是小于，不包括等于
         })
 
 
