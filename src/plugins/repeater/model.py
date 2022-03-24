@@ -686,6 +686,16 @@ class Chat:
                 {"$set": {"answers_reserve": list(answers)}},
                 upsert=True)
 
+    @staticmethod
+    def clearup_context() -> None:
+        """
+        清理所有超过 30 天没人说、且没有学会的话
+        """
+        context_mongo.delete_many({
+            "count": {"$lt", Chat.answer_threshold - 1},
+            "time": {"$lt": int(time.time()) - 30 * 24 * 3600}  # 三十天前
+        })
+
 
 # Auto sync on program start
 Chat.update_global_blacklist()
