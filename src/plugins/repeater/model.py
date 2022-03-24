@@ -174,23 +174,24 @@ class Chat:
 
             if self.chat_data.group_id in Chat._reply_dict:
                 group_replies = Chat._reply_dict[self.chat_data.group_id]
-                latest_reply = group_replies[-1]
-                # 限制发音频率，最多 6 秒一次
-                if int(time.time()) - latest_reply['time'] < 6:
-                    return None
-                # # 不要一直回复同一个内容
-                # if self.chat_data.raw_message == latest_reply['pre_raw_message']:
-                #     return None
-                # 有人复读了牛牛的回复，不继续回复
-                # if self.chat_data.raw_message == latest_reply['reply']:
-                #    return None
+                if len(group_replies):
+                    latest_reply = group_replies[-1]
+                    # 限制发音频率，最多 6 秒一次
+                    if int(time.time()) - latest_reply['time'] < 6:
+                        return None
+                    # # 不要一直回复同一个内容
+                    # if self.chat_data.raw_message == latest_reply['pre_raw_message']:
+                    #     return None
+                    # 有人复读了牛牛的回复，不继续回复
+                    # if self.chat_data.raw_message == latest_reply['reply']:
+                    #    return None
 
-                # 如果连续 5 次回复同样的内容，就不再回复。这种情况很可能是和别的 bot 死循环了
-                # repeat_times = 5
-                # if len(group_replies) >= repeat_times \
-                #     and all(reply['pre_raw_message'] == self.chat_data.raw_message
-                #             for reply in group_replies[-repeat_times:]):
-                #     return None
+                    # 如果连续 5 次回复同样的内容，就不再回复。这种情况很可能是和别的 bot 死循环了
+                    # repeat_times = 5
+                    # if len(group_replies) >= repeat_times \
+                    #     and all(reply['pre_raw_message'] == self.chat_data.raw_message
+                    #             for reply in group_replies[-repeat_times:]):
+                    #     return None
 
         results = self._context_find()
 

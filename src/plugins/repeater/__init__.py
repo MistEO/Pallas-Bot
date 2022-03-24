@@ -71,7 +71,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     for item in event.dict()['reply']['message']:
         raw_reply = str(item)
         # 去掉图片消息中的 url, subType 等字段
-        raw_message += re.sub(r'(\[CQ\:image.+)(?:,url=.+)(\])',
+        raw_message += re.sub(r'(\[CQ\:.+)(?:,url=(?:.+)?)(\])',
                               r'\1\2', raw_reply)
 
     if not raw_message:
