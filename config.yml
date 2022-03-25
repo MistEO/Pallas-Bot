@@ -3,7 +3,7 @@ account:
   password: "机器人密码"
 
 message:
-  post-format: string
+  post-format: array
 
 servers:
   - ws-reverse:
