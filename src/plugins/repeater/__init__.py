@@ -1,8 +1,10 @@
 import random
 import asyncio
 import re
+import time
 
 from nonebot import on_message, require, get_bot
+from nonebot.exception import ActionFailed
 from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me
 from nonebot.adapters import Bot, Event
@@ -12,6 +14,7 @@ from nonebot.adapters.onebot.v11 import permission
 
 from .model import Chat, ChatData
 
+
 any_msg = on_message(
     priority=15,
     block=False,
@@ -19,15 +22,14 @@ any_msg = on_message(
 )
 
 
-async def chat_answer(answers):
-    if not answers:
-        return
+async def is_shutup(self_id: int, group_id: int) -> bool:
+    info = await get_bot().call_api('get_group_member_info', **{
+        'user_id': self_id,
+        'group_id': group_id
+    })
+    flag: bool = info['shut_up_timestamp'] > time.time()
 
-    delay = random.randint(2, 5)
-    for item in answers:
-        await asyncio.sleep(delay)
-        await any_msg.send(item)
-        delay = random.randint(1, 3)
+    return flag
 
 
 @any_msg.handle()
@@ -38,18 +40,29 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     answers = chat.answer()
     chat.learn()
 
-    await chat_answer(answers)
+    if not answers:
+        return
 
-
-@any_msg.handle()
-async def _(bot: Bot, event: PrivateMessageEvent, state: T_State):
-
-    chat: Chat = Chat(event)
-
-    answers = chat.answer()
-    # chat.learn()  # 不学习私聊的
-
-    await chat_answer(answers)
+    delay = random.randint(2, 5)
+    for item in answers:
+        print("ready to send:", item)
+        await asyncio.sleep(delay)
+        try:
+            await any_msg.send(item)
+        except ActionFailed:
+            continue
+            # 自动删除失效消息。若 bot 处于风控期，请勿开启该功能
+            shutup = await is_shutup(bot.self_id, event.group_id)
+            if not shutup:  # 说明这条消息失效了
+                Chat(ChatData(
+                    group_id=event.group_id,
+                    user_id=bot.self_id,
+                    raw_message=str(item),
+                    plain_text=str(item),
+                    time=event.time
+                )).ban()
+                break
+        delay = random.randint(1, 3)
 
 
 ban_msg = on_message(
@@ -60,7 +73,7 @@ ban_msg = on_message(
 )
 
 
-@ban_msg.handle()
+@ ban_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     event_dict = event.dict()
@@ -71,7 +84,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     for item in event.dict()['reply']['message']:
         raw_reply = str(item)
         # 去掉图片消息中的 url, subType 等字段
-        raw_message += re.sub(r'(\[CQ\:.+)(?:,url=(?:.+)?)(\])',
+        raw_message += re.sub(r'(\[CQ\:.+)(?:,url=*)(\])',
                               r'\1\2', raw_reply)
 
     if not raw_message:
@@ -94,7 +107,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 speak_sched = require('nonebot_plugin_apscheduler').scheduler
 
 
-@speak_sched.scheduled_job('interval', seconds=5)
+@ speak_sched.scheduled_job('interval', seconds=5)
 async def speak_up():
 
     ret = Chat.speak()
@@ -114,7 +127,7 @@ async def speak_up():
 update_sched = require('nonebot_plugin_apscheduler').scheduler
 
 
-@update_sched.scheduled_job("cron", hour="4")
+@ update_sched.scheduled_job("cron", hour="4")
 def update_data():
     Chat.update_global_blacklist()
     Chat.clearup_context()
