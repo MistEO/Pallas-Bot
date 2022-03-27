@@ -338,47 +338,6 @@ class Chat:
 
         return None
 
-    def banPre(self) -> bool:
-        group_id = self.chat_data.group_id
-        if group_id not in Chat._reply_dict:
-            return False
-        for reply in Chat._reply_dict[group_id][::-1]:
-            if self.chat_data.raw_message in reply['pre_keywords']:
-                # pre_keywords = reply['pre_keywords']  # 别人说的
-                # keywords = self.chat_data.keywords  # 牛牛回的
-                pre_keywords = self.chat_data.keywords
-                keywords = reply['reply']
-                # 考虑这句回复是从别的群捞过来的情况，所以这里要分两次 update
-
-                context_mongo.update_one({
-                    'keywords': pre_keywords,
-                    'answers.keywords': keywords,
-                    'answers.group_id': group_id
-                }, {
-                    '$set': {
-                        'answers.$.count': -99999
-                    }
-                })
-                context_mongo.update_one({
-                    'keywords': pre_keywords
-                }, {
-                    '$push': {
-                        'ban': {
-                            'keywords': keywords,
-                            'group_id': group_id
-                        }
-                    }
-                })
-                if keywords in Chat.blacklist_answer_reserve[group_id]:
-                    Chat.blacklist_answer[group_id].add(keywords)
-                    if keywords in Chat.blacklist_answer_reserve[Chat._blacklist_flag]:
-                        Chat.blacklist_answer[Chat._blacklist_flag].add(
-                            keywords)
-                else:
-                    Chat.blacklist_answer_reserve[group_id].add(keywords)
-                return True
-        return False
-
     def ban(self) -> bool:
         '''
         禁止以后回复这句话，仅对该群有效果
