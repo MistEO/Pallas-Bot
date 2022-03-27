@@ -601,16 +601,16 @@ class Chat:
                            if answer['count'] >= rand_threshold
                            and answer['keywords'].startswith('[CQ:')]   # 屏蔽图片后的纯文字回复，图片经常是表情包，后面的纯文字什么都有，很乱
 
-        answers_count = defaultdict(int)
-        other_group_cache = defaultdict(list)
         candidate_answers = {}
+        other_group_cache = {}
+        answers_count = defaultdict(int)
 
-        def candidate_append(answer):
+        def candidate_append(dst, answer):
             answer_key = answer['keywords']
-            if answer_key not in candidate_answers:
-                candidate_answers[answer_key] = answer
+            if answer_key not in dst:
+                dst[answer_key] = answer
             else:
-                pre_answer = candidate_answers[answer_key]
+                pre_answer = dst[answer_key]
                 pre_answer['count'] += answer['count']
                 pre_answer['messages'] += answer['messages']
 
@@ -624,7 +624,7 @@ class Chat:
                 continue
 
             if answer['group_id'] == group_id:
-                candidate_append(answer)
+                candidate_append(candidate_answers, answer)
             # 别的群的 at, 忽略
             elif '[CQ:at,qq=' in answer_key:
                 continue
@@ -632,12 +632,13 @@ class Chat:
                 answers_count[answer_key] += 1
                 cur_count = answers_count[answer_key]
                 if cur_count < cross_group_threshold:      # 没达到阈值前，先缓存
-                    other_group_cache[answer_key].append(answer)
+                    candidate_append(other_group_cache, answer)
                 elif cur_count == cross_group_threshold:   # 刚达到阈值时，将缓存加入
-                    candidate_append(answer)
-                    candidate_answers += other_group_cache[answer_key]
-                else:                                           # 超过阈值后，加入
-                    candidate_append(answer)
+                    candidate_append(candidate_answers,
+                                     other_group_cache[answer_key])
+                    candidate_append(candidate_answers, answer)
+                else:                                      # 超过阈值后，加入
+                    candidate_append(candidate_answers, answer)
 
         if not candidate_answers:
             return None
