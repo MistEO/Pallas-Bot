@@ -569,7 +569,7 @@ class Chat:
         if not context:
             return None
 
-        if random.random() < Chat.drunk_probability:
+        if not self.chat_data.to_me and random.random() < Chat.drunk_probability:
             rand_threshold = 1
         else:
             rand_threshold = Chat.answer_threshold
