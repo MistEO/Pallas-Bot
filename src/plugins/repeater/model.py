@@ -615,8 +615,8 @@ class Chat:
                 pre_answer['messages'] += answer['messages']
 
         cross_group_threshold = Chat.cross_group_threshold
-        if self.chat_data.to_me:
-            cross_group_threshold = 1
+        # if self.chat_data.to_me:
+        #     cross_group_threshold = 1
 
         for answer in all_answers:
             answer_key = answer['keywords']
