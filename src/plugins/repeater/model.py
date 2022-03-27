@@ -347,42 +347,59 @@ class Chat:
         if group_id not in Chat._reply_dict:
             return False
 
+        ban_reply = None
         for reply in Chat._reply_dict[group_id][::-1]:
             if self.chat_data.raw_message in reply['reply']:
-                pre_keywords = reply['pre_keywords']
-                keywords = self.chat_data.keywords
+                ban_reply = reply
+                break
 
-                # 考虑这句回复是从别的群捞过来的情况，所以这里要分两次 update
-                context_mongo.update_one({
-                    'keywords': pre_keywords,
-                    'answers.keywords': keywords,
-                    'answers.group_id': group_id
-                }, {
-                    '$set': {
-                        'answers.$.count': -99999
-                    }
-                })
-                context_mongo.update_one({
-                    'keywords': pre_keywords
-                }, {
-                    '$push': {
-                        'ban': {
-                            'keywords': keywords,
-                            'group_id': group_id
-                        }
-                    }
-                })
-                if keywords in Chat.blacklist_answer_reserve[group_id]:
-                    Chat.blacklist_answer[group_id].add(keywords)
-                    if keywords in Chat.blacklist_answer_reserve[Chat._blacklist_flag]:
-                        Chat.blacklist_answer[Chat._blacklist_flag].add(
-                            keywords)
-                else:
-                    Chat.blacklist_answer_reserve[group_id].add(keywords)
+        # 这种情况一般是有些 CQ 码，牛牛发送的时候，和被回复的时候，里面的内容不一样
+        if not ban_reply:
+            search = re.search(r'(\[CQ:[a-zA-z0-9-_.]+)',
+                               self.chat_data.raw_message)
+            if search:
+                type_keyword = search.group(1)
+                for reply in Chat._reply_dict[group_id][::-1]:
+                    if type_keyword in reply['reply']:
+                        ban_reply = reply
+                        break
 
-                return True
+        if not ban_reply:
+            return False
 
-        return False
+        pre_keywords = reply['pre_keywords']
+        keywords = reply['reply']
+
+        # 考虑这句回复是从别的群捞过来的情况，所以这里要分两次 update
+        # context_mongo.update_one({
+        #     'keywords': pre_keywords,
+        #     'answers.keywords': keywords,
+        #     'answers.group_id': group_id
+        # }, {
+        #     '$set': {
+        #         'answers.$.count': -99999
+        #     }
+        # })
+        context_mongo.update_one({
+            'keywords': pre_keywords
+        }, {
+            '$push': {
+                'ban': {
+                    'keywords': keywords,
+                    'group_id': group_id
+                }
+            }
+        })
+        if keywords in Chat.blacklist_answer_reserve[group_id]:
+            Chat.blacklist_answer[group_id].add(keywords)
+            if keywords in Chat.blacklist_answer_reserve[Chat._blacklist_flag]:
+                Chat.blacklist_answer[Chat._blacklist_flag].add(
+                    keywords)
+        else:
+            Chat.blacklist_answer_reserve[group_id].add(keywords)
+
+        return True
+
 
 # private:
     _reply_dict = defaultdict(list)  # 牛牛回复的消息缓存，暂未做持久化
@@ -648,7 +665,6 @@ class Chat:
                 if keywords_dict[keywords] == Chat.cross_group_threshold:
                     global_blacklist.add(keywords)
 
-        print(global_blacklist)
         Chat.blacklist_answer[Chat._blacklist_flag] |= global_blacklist
 
     @staticmethod
