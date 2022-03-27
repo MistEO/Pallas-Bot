@@ -104,6 +104,38 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         await ban_msg.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
 
 
+ban_msg2 = on_message(
+    rule=keyword('不可以回这个'),
+    priority=5,
+    block=False,
+    permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
+)
+@ ban_msg2.handle()
+async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
+    event_dict = event.dict()
+    if '[CQ:reply,' not in event_dict['raw_message']:
+        return False
+
+    raw_message = ''
+    for item in event.dict()['reply']['message']:
+        raw_reply = str(item)
+        # 去掉图片消息中的 url, subType 等字段
+        raw_message += re.sub(r'(\[CQ\:.+)(?:,url=*)(\])',
+                              r'\1\2', raw_reply)
+    if not raw_message:
+        return
+    ban_data = ChatData(
+        group_id=event_dict['group_id'],
+        user_id=event_dict['user_id'],
+        raw_message=raw_message,
+        plain_text=raw_message,
+        time=event_dict['time']
+    )
+    banned = Chat(ban_data).banPre()
+    if banned:
+        ban_msg.block = True
+        await ban_msg.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
+
 speak_sched = require('nonebot_plugin_apscheduler').scheduler
 
 
