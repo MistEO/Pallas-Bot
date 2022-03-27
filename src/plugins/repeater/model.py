@@ -601,9 +601,18 @@ class Chat:
                            if answer['count'] >= rand_threshold
                            and answer['keywords'].startswith('[CQ:')]   # 屏蔽图片后的纯文字回复，图片经常是表情包，后面的纯文字什么都有，很乱
 
-        candidate_answers = []
         answers_count = defaultdict(int)
         other_group_cache = defaultdict(list)
+        candidate_answers = {}
+
+        def candidate_append(answer):
+            answer_key = answer['keywords']
+            if answer_key not in candidate_answers:
+                candidate_answers[answer_key] = answer
+            else:
+                pre_answer = candidate_answers[answer_key]
+                pre_answer['count'] += answer['count']
+                pre_answer['messages'] += answer['messages']
 
         cross_group_threshold = Chat.cross_group_threshold
         if self.chat_data.to_me:
@@ -615,7 +624,7 @@ class Chat:
                 continue
 
             if answer['group_id'] == group_id:
-                candidate_answers.append(answer)
+                candidate_append(answer)
             # 别的群的 at, 忽略
             elif '[CQ:at,qq=' in answer_key:
                 continue
@@ -625,17 +634,17 @@ class Chat:
                 if cur_count < cross_group_threshold:      # 没达到阈值前，先缓存
                     other_group_cache[answer_key].append(answer)
                 elif cur_count == cross_group_threshold:   # 刚达到阈值时，将缓存加入
-                    candidate_answers.append(answer)
+                    candidate_append(answer)
                     candidate_answers += other_group_cache[answer_key]
                 else:                                           # 超过阈值后，加入
-                    candidate_answers.append(answer)
+                    candidate_append(answer)
 
         if not candidate_answers:
             return None
 
-        final_answer = random.choices(candidate_answers, weights=[
+        final_answer = random.choices(list(candidate_answers.values()), weights=[
             # 防止某个回复权重太大，别的都 Roll 不到了
-            min(answer['count'], 10) for answer in candidate_answers])[0]
+            min(answer['count'], 10) for answer in candidate_answers.values()])[0]
         answer_str = random.choice(final_answer['messages'])
 
         if 0 < answer_str.count('，') <= 3 and random.random() < Chat.split_probability:
