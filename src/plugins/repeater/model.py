@@ -605,16 +605,14 @@ class Chat:
         answers_count = defaultdict(int)
         other_group_cache = defaultdict(list)
 
+        cross_group_threshold = Chat.cross_group_threshold
+        if self.chat_data.to_me:
+            cross_group_threshold = 1
+
         for answer in all_answers:
             answer_key = answer['keywords']
             if answer_key in ban_keywords:
                 continue
-            # if self.chat_data.to_me:
-            #     if '牛牛' in answer_key or '帕拉斯' in answer_key:    # 呼叫牛牛还回复牛牛的，有点笨，ban了
-            #         continue
-            # # 正常一句话说不了这么多遍，一般都是其他 bot 一直发的
-            # if answer['count'] > Chat.answer_limit_threshold:
-            #     continue
 
             if answer['group_id'] == group_id:
                 candidate_answers.append(answer)
@@ -624,9 +622,9 @@ class Chat:
             else:   # 有这么 N 个群都有相同的回复，就作为全局回复
                 answers_count[answer_key] += 1
                 cur_count = answers_count[answer_key]
-                if cur_count < Chat.cross_group_threshold:      # 没达到阈值前，先缓存
+                if cur_count < cross_group_threshold:      # 没达到阈值前，先缓存
                     other_group_cache[answer_key].append(answer)
-                elif cur_count == Chat.cross_group_threshold:   # 刚达到阈值时，将缓存加入
+                elif cur_count == cross_group_threshold:   # 刚达到阈值时，将缓存加入
                     candidate_answers.append(answer)
                     candidate_answers += other_group_cache[answer_key]
                 else:                                           # 超过阈值后，加入
