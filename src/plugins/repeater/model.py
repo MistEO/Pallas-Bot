@@ -634,8 +634,9 @@ class Chat:
                 if cur_count < cross_group_threshold:      # 没达到阈值前，先缓存
                     candidate_append(other_group_cache, answer)
                 elif cur_count == cross_group_threshold:   # 刚达到阈值时，将缓存加入
-                    candidate_append(candidate_answers,
-                                     other_group_cache[answer_key])
+                    if cur_count > 1:
+                        candidate_append(candidate_answers,
+                                         other_group_cache[answer_key])
                     candidate_append(candidate_answers, answer)
                 else:                                      # 超过阈值后，加入
                     candidate_append(candidate_answers, answer)
