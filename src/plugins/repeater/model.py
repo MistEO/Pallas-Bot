@@ -201,18 +201,21 @@ class Chat:
                     'time': int(time.time()),
                     'pre_raw_message': self.chat_data.raw_message,
                     'pre_keywords': self.chat_data.keywords,
-                    'reply': "[PallasBot: Reply]",  # flag
+                    'reply': '[PallasBot: Reply]',  # flag
+                    'reply_keywords': '[PallasBot: Reply]',  # flag
                 })
 
-            def yield_results(str_list: List[str]) -> Generator[Message, None, None]:
+            def yield_results(results: Tuple[List[str], str]) -> Generator[Message, None, None]:
                 group_replies = Chat._reply_dict[self.chat_data.group_id]
-                for item in str_list:
+                answer_list, answer_keywords = results
+                for item in answer_list:
                     with Chat._reply_lock:
                         group_replies.append({
                             'time': int(time.time()),
                             'pre_raw_message': self.chat_data.raw_message,
                             'pre_keywords': self.chat_data.keywords,
                             'reply': item,
+                            'reply_keywords': answer_keywords,
                         })
                     if '[CQ:' not in item and len(item) > 1 \
                             and random.random() < Chat.voice_probability:
@@ -284,7 +287,8 @@ class Chat:
                     'time': int(cur_time),
                     'pre_raw_message': '[PallasBot: Speak]',
                     'pre_keywords': '[PallasBot: Speak]',
-                    'reply': "[PallasBot: Speak]"
+                    'reply': '[PallasBot: Speak]',
+                    'reply_keywords': '[PallasBot: Speak]'
                 })
 
             speak_context = context_mongo.aggregate([
@@ -322,7 +326,8 @@ class Chat:
                     'time': int(cur_time),
                     'pre_raw_message': '[PallasBot: Speak]',
                     'pre_keywords': '[PallasBot: Speak]',
-                    'reply': speak
+                    'reply': speak,
+                    'reply_keywords': '[PallasBot: Speak]'
                 })
 
             speak_list = [Message(speak), ]
@@ -368,7 +373,7 @@ class Chat:
             return False
 
         pre_keywords = reply['pre_keywords']
-        keywords = reply['reply']
+        keywords = reply['reply_keywords']
 
         # 考虑这句回复是从别的群捞过来的情况，所以这里要分两次 update
         # context_mongo.update_one({
@@ -548,7 +553,7 @@ class Chat:
             }
             context_mongo.insert_one(context)
 
-    def _context_find(self) -> Optional[List[str]]:
+    def _context_find(self) -> Optional[Tuple[List[str], str]]:
 
         group_id = self.chat_data.group_id
         raw_message = self.chat_data.raw_message
@@ -648,10 +653,11 @@ class Chat:
             # 防止某个回复权重太大，别的都 Roll 不到了
             min(answer['count'], 10) for answer in candidate_answers.values()])[0]
         answer_str = random.choice(final_answer['messages'])
+        answer_keywords = final_answer['keywords']
 
         if 0 < answer_str.count('，') <= 3 and random.random() < Chat.split_probability:
-            return answer_str.split('，')
-        return [answer_str, ]
+            return (answer_str.split('，'), answer_keywords)
+        return ([answer_str, ], answer_keywords)
 
     @staticmethod
     def _text_to_speech(text: str) -> Optional[Message]:
