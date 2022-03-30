@@ -352,20 +352,23 @@ class Chat:
         if group_id not in Chat._reply_dict:
             return False
 
+        ban_raw_message = self.chat_data.raw_message
         ban_reply = None
         for reply in Chat._reply_dict[group_id][::-1]:
-            if self.chat_data.raw_message in reply['reply']:
+            cur_reply = reply['reply']
+            if ban_raw_message == cur_reply:
                 ban_reply = reply
                 break
 
         # 这种情况一般是有些 CQ 码，牛牛发送的时候，和被回复的时候，里面的内容不一样
         if not ban_reply:
             search = re.search(r'(\[CQ:[a-zA-z0-9-_.]+)',
-                               self.chat_data.raw_message)
+                               ban_raw_message)
             if search:
                 type_keyword = search.group(1)
                 for reply in Chat._reply_dict[group_id][::-1]:
-                    if type_keyword in reply['reply']:
+                    cur_reply = reply['reply']
+                    if type_keyword in cur_reply:
                         ban_reply = reply
                         break
 
