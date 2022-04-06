@@ -486,6 +486,7 @@ class Chat:
         keywords = self.chat_data.keywords
         group_id = self.chat_data.group_id
         pre_keywords = pre_msg['keywords']
+        cur_time = self.chat_data.time
 
         # update_key = {
         #     'keywords': pre_keywords,
@@ -493,7 +494,7 @@ class Chat:
         #     'answers.group_id': group_id
         # }
         # update_value = {
-        #     '$set': {'time': self.chat_data.time},
+        #     '$set': {'time': cur_time},
         #     '$inc': {'answers.$.count': 1},
         #     '$push': {'answers.$.messages': raw_message}
         # }
@@ -509,7 +510,7 @@ class Chat:
         if context:
             update_value = {
                 '$set': {
-                    'time': self.chat_data.time
+                    'time': cur_time
                 },
                 '$inc': {'count': 1}
             }
@@ -519,6 +520,9 @@ class Chat:
             if answer_index != -1:
                 update_value['$inc'].update({
                     f'answers.{answer_index}.count': 1
+                })
+                update_value['$set'].update({
+                    f'answers.{answer_index}.time': cur_time
                 })
                 # 不是纯文本的时候，raw_message 是完全一样的，没必要 push
                 if self.chat_data.is_plain_text:
@@ -531,6 +535,7 @@ class Chat:
                         'keywords': keywords,
                         'group_id': group_id,
                         'count': 1,
+                        'time': cur_time,
                         'messages': [
                             raw_message
                         ]
@@ -541,13 +546,14 @@ class Chat:
         else:
             context = {
                 'keywords': pre_keywords,
-                'time': self.chat_data.time,
+                'time': cur_time,
                 'count': 1,
                 'answers': [
                     {
                         'keywords': keywords,
                         'group_id': group_id,
                         'count': 1,
+                        'time': cur_time,
                         'messages': [
                             raw_message
                         ]
