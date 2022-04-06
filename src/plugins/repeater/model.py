@@ -269,7 +269,7 @@ class Chat:
         for group_id, group_msgs in popularity:
             if group_id not in Chat._reply_dict or len(group_msgs) < basic_msgs_len:
                 continue
-            if Chat._reply_dict[group_id][-1]["time"] > group_msgs[-1]["time"]:
+            if Chat._reply_dict[group_id][-1]['time'] > group_msgs[-1]['time']:
                 continue
 
             msgs_len = len(group_msgs)
@@ -575,7 +575,8 @@ class Chat:
                 if all(item['raw_message'] == raw_message
                         for item in group_msgs[:-Chat.repeat_threshold:-1]):
                     # 复读过一次就不复读了
-                    if group_id not in Chat._reply_dict or Chat._reply_dict[group_id][-1]['reply'] != raw_message:
+                    if group_id not in Chat._reply_dict \
+                            or Chat._reply_dict[group_id][-1]['reply'] != raw_message:
                         return ([raw_message, ], keywords)
 
         context = context_mongo.find_one({'keywords': keywords})
@@ -711,8 +712,8 @@ class Chat:
             if not len(answers):
                 continue
             blacklist_mongo.update_one(
-                {"group_id": group_id},
-                {"$set": {"answers": list(answers)}},
+                {'group_id': group_id},
+                {'$set': {'answers': list(answers)}},
                 upsert=True)
 
         for group_id, answers in Chat.blacklist_answer_reserve.items():
@@ -722,19 +723,39 @@ class Chat:
                 answers = answers - Chat.blacklist_answer[group_id]
 
             blacklist_mongo.update_one(
-                {"group_id": group_id},
-                {"$set": {"answers_reserve": list(answers)}},
+                {'group_id': group_id},
+                {'$set': {'answers_reserve': list(answers)}},
                 upsert=True)
 
     @staticmethod
     def clearup_context() -> None:
-        """
+        '''
         清理所有超过 30 天没人说、且没有学会的话
-        """
+        '''
+
+        clear_time = int(time.time()) - 30 * 24 * 3600  # 三十天前
+
         context_mongo.delete_many({
-            "time": {"$lt": int(time.time()) - 30 * 24 * 3600},  # 三十天前
-            "count": {"$lt", Chat.answer_threshold}    # lt 是小于，不包括等于
+            'time': {'$lt': clear_time},
+            'count': {'$lt': Chat.answer_threshold}    # lt 是小于，不包括等于
         })
+
+        all_context = context_mongo.find({'count': {'$gt': 100}})
+        if all_context:
+            for context in all_context:
+                answers = [ans
+                           for ans in context['answers']
+                           if ans['count'] > 1 or ('time' in ans and ans['time'] > clear_time)]
+                if len(answers):
+                    context_mongo.update_one({
+                        'keywords': context['keywords']
+                    }, {
+                        '$set': {'answers': answers}
+                    })
+                else:
+                    context_mongo.delete_one({
+                        'keywords': context['keywords']
+                    })
 
 
 # Auto sync on program start
