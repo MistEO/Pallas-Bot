@@ -61,7 +61,7 @@ class ChatData:
 
     @cached_property
     def keywords(self) -> str:
-        if not self.is_plain_text:
+        if not self.is_plain_text and len(self.plain_text) == 0:
             return self.raw_message
 
         keywords_list = jieba_fast.analyse.extract_tags(
