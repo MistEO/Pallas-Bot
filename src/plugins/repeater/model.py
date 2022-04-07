@@ -106,30 +106,29 @@ class Chat:
         if (isinstance(data, ChatData)):
             self.chat_data = data
         elif (isinstance(data, GroupMessageEvent)):
-            event_dict = data.dict()
             self.chat_data = ChatData(
-                group_id=event_dict['group_id'],
-                user_id=event_dict['user_id'],
+                group_id=data.group_id,
+                user_id=data.user_id,
                 # 删除图片子类型字段，同一张图子类型经常不一样，影响判断
                 raw_message=re.sub(
                     r',subType=\d+\]',
                     r']',
-                    event_dict['raw_message']),
+                    data.raw_message),
                 plain_text=data.get_plaintext(),
-                time=event_dict['time']
+                time=data.time
             )
         elif (isinstance(data, PrivateMessageEvent)):
             event_dict = data.dict()
             self.chat_data = ChatData(
-                group_id=-event_dict['user_id'],    # 故意加个负号，和群号区分开来
-                user_id=event_dict['user_id'],
+                group_id=data.user_id,  # 故意加个符号，和群号区分开来
+                user_id=data.user_id,
                 # 删除图片子类型字段，同一张图子类型经常不一样，影响判断
                 raw_message=re.sub(
                     r',subType=\d+\]',
                     r']',
-                    event_dict['raw_message']),
+                    data.raw_message),
                 plain_text=data.get_plaintext(),
-                time=event_dict['time']
+                time=data.time
             )
 
     def learn(self) -> bool:
