@@ -733,29 +733,40 @@ class Chat:
         清理所有超过 30 天没人说、且没有学会的话
         '''
 
-        clear_time = int(time.time()) - 30 * 24 * 3600  # 三十天前
+        cur_time = int(time.time())
+        expiration = cur_time - 30 * 24 * 3600  # 三十天前
 
         context_mongo.delete_many({
-            'time': {'$lt': clear_time},
+            'time': {'$lt': expiration},
             'count': {'$lt': Chat.answer_threshold}    # lt 是小于，不包括等于
         })
 
-        all_context = context_mongo.find({'count': {'$gt': 100}})
-        if all_context:
-            for context in all_context:
-                answers = [ans
-                           for ans in context['answers']
-                           if ans['count'] > 1 or ('time' in ans and ans['time'] > clear_time)]
-                if len(answers):
-                    context_mongo.update_one({
-                        'keywords': context['keywords']
-                    }, {
-                        '$set': {'answers': answers}
-                    })
-                else:
-                    context_mongo.delete_one({
-                        'keywords': context['keywords']
-                    })
+        all_context = context_mongo.find({
+            'count': {'$gt': 100},
+            '$or': [
+                # 历史遗留问题，老版本的数据没有 clear_time 字段
+                {"clear_time": {"$exists": False}},
+                {"clear_time": {"$lt": expiration}}
+            ]
+        })
+        for context in all_context:
+            answers = [ans
+                       for ans in context['answers']
+                       # 历史遗留问题，老版本的数据没有 answers.$.time 字段
+                       if ans['count'] > 1 or ('time' in ans and ans['time'] > expiration)]
+            if len(answers):
+                context_mongo.update_one({
+                    'keywords': context['keywords']
+                }, {
+                    '$set': {
+                        'answers': answers,
+                        'clear_time': cur_time
+                    }
+                })
+            else:
+                context_mongo.delete_one({
+                    'keywords': context['keywords']
+                })
 
 
 # Auto sync on program start
@@ -773,31 +784,32 @@ atexit.register(_chat_sync)
 
 if __name__ == '__main__':
 
-    # while True:
-    test_data: ChatData = ChatData(
-        group_id=1234567,
-        user_id=1111111,
-        raw_message='牛牛出来玩',
-        plain_text='牛牛出来玩',
-        time=time.time()
-    )
+    Chat.clearup_context()
+    # # while True:
+    # test_data: ChatData = ChatData(
+    #     group_id=1234567,
+    #     user_id=1111111,
+    #     raw_message='牛牛出来玩',
+    #     plain_text='牛牛出来玩',
+    #     time=time.time()
+    # )
 
-    test_chat: Chat = Chat(test_data)
+    # test_chat: Chat = Chat(test_data)
 
-    print(test_chat.answer())
-    test_chat.learn()
+    # print(test_chat.answer())
+    # test_chat.learn()
 
-    test_answer_data: ChatData = ChatData(
-        group_id=1234567,
-        user_id=1111111,
-        raw_message='别烦',
-        plain_text='别烦',
-        time=time.time()
-    )
+    # test_answer_data: ChatData = ChatData(
+    #     group_id=1234567,
+    #     user_id=1111111,
+    #     raw_message='别烦',
+    #     plain_text='别烦',
+    #     time=time.time()
+    # )
 
-    test_answer: Chat = Chat(test_answer_data)
-    print(test_chat.answer())
-    test_answer.learn()
+    # test_answer: Chat = Chat(test_answer_data)
+    # print(test_chat.answer())
+    # test_answer.learn()
 
-    time.sleep(5)
-    print(Chat.speak())
+    # time.sleep(5)
+    # print(Chat.speak())
