@@ -6,7 +6,7 @@ import time
 from nonebot import on_message, require, get_bot
 from nonebot.exception import ActionFailed
 from nonebot.typing import T_State
-from nonebot.rule import keyword, to_me, Rule
+from nonebot.rule import keyword, to_me
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 
@@ -59,28 +59,30 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         delay = random.randint(1, 3)
 
 
-async def message_equal(bot: Bot, event: GroupMessageEvent, state: T_State):
-    return event.get_plaintext().strip() == '不可以'
-
 ban_msg = on_message(
-    rule=to_me() & Rule(message_equal),
+    rule=to_me() & keyword('不可以'),
     priority=5,
-    block=True,
+    block=False,
     permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
 )
 
 
 @ ban_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    raw_message = ''
-    if event.reply:
-        for item in event.reply.message:
-            raw_reply = str(item)
-            # 去掉图片消息中的 url, subType 等字段
-            raw_message += re.sub(r'(\[CQ\:.+)(?:,url=*)(\])',
-                                  r'\1\2', raw_reply)
 
-    if Chat.ban(event.group_id, raw_message):
+    if '[CQ:reply,' not in event.raw_message:
+        return False
+
+    raw_message = ''
+    for item in event.reply.message:
+        raw_reply = str(item)
+        # 去掉图片消息中的 url, subType 等字段
+        raw_message += re.sub(r'(\[CQ\:.+)(?:,url=*)(\])',
+                              r'\1\2', raw_reply)
+
+    banned = Chat.ban(event.group_id, raw_message)
+    if banned:
+        ban_msg.block = True
         await ban_msg.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
 
 
