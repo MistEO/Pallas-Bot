@@ -343,20 +343,20 @@ class Chat:
 
         return None
 
-    def ban(self) -> bool:
+    @staticmethod
+    def ban(group_id: int, ban_raw_message: str) -> bool:
         '''
         禁止以后回复这句话，仅对该群有效果
         '''
 
-        group_id = self.chat_data.group_id
         if group_id not in Chat._reply_dict:
             return False
 
-        ban_raw_message = self.chat_data.raw_message
         ban_reply = None
         for reply in Chat._reply_dict[group_id][::-1]:
             cur_reply = reply['reply']
-            if ban_raw_message == cur_reply:
+            # 为空时就直接 ban 最后一条回复
+            if not ban_raw_message or ban_raw_message == cur_reply:
                 ban_reply = reply
                 break
 

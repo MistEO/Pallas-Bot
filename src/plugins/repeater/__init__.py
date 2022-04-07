@@ -54,13 +54,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
             # 自动删除失效消息。若 bot 处于风控期，请勿开启该功能
             shutup = await is_shutup(bot.self_id, event.group_id)
             if not shutup:  # 说明这条消息失效了
-                Chat(ChatData(
-                    group_id=event.group_id,
-                    user_id=bot.self_id,
-                    raw_message=str(item),
-                    plain_text=str(item),
-                    time=event.time
-                )).ban()
+                Chat.ban(event.group_id, str(item))
                 break
         delay = random.randint(1, 3)
 
@@ -76,29 +70,17 @@ ban_msg = on_message(
 @ ban_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
-    event_dict = event.dict()
-    if '[CQ:reply,' not in event_dict['raw_message']:
+    if '[CQ:reply,' not in event.raw_message:
         return False
 
     raw_message = ''
-    for item in event.dict()['reply']['message']:
+    for item in event.reply.message:
         raw_reply = str(item)
         # 去掉图片消息中的 url, subType 等字段
         raw_message += re.sub(r'(\[CQ\:.+)(?:,url=*)(\])',
                               r'\1\2', raw_reply)
 
-    if not raw_message:
-        return
-
-    ban_data = ChatData(
-        group_id=event_dict['group_id'],
-        user_id=event_dict['user_id'],
-        raw_message=raw_message,
-        plain_text=raw_message,
-        time=event_dict['time']
-    )
-
-    banned = Chat(ban_data).ban()
+    banned = Chat.ban(event.group_id, raw_message)
     if banned:
         ban_msg.block = True
         await ban_msg.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
