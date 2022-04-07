@@ -3,10 +3,10 @@ import asyncio
 import re
 import time
 
-from nonebot import on_message, require, get_bot
+from nonebot import on_message, require, get_bot, logger
 from nonebot.exception import ActionFailed
 from nonebot.typing import T_State
-from nonebot.rule import keyword, to_me
+from nonebot.rule import keyword, to_me, Rule
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 
@@ -29,6 +29,9 @@ async def is_shutup(self_id: int, group_id: int) -> bool:
     })
     flag: bool = info['shut_up_timestamp'] > time.time()
 
+    logger.info("repeater | group [{}] is shutup: {}".format(
+        group_id, flag))
+
     return flag
 
 
@@ -45,7 +48,9 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     delay = random.randint(2, 5)
     for item in answers:
-        print("ready to send:", item)
+        logger.info(
+            "repeater | ready to send [{}] to group [{}]".format(item, event.group_id))
+
         await asyncio.sleep(delay)
         try:
             await any_msg.send(item)
@@ -54,20 +59,25 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
             # 自动删除失效消息。若 bot 处于风控期，请勿开启该功能
             shutup = await is_shutup(bot.self_id, event.group_id)
             if not shutup:  # 说明这条消息失效了
+                logger.info("repeater | ready to ban [{}] in group [{}]".format(
+                    str(item), event.group_id))
                 Chat.ban(event.group_id, str(item))
                 break
         delay = random.randint(1, 3)
 
 
+async def is_reply(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+    return bool(event.reply)
+
 ban_msg = on_message(
-    rule=to_me() & keyword('不可以'),
+    rule=to_me() & keyword('不可以') & Rule(is_reply),
     priority=5,
-    block=False,
+    block=True,
     permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
 )
 
 
-@ ban_msg.handle()
+@ban_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     if '[CQ:reply,' not in event.raw_message:
@@ -80,13 +90,34 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         raw_message += re.sub(r'(\[CQ\:.+)(?:,url=*)(\])',
                               r'\1\2', raw_reply)
 
-    banned = Chat.ban(event.group_id, raw_message)
-    if banned:
-        ban_msg.block = True
+    logger.info("repeater | ready to ban [{}] in group [{}]".format(
+        raw_message, event.group_id))
+
+    if Chat.ban(event.group_id, raw_message):
         await ban_msg.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
 
 
 speak_sched = require('nonebot_plugin_apscheduler').scheduler
+
+
+async def message_is_ban(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+    return event.get_plaintext().strip() == '不可以发这个'
+
+ban_msg_latest = on_message(
+    rule=to_me() & Rule(message_is_ban),
+    priority=5,
+    block=True,
+    permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
+)
+
+
+@ban_msg_latest.handle()
+async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
+    logger.info(
+        "repeater | ready to ban latest reply in group [{}]".format(event.group_id))
+
+    if Chat.ban(event.group_id, ''):
+        await ban_msg.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
 
 
 @ speak_sched.scheduled_job('interval', seconds=5)
@@ -99,6 +130,8 @@ async def speak_up():
     group_id, messages = ret
 
     for msg in messages:
+        logger.info("repeater | ready to speak [{}] to group [{}]".format(
+            msg, group_id))
         await get_bot().call_api('send_group_msg', **{
             'message': msg,
             'group_id': group_id
