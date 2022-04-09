@@ -117,7 +117,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         "repeater | ready to ban latest reply in group [{}]".format(event.group_id))
 
     if Chat.ban(event.group_id, ''):
-        await ban_msg.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
+        await ban_msg_latest.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
 
 
 @ speak_sched.scheduled_job('interval', seconds=5)
@@ -144,5 +144,4 @@ update_sched = require('nonebot_plugin_apscheduler').scheduler
 
 @ update_sched.scheduled_job("cron", hour="4")
 def update_data():
-    Chat.update_global_blacklist()
     Chat.clearup_context()
