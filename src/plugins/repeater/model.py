@@ -753,19 +753,14 @@ class Chat:
                        for ans in context['answers']
                        # 历史遗留问题，老版本的数据没有 answers.$.time 字段
                        if ans['count'] > 1 or ('time' in ans and ans['time'] > expiration)]
-            if len(answers):
-                context_mongo.update_one({
-                    'keywords': context['keywords']
-                }, {
-                    '$set': {
-                        'answers': answers,
-                        'clear_time': cur_time
-                    }
-                })
-            else:
-                context_mongo.delete_one({
-                    'keywords': context['keywords']
-                })
+            context_mongo.update_one({
+                'keywords': context['keywords']
+            }, {
+                '$set': {
+                    'answers': answers,
+                    'clear_time': cur_time
+                }
+            })
 
 
 # Auto sync on program start
