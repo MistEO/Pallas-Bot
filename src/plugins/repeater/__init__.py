@@ -12,7 +12,7 @@ from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 
 from nonebot.adapters.onebot.v11 import permission
 
-from .model import Chat, ChatData
+from .model import Chat
 
 
 any_msg = on_message(
@@ -140,6 +140,36 @@ async def speak_up():
 
 
 update_sched = require('nonebot_plugin_apscheduler').scheduler
+
+
+async def is_drink_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+    return event.get_plaintext().strip() == '牛牛喝酒'
+
+drink_msg = on_message(
+    rule=Rule(is_drink_msg),
+    priority=5,
+    block=True,
+    permission=permission.GROUP
+)
+
+
+@drink_msg.handle()
+async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
+    sober_up_time = random.randint(60, 1800)
+    logger.info("repeater | ready to drink in group [{}], sober up after {} sec".format(
+        event.group_id, sober_up_time))
+    Chat.drink(event.group_id)
+    try:
+        await drink_msg.send('呀，博士。你今天走起路来，怎么看着摇摇晃晃的？')
+    except ActionFailed:
+        pass
+
+    await asyncio.sleep(sober_up_time)
+    ret = Chat.sober_up(event.group_id)
+    if ret:
+        logger.info(
+            "repeater | sober up in group [{}]".format(event.group_id))
+        await drink_msg.finish('呃......咳嗯，下次不能喝、喝这么多了......')
 
 
 @ update_sched.scheduled_job("cron", hour="4")
