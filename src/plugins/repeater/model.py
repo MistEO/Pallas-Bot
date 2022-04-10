@@ -607,8 +607,10 @@ class Chat:
 
         if Chat._drunkenness_dict[group_id] > 0:
             drunkenness = 1
+            cross_group_threshold = 1
         else:
             drunkenness = Chat.drunk_probability
+            cross_group_threshold = Chat.cross_group_threshold
 
         if random.random() < drunkenness:
             rand_threshold = 1
@@ -654,10 +656,6 @@ class Chat:
                 pre_answer = dst[answer_key]
                 pre_answer['count'] += answer['count']
                 pre_answer['messages'] += answer['messages']
-
-        cross_group_threshold = Chat.cross_group_threshold
-        # if self.chat_data.to_me:
-        #     cross_group_threshold = 1
 
         for answer in all_answers:
             answer_key = answer['keywords']
