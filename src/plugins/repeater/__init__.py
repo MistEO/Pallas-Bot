@@ -143,7 +143,7 @@ update_sched = require('nonebot_plugin_apscheduler').scheduler
 
 
 async def is_drink_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
-    return event.get_plaintext().strip() == '牛牛喝酒'
+    return event.get_plaintext().strip() in ['牛牛喝酒', '牛牛干杯']
 
 drink_msg = on_message(
     rule=Rule(is_drink_msg),
@@ -155,16 +155,16 @@ drink_msg = on_message(
 
 @drink_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    sober_up_time = random.randint(60, 1800)
+    drunk_time = random.randint(60, 1800)
     logger.info("repeater | ready to drink in group [{}], sober up after {} sec".format(
-        event.group_id, sober_up_time))
+        event.group_id, drunk_time))
     Chat.drink(event.group_id)
     try:
         await drink_msg.send('呀，博士。你今天走起路来，怎么看着摇摇晃晃的？')
     except ActionFailed:
         pass
 
-    await asyncio.sleep(sober_up_time)
+    await asyncio.sleep(drunk_time)
     ret = Chat.sober_up(event.group_id)
     if ret:
         logger.info(

@@ -88,7 +88,7 @@ class Chat:
     repeat_threshold = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
     speak_threshold = 5             # 主动发言的阈值，越小废话越多
 
-    drunkenness_default = 0.07      # 牛牛喝醉的概率（回复没达到阈值的话）
+    drunk_probability = 0.07        # 牛牛喝醉的概率（回复没达到阈值的话）
     split_probability = 0.5         # 按逗号分割回复语的概率
     voice_probability = 0           # 回复语音的概率（仅纯文字）
     speak_continuously_probability = 0.5  # 连续主动说话的概率
@@ -249,15 +249,9 @@ class Chat:
             lhs_len = len(lhs_msgs)
             rhs_len = len(rhs_msgs)
 
-            if lhs_group_id in Chat._drunkenness_dict:
-                lhs_drunkenness = Chat._drunkenness_dict[lhs_group_id]
-            else:
-                lhs_drunkenness = Chat.drunkenness_default
-
-            if rhs_group_id in Chat._drunkenness_dict:
-                rhs_drunkenness = Chat._drunkenness_dict[rhs_group_id]
-            else:
-                rhs_drunkenness = Chat.drunkenness_default
+            # 默认是 0, 加个 1 避免乘没了
+            lhs_drunkenness = Chat._drunkenness_dict[lhs_group_id] + 1
+            rhs_drunkenness = Chat._drunkenness_dict[rhs_group_id] + 1
 
             if lhs_len < basic_msgs_len or rhs_len < basic_msgs_len:
                 return cmp(lhs_len * lhs_drunkenness,
@@ -424,42 +418,27 @@ class Chat:
         '''
         牛牛喝酒，仅对该群有效果。提高醉酒程度（降低回复阈值的概率）
         '''
-        with Chat._drunkenness_lock:
-            if group_id not in Chat._drunkenness_dict:
-                Chat._drunkenness_dict[group_id] = Chat.drunkenness_default
-            Chat._drunkenness_dict[group_id] += random.uniform(0.2, 0.5)
+        Chat._drunkenness_dict[group_id] += 1
 
     @staticmethod
-    def sober_up(group_id: int = 0) -> Optional[int]:
+    def sober_up(group_id: int) -> bool:
         '''
-        牛牛醒酒，仅对该群有效果。若不指定群号，则随机挑选一个群恢复。返回醒酒的群号
+        牛牛醒酒，仅对该群有效果。返回醒酒是否成功
         '''
-        if not Chat._drunkenness_dict:
-            return None
 
-        with Chat._drunkenness_lock:
-            if group_id:
-                if group_id in Chat._drunkenness_dict:
-                    del Chat._drunkenness_dict[group_id]
-                    return group_id
-                else:
-                    return None
-            else:
-                random_group_id = random.choice(list(Chat._drunkenness_dict))
-                del Chat._drunkenness_dict[random_group_id]
-                return random_group_id
+        Chat._drunkenness_dict[group_id] -= 1
+        return Chat._drunkenness_dict[group_id] <= 0
 
 # private:
     _reply_dict = defaultdict(list)  # 牛牛回复的消息缓存，暂未做持久化
     _message_dict = {}              # 群消息缓存
-    _drunkenness_dict = {}          # 醉酒程度，不同群应用不同的数值
+    _drunkenness_dict = defaultdict(int)          # 醉酒程度，不同群应用不同的数值
 
     _save_reserve_size = 100        # 保存时，给内存中保留的大小
     _late_save_time = 0             # 上次保存（消息数据持久化）的时刻 ( time.time(), 秒 )
 
     _reply_lock = threading.Lock()
     _message_lock = threading.Lock()
-    _drunkenness_lock = threading.Lock()
     _blacklist_flag = 114514
 
     def _message_insert(self):
@@ -626,10 +605,10 @@ class Chat:
         if not context:
             return None
 
-        if group_id in Chat._drunkenness_dict:
-            drunkenness = Chat._drunkenness_dict[group_id]
+        if Chat._drunkenness_dict[group_id] > 0:
+            drunkenness = 1
         else:
-            drunkenness = Chat.drunkenness_default
+            drunkenness = Chat.drunk_probability
 
         if random.random() < drunkenness:
             rand_threshold = 1
