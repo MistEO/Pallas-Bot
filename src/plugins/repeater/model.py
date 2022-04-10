@@ -789,6 +789,11 @@ class Chat:
                 }
             })
 
+    @staticmethod
+    def completely_sober():
+        for key in Chat._drunkenness_dict.keys():
+            Chat._drunkenness_dict[key] = 0
+
 
 # Auto sync on program start
 Chat.update_global_blacklist()

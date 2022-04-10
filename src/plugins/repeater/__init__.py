@@ -175,3 +175,4 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 @ update_sched.scheduled_job("cron", hour="4")
 def update_data():
     Chat.clearup_context()
+    Chat.completely_sober()
