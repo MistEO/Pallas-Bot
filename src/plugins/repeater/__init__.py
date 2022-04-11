@@ -155,7 +155,7 @@ drink_msg = on_message(
 
 @drink_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    drunk_time = random.randint(600, 3600)
+    drunk_time = random.randint(60, 600)
     logger.info("repeater | ready to drink in group [{}], sober up after {} sec".format(
         event.group_id, drunk_time))
     Chat.drink(event.group_id)
