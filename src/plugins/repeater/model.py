@@ -166,9 +166,9 @@ class Chat:
         '''
 
         if with_limit:
-            # 不回复太短的对话，大部分是“？”、“草”
-            if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
-                return None
+            # # 不回复太短的对话，大部分是“？”、“草”
+            # if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
+            #     return None
 
             if self.chat_data.group_id in Chat._reply_dict:
                 group_replies = Chat._reply_dict[self.chat_data.group_id]
