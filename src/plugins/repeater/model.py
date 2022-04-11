@@ -606,16 +606,11 @@ class Chat:
             return None
 
         if Chat._drunkenness_dict[group_id] > 0:
-            drunkenness = 1
+            answer_count_threshold = 1
             cross_group_threshold = 1
         else:
-            drunkenness = Chat.drunk_probability
+            answer_count_threshold = Chat.answer_threshold
             cross_group_threshold = Chat.cross_group_threshold
-
-        if random.random() < drunkenness:
-            rand_threshold = 1
-        else:
-            rand_threshold = Chat.answer_threshold
 
         # 全局的黑名单
         ban_keywords = Chat.blacklist_answer[Chat._blacklist_flag] | Chat.blacklist_answer[group_id]
@@ -632,18 +627,6 @@ class Chat:
                     if ban_count[ban_key] == Chat.cross_group_threshold:
                         ban_keywords.add(ban_key)
 
-        if not self.chat_data.is_image:
-            all_answers = [answer
-                           for answer in context['answers']
-                           if answer['count'] >= rand_threshold
-                           and len(answer['keywords']) > 1]  # 屏蔽特别短的回复内容，大部分是“？”、“草”之类的
-
-        else:
-            all_answers = [answer
-                           for answer in context['answers']
-                           if answer['count'] >= rand_threshold
-                           and answer['keywords'].startswith('[CQ:')]   # 屏蔽图片后的纯文字回复，图片经常是表情包，后面的纯文字什么都有，很乱
-
         candidate_answers = {}
         other_group_cache = {}
         answers_count = defaultdict(int)
@@ -657,9 +640,9 @@ class Chat:
                 pre_answer['count'] += answer['count']
                 pre_answer['messages'] += answer['messages']
 
-        for answer in all_answers:
+        for answer in context['answers']:
             answer_key = answer['keywords']
-            if answer_key in ban_keywords:
+            if answer_key in ban_keywords or answer['count'] < answer_count_threshold:
                 continue
 
             if answer['group_id'] == group_id:
