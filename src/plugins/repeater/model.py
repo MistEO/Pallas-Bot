@@ -610,7 +610,7 @@ class Chat:
         else:
             answer_count_threshold = Chat.answer_threshold
 
-        cross_group_threshold = 1
+        cross_group_threshold = Chat.cross_group_threshold
 
         # 全局的黑名单
         ban_keywords = Chat.blacklist_answer[Chat._blacklist_flag] | Chat.blacklist_answer[group_id]
