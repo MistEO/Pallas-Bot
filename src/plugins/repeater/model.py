@@ -361,7 +361,7 @@ class Chat:
         for reply in Chat._reply_dict[group_id][::-1]:
             cur_reply = reply['reply']
             # 为空时就直接 ban 最后一条回复
-            if not ban_raw_message or ban_raw_message == cur_reply:
+            if not ban_raw_message or ban_raw_message in cur_reply:
                 ban_reply = reply
                 break
 
