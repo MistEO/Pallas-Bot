@@ -149,7 +149,7 @@ drink_msg = on_message(
     rule=Rule(is_drink_msg),
     priority=5,
     block=True,
-    permission=permission.GROUP
+    permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
 )
 
 
