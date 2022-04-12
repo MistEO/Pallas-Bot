@@ -607,10 +607,10 @@ class Chat:
 
         if Chat._drunkenness_dict[group_id] > 0:
             answer_count_threshold = 1
-            cross_group_threshold = 1
         else:
             answer_count_threshold = Chat.answer_threshold
-            cross_group_threshold = Chat.cross_group_threshold
+
+        cross_group_threshold = 1
 
         # 全局的黑名单
         ban_keywords = Chat.blacklist_answer[Chat._blacklist_flag] | Chat.blacklist_answer[group_id]
