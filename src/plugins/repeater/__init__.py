@@ -155,16 +155,16 @@ drink_msg = on_message(
 
 @drink_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    drunk_time = random.randint(60, 600)
+    drunk_duration = random.randint(60, 600)
     logger.info("repeater | ready to drink in group [{}], sober up after {} sec".format(
-        event.group_id, drunk_time))
+        event.group_id, drunk_duration))
     Chat.drink(event.group_id)
     try:
         await drink_msg.send('呀，博士。你今天走起路来，怎么看着摇摇晃晃的？')
     except ActionFailed:
         pass
 
-    await asyncio.sleep(drunk_time)
+    await asyncio.sleep(drunk_duration)
     ret = Chat.sober_up(event.group_id)
     if ret:
         logger.info(
