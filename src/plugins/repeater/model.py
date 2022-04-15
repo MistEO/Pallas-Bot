@@ -316,9 +316,11 @@ class Chat:
             if not speak_context:
                 continue
 
+            ban_keywords = find_ban_keywords(context=speak_context[0], group_id=group_id)
             messages = [answer['messages']
                         for answer in speak_context[0]['answers']
                         if answer['count'] >= Chat.answer_threshold
+                        and answer['keywords'] not in ban_keywords
                         and answer['group_id'] == group_id]
 
             if not messages:
@@ -612,20 +614,7 @@ class Chat:
 
         cross_group_threshold = Chat.cross_group_threshold
 
-        # 全局的黑名单
-        ban_keywords = Chat.blacklist_answer[Chat._blacklist_flag] | Chat.blacklist_answer[group_id]
-        # 针对单条回复的黑名单
-        if 'ban' in context:
-            ban_count = defaultdict(int)
-            for ban in context['ban']:
-                ban_key = ban['keywords']
-                if ban['group_id'] == group_id or ban['group_id'] == Chat._blacklist_flag:
-                    ban_keywords.add(ban_key)
-                else:
-                    # 超过 N 个群都把这句话 ban 了，那就全局 ban 掉
-                    ban_count[ban_key] += 1
-                    if ban_count[ban_key] == Chat.cross_group_threshold:
-                        ban_keywords.add(ban_key)
+        ban_keywords = find_ban_keywords(context=context, group_id=group_id)
 
         candidate_answers = {}
         other_group_cache = {}
@@ -780,6 +769,27 @@ class Chat:
         for key in Chat._drunkenness_dict.keys():
             Chat._drunkenness_dict[key] = 0
 
+    @staticmethod
+    def find_ban_keywords(context, group_id) -> set:
+        '''
+        找到在 group_id 群中对应 context 不能回复的关键词
+        '''
+
+        # 全局的黑名单
+        ban_keywords = Chat.blacklist_answer[Chat._blacklist_flag] | Chat.blacklist_answer[group_id]
+        # 针对单条回复的黑名单
+        if 'ban' in context:
+            ban_count = defaultdict(int)
+            for ban in context['ban']:
+                ban_key = ban['keywords']
+                if ban['group_id'] == group_id or ban['group_id'] == Chat._blacklist_flag:
+                    ban_keywords.add(ban_key)
+                else:
+                    # 超过 N 个群都把这句话 ban 了，那就全局 ban 掉
+                    ban_count[ban_key] += 1
+                    if ban_count[ban_key] == Chat.cross_group_threshold:
+                        ban_keywords.add(ban_key)
+        return ban_keywords
 
 # Auto sync on program start
 Chat.update_global_blacklist()
