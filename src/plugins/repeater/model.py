@@ -316,7 +316,7 @@ class Chat:
             if not speak_context:
                 continue
 
-            ban_keywords = find_ban_keywords(context=speak_context[0], group_id=group_id)
+            ban_keywords = Chat.find_ban_keywords(context=speak_context[0], group_id=group_id)
             messages = [answer['messages']
                         for answer in speak_context[0]['answers']
                         if answer['count'] >= Chat.answer_threshold
@@ -614,7 +614,7 @@ class Chat:
 
         cross_group_threshold = Chat.cross_group_threshold
 
-        ban_keywords = find_ban_keywords(context=context, group_id=group_id)
+        ban_keywords = Chat.find_ban_keywords(context=context, group_id=group_id)
 
         candidate_answers = {}
         other_group_cache = {}
