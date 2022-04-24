@@ -2,6 +2,7 @@ import random
 import asyncio
 import re
 import time
+import os
 
 from nonebot import on_message, require, get_bot, logger, get_driver
 from nonebot.exception import ActionFailed
@@ -41,9 +42,9 @@ plugin_config = Config(**global_config.dict())
 @any_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
-    print('accounts', plugin_config.accounts)
     # 不响应其他牛牛的消息
-    if event.user_id in plugin_config.accounts:
+    accounts_dir = 'accounts'
+    if os.path.exists(accounts_dir) and event.user_id in os.listdir(accounts_dir):
         return
 
     chat: Chat = Chat(event)
