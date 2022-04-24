@@ -3,7 +3,7 @@ import asyncio
 import re
 import time
 
-from nonebot import on_message, require, get_bot, logger
+from nonebot import on_message, require, get_bot, logger, get_driver
 from nonebot.exception import ActionFailed
 from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me, Rule
@@ -13,7 +13,7 @@ from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.onebot.v11 import permission
 
 from .model import Chat
-
+from .config import Config
 
 any_msg = on_message(
     priority=15,
@@ -34,9 +34,17 @@ async def is_shutup(self_id: int, group_id: int) -> bool:
 
     return flag
 
+global_config = get_driver().config
+plugin_config = Config(**global_config.dict())
+
 
 @any_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
+
+    print('accounts', plugin_config.accounts)
+    # 不响应其他牛牛的消息
+    if event.user_id in plugin_config.accounts:
+        return
 
     chat: Chat = Chat(event)
 
@@ -56,6 +64,9 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
             await any_msg.send(item)
         except ActionFailed:
             continue
+            if event.user_id not in plugin_config.safe_accounts:
+                continue
+
             # 自动删除失效消息。若 bot 处于风控期，请勿开启该功能
             shutup = await is_shutup(bot.self_id, event.group_id)
             if not shutup:  # 说明这条消息失效了

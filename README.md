@@ -53,11 +53,11 @@
 
 ## 如何配置一个自己的牛牛？
 
-1. 配置并启动 [go-cqhttp](https://github.com/Mrs4s/go-cqhttp), 选择反向 WS
-2. 安装 [nonebot2](https://github.com/nonebot/nonebot2)
-3. clone 本仓库，并安装 requirements
-4. 依次安装每个 [插件](src/plugins) 的额外依赖或配置，请查阅对应的 README ~
-5. run your bot using `nb run` .
+1. 安装 [nonebot2](https://github.com/nonebot/nonebot2)
+2. clone 本仓库，并安装 requirements
+3. 依次安装每个 [插件](src/plugins) 的额外依赖或配置，请查阅对应的 README ~
+4. 使用 `nb run` 运行 bot
+5. 访问 `http://127.0.0.1:8080/go-cqhttp/#/` 添加或管理你的账号
 
 ## QQ群
 

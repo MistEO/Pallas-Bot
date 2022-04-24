@@ -8,4 +8,5 @@
 
 ```bash
 nb plugin install nonebot_plugin_apscheduler
+nb plugin install gocqhttp
 ```

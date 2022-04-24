@@ -13,7 +13,7 @@ nonebot2 = "^2.0.0-beta.1"
 nb-cli = "^0.6.0"
 
 [tool.nonebot]
-plugins = ["nonebot_plugin_apscheduler"]
+plugins = ["nonebot_plugin_apscheduler", "nonebot_plugin_gocqhttp"]
 plugin_dirs = ["src/plugins"]
 
 [build-system]
