@@ -316,7 +316,8 @@ class Chat:
             if not speak_context:
                 continue
 
-            ban_keywords = Chat.find_ban_keywords(context=speak_context[0], group_id=group_id)
+            ban_keywords = Chat._find_ban_keywords(
+                context=speak_context[0], group_id=group_id)
             messages = [answer['messages']
                         for answer in speak_context[0]['answers']
                         if answer['count'] >= Chat.answer_threshold
@@ -614,7 +615,8 @@ class Chat:
 
         cross_group_threshold = Chat.cross_group_threshold
 
-        ban_keywords = Chat.find_ban_keywords(context=context, group_id=group_id)
+        ban_keywords = Chat._find_ban_keywords(
+            context=context, group_id=group_id)
 
         candidate_answers = {}
         other_group_cache = {}
@@ -770,7 +772,7 @@ class Chat:
             Chat._drunkenness_dict[key] = 0
 
     @staticmethod
-    def find_ban_keywords(context, group_id) -> set:
+    def _find_ban_keywords(context, group_id) -> set:
         '''
         找到在 group_id 群中对应 context 不能回复的关键词
         '''
@@ -790,6 +792,7 @@ class Chat:
                     if ban_count[ban_key] == Chat.cross_group_threshold:
                         ban_keywords.add(ban_key)
         return ban_keywords
+
 
 # Auto sync on program start
 Chat.update_global_blacklist()
