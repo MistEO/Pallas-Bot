@@ -170,13 +170,13 @@ class Chat:
 
         group_id = self.chat_data.group_id
         bot_id = self.chat_data.bot_id
+        group_bot_replies = Chat._reply_dict[group_id][bot_id]
 
         if with_limit:
             # # 不回复太短的对话，大部分是“？”、“草”
             # if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
             #     return None
 
-            group_bot_replies = Chat._reply_dict[group_id][bot_id]
             if len(group_bot_replies):
                 latest_reply = group_bot_replies[-1]
                 # 限制发音频率，最多 6 秒一次
@@ -195,7 +195,7 @@ class Chat:
             raw_message = self.chat_data.raw_message
             keywords = self.chat_data.keywords
             with Chat._reply_lock:
-                Chat._reply_dict[group_id][bot_id].append({
+                group_bot_replies.append({
                     'time': int(time.time()),
                     'pre_raw_message': raw_message,
                     'pre_keywords': keywords,
@@ -204,8 +204,8 @@ class Chat:
                 })
 
             def yield_results(results: Tuple[List[str], str]) -> Generator[Message, None, None]:
-                group_bot_replies = Chat._reply_dict[group_id][bot_id]
                 answer_list, answer_keywords = results
+                group_bot_replies = Chat._reply_dict[group_id][bot_id]
                 for item in answer_list:
                     with Chat._reply_lock:
                         group_bot_replies.append({
@@ -229,12 +229,10 @@ class Chat:
         return None
 
     @staticmethod
-    def speak() -> Optional[Tuple[int, List[Message]]]:
+    def speak() -> Optional[Tuple[int, int, List[Message]]]:
         '''
-        主动发言，返回当前最希望发言的群号、发言消息 List，也有可能不发言
+        主动发言，返回当前最希望发言的 bot 账号、群号、发言消息 List，也有可能不发言
         '''
-
-        return None
 
         basic_msgs_len = 10
         basic_delay = 600
@@ -274,9 +272,13 @@ class Chat:
 
         cur_time = time.time()
         for group_id, group_msgs in popularity:
-            if group_id not in Chat._reply_dict or len(group_msgs) < basic_msgs_len:
+            group_replies = Chat._reply_dict[group_id]
+            if not len(group_replies) or len(group_msgs) < basic_msgs_len:
                 continue
-            if Chat._reply_dict[group_id][-1]['time'] > group_msgs[-1]['time']:
+
+            # 一般来说所有牛牛都是一起回复的，最后发言时间应该是一样的，随意随便选一个[0]就好了
+            group_replies_front = list(group_replies.values())[0]
+            if group_replies_front[-1]['time'] > group_msgs[-1]['time']:
                 continue
 
             msgs_len = len(group_msgs)
@@ -290,7 +292,7 @@ class Chat:
 
             # append 一个 flag, 防止这个群热度特别高，但压根就没有可用的 context 时，每次 speak 都查这个群，浪费时间
             with Chat._reply_lock:
-                Chat._reply_dict[group_id].append({
+                group_replies_front.append({
                     'time': int(cur_time),
                     'pre_raw_message': '[PallasBot: Speak]',
                     'pre_keywords': '[PallasBot: Speak]',
@@ -298,16 +300,24 @@ class Chat:
                     'reply_keywords': '[PallasBot: Speak]',
                 })
 
+            available_time = cur_time - 24 * 3600
             speak_context = context_mongo.aggregate([
                 {
                     '$match': {
+                        'count': {
+                            '$gt': Chat.answer_threshold
+                        },
                         'time': {
-                            '$gt': cur_time - 24 * 3600
+                            '$gt': available_time
+                        },
+                        # 上面两行为了加快查找速度，对查找到的结果不产生影响
+                        'answers.group_id': group_id,
+                        'answers.time': {
+                            '$gt': available_time
                         },
                         'answers.count': {
                             '$gt': Chat.answer_threshold
-                        },
-                        'answers.group_id': group_id
+                        }
                     }
                 }, {
                     '$sample': {'size': 1}  # 随机一条
@@ -331,8 +341,9 @@ class Chat:
 
             speak = random.choice(random.choice(messages))
 
+            bot_id = random.choice(list(group_replies.keys()))
             with Chat._reply_lock:
-                Chat._reply_dict[group_id].append({
+                group_replies[bot_id].append({
                     'time': int(cur_time),
                     'pre_raw_message': '[PallasBot: Speak]',
                     'pre_keywords': '[PallasBot: Speak]',
@@ -349,7 +360,7 @@ class Chat:
                 if not answer:
                     break
                 speak_list.extend(answer)
-            return (group_id, speak_list)
+            return (bot_id, group_id, speak_list)
 
         return None
 
@@ -363,7 +374,9 @@ class Chat:
             return False
 
         ban_reply = None
-        for reply in Chat._reply_dict[group_id][bot_id][::-1]:
+        reply_data = Chat._reply_dict[group_id][bot_id][::-1]
+
+        for reply in reply_data:
             cur_reply = reply['reply']
             # 为空时就直接 ban 最后一条回复
             if not ban_raw_message or ban_raw_message in cur_reply:
@@ -376,7 +389,7 @@ class Chat:
                                ban_raw_message)
             if search:
                 type_keyword = search.group(1)
-                for reply in Chat._reply_dict[group_id][bot_id][::-1]:
+                for reply in reply_data:
                     cur_reply = reply['reply']
                     if type_keyword in cur_reply:
                         ban_reply = reply

@@ -25,7 +25,7 @@ any_msg = on_message(
 
 
 async def is_shutup(self_id: int, group_id: int) -> bool:
-    info = await get_bot().call_api('get_group_member_info', **{
+    info = await get_bot(self_id).call_api('get_group_member_info', **{
         'user_id': self_id,
         'group_id': group_id
     })
@@ -165,12 +165,12 @@ async def speak_up():
     if not ret:
         return
 
-    group_id, messages = ret
+    bot_id, group_id, messages = ret
 
     for msg in messages:
         logger.info("repeater | ready to speak [{}] to group [{}]".format(
             msg, group_id))
-        await get_bot().call_api('send_group_msg', **{
+        await get_bot(str(bot_id)).call_api('send_group_msg', **{
             'message': msg,
             'group_id': group_id
         })
