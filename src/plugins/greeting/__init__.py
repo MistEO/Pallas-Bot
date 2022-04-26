@@ -71,7 +71,7 @@ all_notice = on_notice(
 
 
 async def is_admin(self_id: int, group_id: int) -> bool:
-    info = await get_bot(self_id).call_api('get_group_member_info', **{
+    info = await get_bot(str(self_id)).call_api('get_group_member_info', **{
         'user_id': self_id,
         'group_id': group_id
     })
@@ -82,21 +82,21 @@ async def is_admin(self_id: int, group_id: int) -> bool:
 
 @all_notice.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
-    if event.notice_type == 'notify' and event.sub_type == 'poke' and str(event.target_id) == bot.self_id:
+    if event.notice_type == 'notify' and event.sub_type == 'poke' and event.target_id == event.self_id:
         poke_msg: str = '[CQ:poke,qq={}]'.format(event.user_id)
         delay = random.randint(1, 3)
         await asyncio.sleep(delay)
         await all_notice.finish(Message(poke_msg))
     elif event.notice_type == 'group_increase':
-        if str(event.user_id) == bot.self_id:
+        if event.user_id == event.self_id:
             msg = '我是来自米诺斯的祭司帕拉斯，会在罗德岛休息一段时间......虽然这么说，我渴望以美酒和戏剧被招待，更渴望走向战场。'
-        elif is_admin(bot.self_id, event.group_id):
+        elif is_admin(event.self_id, event.group_id):
             msg: Message = MessageSegment.at(event.user_id) + MessageSegment.text(
                 '博士，欢迎加入这盛大的庆典！我是来自米诺斯的祭司帕拉斯......要来一杯美酒么？')
         else:
-            return False
+            return
         await all_notice.finish(msg)
-    elif event.notice_type == 'group_admin' and event.sub_type == 'set' and str(event.user_id) == bot.self_id:
+    elif event.notice_type == 'group_admin' and event.sub_type == 'set' and event.user_id == event.self_id:
         msg: Message = MessageSegment.record(file=Path(get_voice('任命助理')))
         await all_notice.finish(msg)
     elif event.notice_type == 'friend_add':

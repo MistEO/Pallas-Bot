@@ -20,7 +20,7 @@ target_msgs = ['牛牛唱歌', '欢乐水牛']
 
 
 async def message_equal(bot: "Bot", event: "Event", state: T_State) -> bool:
-    raw_msg = event.dict()['raw_message']
+    raw_msg = event.raw_message
     for target in target_msgs:
         if target == raw_msg:
             return True
