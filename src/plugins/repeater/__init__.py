@@ -3,6 +3,7 @@ import asyncio
 import re
 import time
 import os
+import threading
 
 from nonebot import on_message, require, get_bot, logger, get_driver
 from nonebot.exception import ActionFailed
@@ -39,8 +40,27 @@ global_config = get_driver().config
 plugin_config = Config(**global_config.dict())
 
 
+message_id_lock = threading.Lock()
+message_id_dict = {}
+
+
 @any_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
+
+    # 多账号登陆，且在同一群中时；避免一条消息被处理多次
+    with message_id_lock:
+        message_id = event.message_id
+        group_id = event.group_id
+        if group_id in message_id_dict:
+            if message_id in message_id_dict[group_id]:
+                return
+        else:
+            message_id_dict[group_id] = []
+
+        group_message = message_id_dict[group_id]
+        group_message.append(message_id)
+        if len(group_message) > 100:
+            group_message = group_message[:-10]
 
     # 不响应其他牛牛的消息
     accounts_dir = 'accounts'
