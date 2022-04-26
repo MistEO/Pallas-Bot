@@ -131,7 +131,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     logger.info("repeater | ready to ban [{}] in group [{}]".format(
         raw_message, event.group_id))
 
-    if Chat.ban(event.group_id, raw_message):
+    if Chat.ban(event.group_id, event.self_id, raw_message):
         await ban_msg.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
 
 

@@ -47,6 +47,7 @@ class ChatData:
     raw_message: str
     plain_text: str
     time: int
+    bot_id: int
 
     _keywords_size: int = 3
 
@@ -114,7 +115,8 @@ class Chat:
                     r']',
                     data.raw_message),
                 plain_text=data.get_plaintext(),
-                time=data.time
+                time=data.time,
+                bot_id=data.self_id,
             )
         elif (isinstance(data, PrivateMessageEvent)):
             event_dict = data.dict()
@@ -127,7 +129,8 @@ class Chat:
                     r']',
                     data.raw_message),
                 plain_text=data.get_plaintext(),
-                time=data.time
+                time=data.time,
+                bot_id=data.self_id,
             )
 
     def learn(self) -> bool:
@@ -165,53 +168,50 @@ class Chat:
         回复这句话，可能会分多次回复，也可能不回复
         '''
 
+        group_id = self.chat_data.group_id
+        bot_id = self.chat_data.bot_id
+
         if with_limit:
             # # 不回复太短的对话，大部分是“？”、“草”
             # if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
             #     return None
 
-            if self.chat_data.group_id in Chat._reply_dict:
-                group_replies = Chat._reply_dict[self.chat_data.group_id]
-                if len(group_replies):
-                    latest_reply = group_replies[-1]
-                    # 限制发音频率，最多 6 秒一次
-                    if int(time.time()) - latest_reply['time'] < 6:
-                        return None
-                    # # 不要一直回复同一个内容
-                    # if self.chat_data.raw_message == latest_reply['pre_raw_message']:
-                    #     return None
-                    # 有人复读了牛牛的回复，不继续回复
-                    # if self.chat_data.raw_message == latest_reply['reply']:
-                    #    return None
-
-                    # 如果连续 5 次回复同样的内容，就不再回复。这种情况很可能是和别的 bot 死循环了
-                    # repeat_times = 5
-                    # if len(group_replies) >= repeat_times \
-                    #     and all(reply['pre_raw_message'] == self.chat_data.raw_message
-                    #             for reply in group_replies[-repeat_times:]):
-                    #     return None
+            group_bot_replies = Chat._reply_dict[group_id][bot_id]
+            if len(group_bot_replies):
+                latest_reply = group_bot_replies[-1]
+                # 限制发音频率，最多 6 秒一次
+                if int(time.time()) - latest_reply['time'] < 6:
+                    return None
+                # # 不要一直回复同一个内容
+                # if self.chat_data.raw_message == latest_reply['pre_raw_message']:
+                #     return None
+                # 有人复读了牛牛的回复，不继续回复
+                # if self.chat_data.raw_message == latest_reply['reply']:
+                #    return None
 
         results = self._context_find()
 
         if results:
+            raw_message = self.chat_data.raw_message
+            keywords = self.chat_data.keywords
             with Chat._reply_lock:
-                Chat._reply_dict[self.chat_data.group_id].append({
+                Chat._reply_dict[group_id][bot_id].append({
                     'time': int(time.time()),
-                    'pre_raw_message': self.chat_data.raw_message,
-                    'pre_keywords': self.chat_data.keywords,
+                    'pre_raw_message': raw_message,
+                    'pre_keywords': keywords,
                     'reply': '[PallasBot: Reply]',  # flag
                     'reply_keywords': '[PallasBot: Reply]',  # flag
                 })
 
             def yield_results(results: Tuple[List[str], str]) -> Generator[Message, None, None]:
-                group_replies = Chat._reply_dict[self.chat_data.group_id]
+                group_bot_replies = Chat._reply_dict[group_id][bot_id]
                 answer_list, answer_keywords = results
                 for item in answer_list:
                     with Chat._reply_lock:
-                        group_replies.append({
+                        group_bot_replies.append({
                             'time': int(time.time()),
-                            'pre_raw_message': self.chat_data.raw_message,
-                            'pre_keywords': self.chat_data.keywords,
+                            'pre_raw_message': raw_message,
+                            'pre_keywords': keywords,
                             'reply': item,
                             'reply_keywords': answer_keywords,
                         })
@@ -222,7 +222,7 @@ class Chat:
                         yield Message(item)
 
                 with Chat._reply_lock:
-                    group_replies = group_replies[-Chat._save_reserve_size:]
+                    group_bot_replies = group_bot_replies[-Chat._save_reserve_size:]
 
             return yield_results(results)
 
@@ -233,6 +233,8 @@ class Chat:
         '''
         主动发言，返回当前最希望发言的群号、发言消息 List，也有可能不发言
         '''
+
+        return None
 
         basic_msgs_len = 10
         basic_delay = 600
@@ -293,7 +295,7 @@ class Chat:
                     'pre_raw_message': '[PallasBot: Speak]',
                     'pre_keywords': '[PallasBot: Speak]',
                     'reply': '[PallasBot: Speak]',
-                    'reply_keywords': '[PallasBot: Speak]'
+                    'reply_keywords': '[PallasBot: Speak]',
                 })
 
             speak_context = context_mongo.aggregate([
@@ -335,7 +337,7 @@ class Chat:
                     'pre_raw_message': '[PallasBot: Speak]',
                     'pre_keywords': '[PallasBot: Speak]',
                     'reply': speak,
-                    'reply_keywords': '[PallasBot: Speak]'
+                    'reply_keywords': '[PallasBot: Speak]',
                 })
 
             speak_list = [Message(speak), ]
@@ -343,7 +345,7 @@ class Chat:
                     and len(speak_list) < Chat.speak_continuously_max_len:
                 pre_msg = str(speak_list[-1])
                 answer = Chat(ChatData(group_id, 0, pre_msg,
-                                       pre_msg, cur_time)).answer(False)
+                                       pre_msg, cur_time, 0)).answer(False)
                 if not answer:
                     break
                 speak_list.extend(answer)
@@ -352,7 +354,7 @@ class Chat:
         return None
 
     @staticmethod
-    def ban(group_id: int, ban_raw_message: str) -> bool:
+    def ban(group_id: int, bot_id: int, ban_raw_message: str) -> bool:
         '''
         禁止以后回复这句话，仅对该群有效果
         '''
@@ -361,7 +363,7 @@ class Chat:
             return False
 
         ban_reply = None
-        for reply in Chat._reply_dict[group_id][::-1]:
+        for reply in Chat._reply_dict[group_id][bot_id][::-1]:
             cur_reply = reply['reply']
             # 为空时就直接 ban 最后一条回复
             if not ban_raw_message or ban_raw_message in cur_reply:
@@ -374,7 +376,7 @@ class Chat:
                                ban_raw_message)
             if search:
                 type_keyword = search.group(1)
-                for reply in Chat._reply_dict[group_id][::-1]:
+                for reply in Chat._reply_dict[group_id][bot_id][::-1]:
                     cur_reply = reply['reply']
                     if type_keyword in cur_reply:
                         ban_reply = reply
@@ -433,7 +435,7 @@ class Chat:
         return Chat._drunkenness_dict[group_id] <= 0
 
 # private:
-    _reply_dict = defaultdict(list)  # 牛牛回复的消息缓存，暂未做持久化
+    _reply_dict = defaultdict(lambda: defaultdict(list))  # 牛牛回复的消息缓存，暂未做持久化
     _message_dict = {}              # 群消息缓存
     _drunkenness_dict = defaultdict(int)          # 醉酒程度，不同群应用不同的数值
 
@@ -591,17 +593,22 @@ class Chat:
         group_id = self.chat_data.group_id
         raw_message = self.chat_data.raw_message
         keywords = self.chat_data.keywords
+        bot_id = self.chat_data.bot_id
 
         # 复读！
         if group_id in Chat._message_dict:
             group_msgs = Chat._message_dict[group_id]
-            if group_msgs and len(group_msgs) >= Chat.repeat_threshold:
-                if all(item['raw_message'] == raw_message
-                        for item in group_msgs[:-Chat.repeat_threshold:-1]):
-                    # 复读过一次就不复读了
-                    if group_id not in Chat._reply_dict \
-                            or Chat._reply_dict[group_id][-1]['reply'] != raw_message:
+            if group_msgs and len(group_msgs) >= Chat.repeat_threshold and \
+                all(item['raw_message'] == raw_message
+                    for item in group_msgs[:-Chat.repeat_threshold:-1]):
+                # 到这里说明当前群里是在复读
+                group_bot_replies = Chat._reply_dict[group_id][bot_id]
+                if len(group_bot_replies):
+                    if group_bot_replies[-1]['reply'] != raw_message:
                         return ([raw_message, ], keywords)
+                    else:
+                        # 复读过一次就不再回复这句话了
+                        return None
 
         context = context_mongo.find_one({'keywords': keywords})
 
@@ -809,32 +816,34 @@ atexit.register(_chat_sync)
 
 if __name__ == '__main__':
 
-    Chat.clearup_context()
+    # Chat.clearup_context()
     # # while True:
-    # test_data: ChatData = ChatData(
-    #     group_id=1234567,
-    #     user_id=1111111,
-    #     raw_message='牛牛出来玩',
-    #     plain_text='牛牛出来玩',
-    #     time=time.time()
-    # )
+    test_data: ChatData = ChatData(
+        group_id=1234567,
+        user_id=1111111,
+        raw_message='牛牛出来玩',
+        plain_text='牛牛出来玩',
+        time=time.time(),
+        bot_id=0,
+    )
 
-    # test_chat: Chat = Chat(test_data)
+    test_chat: Chat = Chat(test_data)
 
-    # print(test_chat.answer())
-    # test_chat.learn()
+    print(test_chat.answer())
+    test_chat.learn()
 
-    # test_answer_data: ChatData = ChatData(
-    #     group_id=1234567,
-    #     user_id=1111111,
-    #     raw_message='别烦',
-    #     plain_text='别烦',
-    #     time=time.time()
-    # )
+    test_answer_data: ChatData = ChatData(
+        group_id=1234567,
+        user_id=1111111,
+        raw_message='别烦',
+        plain_text='别烦',
+        time=time.time(),
+        bot_id=0,
+    )
 
-    # test_answer: Chat = Chat(test_answer_data)
-    # print(test_chat.answer())
-    # test_answer.learn()
+    test_answer: Chat = Chat(test_answer_data)
+    print(test_chat.answer())
+    test_answer.learn()
 
     # time.sleep(5)
     # print(Chat.speak())
