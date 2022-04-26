@@ -25,7 +25,7 @@ any_msg = on_message(
 
 
 async def is_shutup(self_id: int, group_id: int) -> bool:
-    info = await get_bot(self_id).call_api('get_group_member_info', **{
+    info = await get_bot(str(self_id)).call_api('get_group_member_info', **{
         'user_id': self_id,
         'group_id': group_id
     })

@@ -93,7 +93,8 @@ class Chat:
     split_probability = 0.5         # 按逗号分割回复语的概率
     voice_probability = 0           # 回复语音的概率（仅纯文字）
     speak_continuously_probability = 0.5  # 连续主动说话的概率
-    speak_continuously_max_len = 2  # 连续主动发言最多几句话
+    speak_poke_probability = 0.5    # 主动说话加上随机戳一戳群友的概率
+    speak_continuously_max_len = 2  # 连续主动说话最多几句话
 
     save_time_threshold = 3600      # 每隔多久进行一次持久化 ( 秒 )
     save_count_threshold = 1000     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
@@ -288,6 +289,8 @@ class Chat:
             avg_interval = duration / msgs_len
 
             # 已经超过平均发言间隔 N 倍的时间没有人说话了，才主动发言
+            # print(cur_time - latest_time, '/', avg_interval *
+            #       Chat.speak_threshold + basic_delay)
             if cur_time - latest_time < avg_interval * Chat.speak_threshold + basic_delay:
                 continue
 
@@ -342,7 +345,8 @@ class Chat:
 
             speak = random.choice(random.choice(messages))
 
-            bot_id = random.choice(list(group_replies.keys()))
+            bot_id = random.choice(
+                [bid for bid in group_replies.keys() if bid])
             with Chat._reply_lock:
                 group_replies[bot_id].append({
                     'time': int(cur_time),
@@ -361,6 +365,12 @@ class Chat:
                 if not answer:
                     break
                 speak_list.extend(answer)
+
+            if random.random() < Chat.speak_poke_probability:
+                target_id = random.choice(
+                    Chat._message_dict[group_id])['user_id']
+                speak_list.append(Message('[CQ:poke,qq={}]'.format(target_id)))
+
             return (bot_id, group_id, speak_list)
 
         return None
