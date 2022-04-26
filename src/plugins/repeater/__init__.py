@@ -47,13 +47,14 @@ message_id_dict = {}
 @any_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
+    to_learn = True
     # 多账号登陆，且在同一群中时；避免一条消息被处理多次
     with message_id_lock:
         message_id = event.message_id
         group_id = event.group_id
         if group_id in message_id_dict:
             if message_id in message_id_dict[group_id]:
-                return
+                to_learn = False
         else:
             message_id_dict[group_id] = []
 
@@ -70,7 +71,8 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     chat: Chat = Chat(event)
 
     answers = chat.answer()
-    chat.learn()
+    if to_learn:
+        chat.learn()
 
     if not answers:
         return
