@@ -65,8 +65,12 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     # 不响应其他牛牛的消息
     accounts_dir = 'accounts'
-    if os.path.exists(accounts_dir) and event.user_id in os.listdir(accounts_dir):
-        return
+
+    if os.path.exists(accounts_dir):
+        accounts = [int(d) for d in os.listdir(accounts_dir)
+                    if d.isnumeric()]
+        if event.user_id in accounts:
+            return
 
     chat: Chat = Chat(event)
 
