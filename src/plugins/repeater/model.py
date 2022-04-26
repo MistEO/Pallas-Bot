@@ -278,7 +278,8 @@ class Chat:
 
             # 一般来说所有牛牛都是一起回复的，最后发言时间应该是一样的，随意随便选一个[0]就好了
             group_replies_front = list(group_replies.values())[0]
-            if group_replies_front[-1]['time'] > group_msgs[-1]['time']:
+            if not len(group_replies_front) or \
+                    group_replies_front[-1]['time'] > group_msgs[-1]['time']:
                 continue
 
             msgs_len = len(group_msgs)
