@@ -31,8 +31,8 @@ async def is_shutup(self_id: int, group_id: int) -> bool:
     })
     flag: bool = info['shut_up_timestamp'] > time.time()
 
-    logger.info("repeater | group [{}] is shutup: {}".format(
-        group_id, flag))
+    logger.info('repeater | bot [{}] in group [{}] is shutup: {}'.format(
+        self_id, group_id, flag))
 
     return flag
 
@@ -84,7 +84,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     delay = random.randint(2, 5)
     for item in answers:
         logger.info(
-            "repeater | ready to send [{}] to group [{}]".format(item, event.group_id))
+            'repeater | bot [{}] ready to send [{}] to group [{}]'.format(event.self_id, item, event.group_id))
 
         await asyncio.sleep(delay)
         try:
@@ -95,10 +95,10 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
                 continue
 
             # 自动删除失效消息。若 bot 处于风控期，请勿开启该功能
-            shutup = await is_shutup(bot.self_id, event.group_id)
+            shutup = await is_shutup(event.self_id, event.group_id)
             if not shutup:  # 说明这条消息失效了
-                logger.info("repeater | ready to ban [{}] in group [{}]".format(
-                    str(item), event.group_id))
+                logger.info('repeater | bot [{}] ready to ban [{}] in group [{}]'.format(
+                    event.self_id, str(item), event.group_id))
                 Chat.ban(event.group_id, str(item))
                 break
         delay = random.randint(1, 3)
@@ -128,8 +128,8 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         raw_message += re.sub(r'(\[CQ\:.+)(?:,url=*)(\])',
                               r'\1\2', raw_reply)
 
-    logger.info("repeater | ready to ban [{}] in group [{}]".format(
-        raw_message, event.group_id))
+    logger.info('repeater | bot [{}] ready to ban [{}] in group [{}]'.format(
+        event.self_id, raw_message, event.group_id))
 
     if Chat.ban(event.group_id, event.self_id, raw_message):
         await ban_msg.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
@@ -152,7 +152,8 @@ ban_msg_latest = on_message(
 @ban_msg_latest.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     logger.info(
-        "repeater | ready to ban latest reply in group [{}]".format(event.group_id))
+        'repeater | bot [{}] ready to ban latest reply in group [{}]'.format(
+            event.self_id, event.group_id))
 
     if Chat.ban(event.group_id, ''):
         await ban_msg_latest.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
@@ -168,8 +169,9 @@ async def speak_up():
     bot_id, group_id, messages = ret
 
     for msg in messages:
-        logger.info("repeater | ready to speak [{}] to group [{}]".format(
-            msg, group_id))
+        logger.info(
+            'repeater | bot [{}] ready to speak [{}] to group [{}]'.format(
+                bot_id, msg, group_id))
         await get_bot(str(bot_id)).call_api('send_group_msg', **{
             'message': msg,
             'group_id': group_id
@@ -194,8 +196,9 @@ drink_msg = on_message(
 @drink_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     drunk_duration = random.randint(60, 600)
-    logger.info("repeater | ready to drink in group [{}], sober up after {} sec".format(
-        event.group_id, drunk_duration))
+    logger.info(
+        'repeater | bot [{}] ready to drink in group [{}], sober up after {} sec'.format(
+            event.self_id, event.group_id, drunk_duration))
     Chat.drink(event.group_id)
     try:
         await drink_msg.send('呀，博士。你今天走起路来，怎么看着摇摇晃晃的？')
@@ -206,11 +209,12 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     ret = Chat.sober_up(event.group_id)
     if ret:
         logger.info(
-            "repeater | sober up in group [{}]".format(event.group_id))
+            'repeater | bot [{}] sober up in group [{}]'.format(
+                event.self_id, event.group_id))
         await drink_msg.finish('呃......咳嗯，下次不能喝、喝这么多了......')
 
 
-@ update_sched.scheduled_job("cron", hour="4")
+@ update_sched.scheduled_job('cron', hour='4')
 def update_data():
     Chat.clearup_context()
     Chat.completely_sober()
