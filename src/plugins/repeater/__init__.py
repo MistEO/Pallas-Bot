@@ -99,7 +99,8 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
             if not shutup:  # 说明这条消息失效了
                 logger.info('repeater | bot [{}] ready to ban [{}] in group [{}]'.format(
                     event.self_id, str(item), event.group_id))
-                Chat.ban(event.group_id, str(item))
+                Chat.ban(event.group_id, event.self_id,
+                         str(item), 'ActionFailed')
                 break
         delay = random.randint(1, 3)
 
@@ -131,7 +132,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     logger.info('repeater | bot [{}] ready to ban [{}] in group [{}]'.format(
         event.self_id, raw_message, event.group_id))
 
-    if Chat.ban(event.group_id, event.self_id, raw_message):
+    if Chat.ban(event.group_id, event.self_id, raw_message, str(event.user_id)):
         await ban_msg.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
 
 
@@ -155,7 +156,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         'repeater | bot [{}] ready to ban latest reply in group [{}]'.format(
             event.self_id, event.group_id))
 
-    if Chat.ban(event.group_id, ''):
+    if Chat.ban(event.group_id, event.self_id, '', str(event.user_id)):
         await ban_msg_latest.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
 
 

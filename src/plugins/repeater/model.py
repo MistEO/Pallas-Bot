@@ -376,7 +376,7 @@ class Chat:
         return None
 
     @staticmethod
-    def ban(group_id: int, bot_id: int, ban_raw_message: str) -> bool:
+    def ban(group_id: int, bot_id: int, ban_raw_message: str, reason: str) -> bool:
         '''
         禁止以后回复这句话，仅对该群有效果
         '''
@@ -428,7 +428,9 @@ class Chat:
             '$push': {
                 'ban': {
                     'keywords': keywords,
-                    'group_id': group_id
+                    'group_id': group_id,
+                    'reason': reason,
+                    'time': int(time.time()),
                 }
             }
         })
