@@ -622,17 +622,16 @@ class Chat:
         # 复读！
         if group_id in Chat._message_dict:
             group_msgs = Chat._message_dict[group_id]
-            if group_msgs and len(group_msgs) >= Chat.repeat_threshold and \
+            if len(group_msgs) >= Chat.repeat_threshold and \
                 all(item['raw_message'] == raw_message
                     for item in group_msgs[:-Chat.repeat_threshold:-1]):
                 # 到这里说明当前群里是在复读
                 group_bot_replies = Chat._reply_dict[group_id][bot_id]
-                if len(group_bot_replies):
-                    if group_bot_replies[-1]['reply'] != raw_message:
-                        return ([raw_message, ], keywords)
-                    else:
-                        # 复读过一次就不再回复这句话了
-                        return None
+                if len(group_bot_replies) and group_bot_replies[-1]['reply'] != raw_message:
+                    return ([raw_message, ], keywords)
+                else:
+                    # 复读过一次就不再回复这句话了
+                    return None
 
         context = context_mongo.find_one({'keywords': keywords})
 
@@ -845,8 +844,8 @@ if __name__ == '__main__':
     test_data: ChatData = ChatData(
         group_id=1234567,
         user_id=1111111,
-        raw_message='牛牛出来玩',
-        plain_text='牛牛出来玩',
+        raw_message='完了又有新bug',
+        plain_text='完了又有新bug',
         time=time.time(),
         bot_id=0,
     )
@@ -859,8 +858,8 @@ if __name__ == '__main__':
     test_answer_data: ChatData = ChatData(
         group_id=1234567,
         user_id=1111111,
-        raw_message='别烦',
-        plain_text='别烦',
+        raw_message='完了又有新bug',
+        plain_text='完了又有新bug',
         time=time.time(),
         bot_id=0,
     )
