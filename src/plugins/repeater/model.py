@@ -645,7 +645,7 @@ class Chat:
         else:
             answer_count_threshold = Chat.answer_threshold
 
-        if Chat.chat_data.to_me:
+        if self.chat_data.to_me:
             cross_group_threshold = 1
         else:
             cross_group_threshold = Chat.cross_group_threshold
