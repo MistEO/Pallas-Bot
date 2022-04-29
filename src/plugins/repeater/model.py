@@ -79,7 +79,7 @@ class ChatData:
 
     @cached_property
     def to_me(self) -> bool:
-        return '牛牛' in self.keywords or '帕拉斯' in self.keywords
+        return self.plain_text.startswith('牛牛')
 
 
 class Chat:
@@ -645,7 +645,10 @@ class Chat:
         else:
             answer_count_threshold = Chat.answer_threshold
 
-        cross_group_threshold = Chat.cross_group_threshold
+        if Chat.chat_data.to_me:
+            cross_group_threshold = 1
+        else:
+            cross_group_threshold = Chat.cross_group_threshold
 
         ban_keywords = Chat._find_ban_keywords(
             context=context, group_id=group_id)
