@@ -47,6 +47,15 @@ message_id_dict = {}
 @any_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
+    # 不响应其他牛牛的消息
+    accounts_dir = 'accounts'
+
+    if os.path.exists(accounts_dir):
+        accounts = [int(d) for d in os.listdir(accounts_dir)
+                    if d.isnumeric()]
+        if event.user_id in accounts:
+            return
+
     to_learn = True
     # 多账号登陆，且在同一群中时；避免一条消息被处理多次
     with message_id_lock:
@@ -62,15 +71,6 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         group_message.append(message_id)
         if len(group_message) > 100:
             group_message = group_message[:-10]
-
-    # 不响应其他牛牛的消息
-    accounts_dir = 'accounts'
-
-    if os.path.exists(accounts_dir):
-        accounts = [int(d) for d in os.listdir(accounts_dir)
-                    if d.isnumeric()]
-        if event.user_id in accounts:
-            return
 
     chat: Chat = Chat(event)
 
