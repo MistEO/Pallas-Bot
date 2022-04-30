@@ -142,3 +142,4 @@ dmypy.json
 
 resource/voices/*
 accounts
+cache
