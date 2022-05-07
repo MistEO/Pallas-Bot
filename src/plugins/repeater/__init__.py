@@ -11,11 +11,10 @@ from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me, Rule
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
-
 from nonebot.adapters.onebot.v11 import permission
+from src.common.config import BotConfig
 
 from .model import Chat
-from .config import Config
 
 any_msg = on_message(
     priority=15,
@@ -35,10 +34,6 @@ async def is_shutup(self_id: int, group_id: int) -> bool:
         self_id, group_id, flag))
 
     return flag
-
-global_config = get_driver().config
-plugin_config = Config(**global_config.dict())
-
 
 message_id_lock = threading.Lock()
 message_id_dict = {}
@@ -90,8 +85,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         try:
             await any_msg.send(item)
         except ActionFailed:
-            continue
-            if event.user_id not in plugin_config.safe_accounts:
+            if not BotConfig(event.self_id).security():
                 continue
 
             # 自动删除失效消息。若 bot 处于风控期，请勿开启该功能

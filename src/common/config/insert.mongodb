@@ -2,19 +2,28 @@
 // Use Ctrl+Space inside a snippet or a string literal to trigger completions.
 
 const database = 'PallasBot';
-const collection = 'request';
+const collection = 'config';
 
 // The current database to use.
 use(database);
 
 // Create a new collection.
-db.createCollection(collection);
-db.getCollection(collection).insert({
-    "type": "auto_accept",
-    "accounts": [
-        
-    ]
-});
+// db.createCollection(collection);
+db.getCollection(collection)
+    .updateOne(
+        {
+            "account": 1234567
+        }, 
+        {
+            "$set": {
+                "security": false,
+                "auto_accept": true
+            }
+        }, 
+        {
+            "upsert": true
+        }
+    );
 
 
 // The prototype form to create a collection:
