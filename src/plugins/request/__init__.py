@@ -16,20 +16,8 @@ request_cmd = on_request(
 @request_cmd.handle()
 async def handle_request(bot: Bot, event: Union[GroupRequestEvent, FriendRequestEvent], state: T_State):
 
-    if BotConfig(event.self_id).auto_accept():
+    if event.sub_type != 'invite':
+        return
 
-        if isinstance(event, GroupRequestEvent):
-            await bot.set_group_add_request(
-                flag=event.flag,
-                sub_type=event.sub_type,
-                approve=True,
-                reason=""
-            )
-            nonebot.logger.info("同意加入群聊: {}", event. group_id)
-        elif isinstance(event, FriendRequestEvent):
-            await bot.set_friend_add_request(
-                flag=event.flag,
-                approve=True,
-                remark=""
-            )
-            nonebot.logger.info("同意添加好友: {}", event.user_id)
+    if BotConfig(event.self_id).auto_accept():
+        await event.approve(bot)
