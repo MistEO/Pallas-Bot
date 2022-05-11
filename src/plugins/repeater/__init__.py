@@ -12,6 +12,7 @@ from nonebot.rule import keyword, to_me, Rule
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.onebot.v11 import permission
+from nonebot.permission import Permission
 from src.common.config import BotConfig
 
 from .model import Chat
@@ -99,6 +100,13 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         delay = random.randint(1, 3)
 
 
+async def is_config_admin(event: GroupMessageEvent) -> bool:
+    return BotConfig(event.self_id).is_admin(event.user_id)
+
+IsAdmin = permission.GROUP_OWNER | permission.GROUP_ADMIN | Permission(
+    is_config_admin)
+
+
 async def is_reply(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
     return bool(event.reply)
 
@@ -106,7 +114,7 @@ ban_msg = on_message(
     rule=to_me() & keyword('不可以') & Rule(is_reply),
     priority=5,
     block=True,
-    permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
+    permission=IsAdmin
 )
 
 
@@ -140,7 +148,7 @@ ban_msg_latest = on_message(
     rule=to_me() & Rule(message_is_ban),
     priority=5,
     block=True,
-    permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
+    permission=IsAdmin
 )
 
 
@@ -184,7 +192,7 @@ drink_msg = on_message(
     rule=Rule(is_drink_msg),
     priority=5,
     block=True,
-    permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
+    permission=IsAdmin
 )
 
 

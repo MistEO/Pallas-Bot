@@ -17,7 +17,10 @@ db.getCollection(collection)
         {
             "$set": {
                 "security": false,
-                "auto_accept": true
+                "auto_accept": true,
+                "admins": [
+                    111111
+                ]
             }
         }, 
         {

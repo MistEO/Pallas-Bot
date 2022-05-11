@@ -3,7 +3,6 @@ import pymongo
 from dataclasses import dataclass
 from typing import Any
 
-from pyparsing import And
 
 mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
 mongo_db = mongo_client['PallasBot']
@@ -12,7 +11,6 @@ config_mongo.create_index(name='accounts_index',
                           keys=[('account', pymongo.HASHED)])
 
 
-@dataclass
 class BotConfig:
     def __init__(self, bot_id: int) -> None:
         self.bot_id = bot_id
@@ -40,3 +38,20 @@ class BotConfig:
         '''
         accept = self._find_key('auto_accept')
         return accept if accept is not None else False
+
+    def is_admin(self, user_id: int) -> bool:
+        '''
+        是否是管理员
+        '''
+        admins = self._find_key('admins')
+        return user_id in admins if admins is not None else False
+
+    def add_admin(self, user_id: int) -> None:
+        '''
+        添加管理员
+        '''
+        config_mongo.update_one(
+            self._mongo_find_key,
+            {'$push': {'admins': user_id}},
+            upsert=True
+        )
