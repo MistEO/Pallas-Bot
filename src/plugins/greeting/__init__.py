@@ -1,7 +1,9 @@
+from collections import defaultdict
 import random
 import asyncio
 
 from pathlib import Path
+import time
 from nonebot import on_command, on_message, on_notice, get_driver, get_bot
 from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 from nonebot.rule import keyword, startswith, to_me, Rule
@@ -46,9 +48,16 @@ call_me_cmd = on_message(
     block=False,
     permission=permission.GROUP)
 
+greeting_time = defaultdict(lambda: defaultdict(int))
+
 
 @call_me_cmd.handle()
 async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_State):
+    cur_time = int(time.time())
+    if greeting_time[event.group_id][event.self_id] + 6 > cur_time:
+        return
+    greeting_time[event.group_id][event.self_id] = cur_time
+
     msg: Message = MessageSegment.record(file=Path(get_rand_voice()))
     await call_me_cmd.finish(msg)
 
