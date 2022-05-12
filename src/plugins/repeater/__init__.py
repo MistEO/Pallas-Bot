@@ -11,7 +11,7 @@ from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me, Rule
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
-from nonebot.adapters.onebot.v11 import permission
+from nonebot.adapters.onebot.v11 import permission, Message, MessageSegment
 from nonebot.permission import Permission
 from src.common.config import BotConfig
 
@@ -38,6 +38,25 @@ async def is_shutup(self_id: int, group_id: int) -> bool:
 
 message_id_lock = threading.Lock()
 message_id_dict = {}
+
+
+async def replace_at(message: Message, self_id: int, group_id: int) -> Message:
+    new_msg = Message()
+    for seg in message:
+        if seg.type == 'at':
+            try:
+                info = await get_bot(str(self_id)).call_api('get_group_member_info', **{
+                    'user_id': seg.data['qq'],
+                    'group_id': group_id
+                })
+            except ActionFailed:    # 群员不存在
+                continue
+            nick_name = info['card'] if info['card'] else info['nickname']
+            new_msg += '@{}'.format(nick_name)
+        else:
+            new_msg += seg
+
+    return new_msg
 
 
 @any_msg.handle()
@@ -79,12 +98,13 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     delay = random.randint(2, 5)
     for item in answers:
+        msg = await replace_at(item, event.self_id, event.group_id)
         logger.info(
-            'repeater | bot [{}] ready to send [{}] to group [{}]'.format(event.self_id, item, event.group_id))
+            'repeater | bot [{}] ready to send [{}] to group [{}]'.format(event.self_id, msg, event.group_id))
 
         await asyncio.sleep(delay)
         try:
-            await any_msg.send(item)
+            await any_msg.send(msg)
         except ActionFailed:
             if not BotConfig(event.self_id).security():
                 continue
