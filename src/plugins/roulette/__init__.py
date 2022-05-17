@@ -13,6 +13,31 @@ from src.common.config import BotConfig
 import random
 
 
+async def is_roulette_type_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+    return event.raw_message == '牛牛轮盘踢人' or event.raw_message == '牛牛轮盘禁言'
+
+
+roulette_type = defaultdict(int)  # 0 踢人 1 禁言
+
+
+roulette_type_msg = on_message(
+    priority=4,
+    block=True,
+    rule=Rule(is_roulette_type_msg),
+    permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
+)
+
+
+@roulette_type_msg.handle()
+async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
+    if event.raw_message == '牛牛轮盘踢人':
+        roulette_type[event.group_id] = 0
+        await roulette_type_msg.finish('欢呼吧！')
+    elif event.raw_message == '牛牛轮盘禁言':
+        roulette_type[event.group_id] = 1
+        await roulette_type_msg.finish('来吧——')
+
+
 async def is_admin(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
     info = await get_bot(str(event.self_id)).call_api('get_group_member_info', **{
         'user_id': event.self_id,
@@ -26,14 +51,14 @@ roulette_status = defaultdict(int)
 roulette_count = defaultdict(int)
 
 
-async def is_roulette_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+async def is_roulette_type_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
     return event.raw_message == '牛牛轮盘' and roulette_status[event.group_id] == 0
 
 
 roulette_msg = on_message(
     priority=5,
     block=True,
-    rule=Rule(is_roulette_msg) & Rule(is_admin),
+    rule=Rule(is_roulette_type_msg) & Rule(is_admin),
     permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
 )
 
@@ -44,7 +69,12 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     logger.info('Roulette rand: {}'.format(rand))
     roulette_status[event.group_id] = rand
     roulette_count[event.group_id] = 0
-    await roulette_msg.finish('这是一把充满荣耀与死亡的左轮手枪，六个弹槽只有一颗子弹，中弹的那个人将会被踢出群聊。勇敢的战士们啊，扣动你们的扳机吧！')
+    if roulette_type[event.group_id] == 0:
+        type_msg = '踢出群聊'
+    elif roulette_type[event.group_id] == 1:
+        type_msg = '禁言'
+    await roulette_msg.finish(
+        '这是一把充满荣耀与死亡的左轮手枪，六个弹槽只有一颗子弹，中弹的那个人将会被{}。勇敢的战士们啊，扣动你们的扳机吧！'.format(type_msg))
 
 
 async def is_shot_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
@@ -73,6 +103,14 @@ async def kick(bot: Bot, event: GroupMessageEvent, state: T_State):
     await get_bot(str(event.self_id)).call_api('set_group_kick', **{
         'user_id': event.user_id,
         'group_id': event.group_id
+    })
+
+
+async def shutup(bot: Bot, event: GroupMessageEvent, state: T_State):
+    await get_bot(str(event.self_id)).call_api('set_group_ban', **{
+        'user_id': event.user_id,
+        'group_id': event.group_id,
+        'duration': random.randint(1, 15) * 60
     })
 
 shot_msg = on_message(
@@ -109,4 +147,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     await roulette_msg.send(reply_msg)
     if can_kick:
-        await kick(bot, event, state)
+        if roulette_type[event.group_id] == 0:
+            await kick(bot, event, state)
+        elif roulette_type[event.group_id] == 1:
+            await shutup(bot, event, state)
