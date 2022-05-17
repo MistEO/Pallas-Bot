@@ -109,4 +109,4 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     await roulette_msg.send(reply_msg)
     if can_kick:
-        kick(bot, event, state)
+        await kick(bot, event, state)
