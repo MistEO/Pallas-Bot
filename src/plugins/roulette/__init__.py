@@ -25,7 +25,7 @@ roulette_count = defaultdict(int)
 
 
 async def is_roulette_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
-    return event.raw_message in ['牛牛轮盘', '牛牛轮盘踢人', '牛牛轮盘禁言'] \
+    return event.raw_message in ['牛牛轮盘', '牛牛轮盘踢人', '牛牛轮盘禁言', '牛牛踢人轮盘', '牛牛禁言轮盘'] \
         and roulette_status[event.group_id] == 0
 
 
@@ -44,9 +44,9 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     roulette_status[event.group_id] = rand
     roulette_count[event.group_id] = 0
 
-    if event.raw_message == '牛牛轮盘踢人':
+    if '踢人' in event.raw_message:
         roulette_type[event.group_id] = 0
-    elif event.raw_message == '牛牛轮盘禁言':
+    elif '禁言' in event.raw_message:
         roulette_type[event.group_id] = 1
     # elif event.raw_message == '牛牛轮盘':
     #     pass
