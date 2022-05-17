@@ -1,6 +1,5 @@
 from collections import defaultdict
 from nonebot import on_message, require, get_bot, logger, get_driver
-import nonebot
 from nonebot.exception import ActionFailed
 from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me, Rule
@@ -17,27 +16,6 @@ async def is_roulette_type_msg(bot: Bot, event: GroupMessageEvent, state: T_Stat
     return event.raw_message == '牛牛轮盘踢人' or event.raw_message == '牛牛轮盘禁言'
 
 
-roulette_type = defaultdict(int)  # 0 踢人 1 禁言
-
-
-roulette_type_msg = on_message(
-    priority=4,
-    block=True,
-    rule=Rule(is_roulette_type_msg),
-    permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
-)
-
-
-@roulette_type_msg.handle()
-async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    if event.raw_message == '牛牛轮盘踢人':
-        roulette_type[event.group_id] = 0
-        await roulette_type_msg.finish('欢呼吧！')
-    elif event.raw_message == '牛牛轮盘禁言':
-        roulette_type[event.group_id] = 1
-        await roulette_type_msg.finish('来吧——')
-
-
 async def is_admin(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
     info = await get_bot(str(event.self_id)).call_api('get_group_member_info', **{
         'user_id': event.self_id,
@@ -47,13 +25,9 @@ async def is_admin(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
 
     return flag
 
+roulette_type = defaultdict(int)  # 0 踢人 1 禁言
 roulette_status = defaultdict(int)
 roulette_count = defaultdict(int)
-
-
-async def is_roulette_type_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
-    return event.raw_message == '牛牛轮盘' and roulette_status[event.group_id] == 0
-
 
 roulette_msg = on_message(
     priority=5,
@@ -69,6 +43,14 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     logger.info('Roulette rand: {}'.format(rand))
     roulette_status[event.group_id] = rand
     roulette_count[event.group_id] = 0
+
+    if event.raw_message == '牛牛轮盘踢人':
+        roulette_type[event.group_id] = 0
+    elif event.raw_message == '牛牛轮盘禁言':
+        roulette_type[event.group_id] = 1
+    # elif event.raw_message == '牛牛轮盘':
+    #     pass
+
     if roulette_type[event.group_id] == 0:
         type_msg = '踢出群聊'
     elif roulette_type[event.group_id] == 1:
