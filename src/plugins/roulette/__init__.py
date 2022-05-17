@@ -34,7 +34,7 @@ roulette_msg = on_message(
     priority=5,
     block=True,
     rule=Rule(is_roulette_msg) & Rule(is_admin),
-    permission=permission.GROUP
+    permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
 )
 
 
