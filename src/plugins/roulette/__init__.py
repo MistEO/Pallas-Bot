@@ -6,7 +6,7 @@ from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me, Rule
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
-from nonebot.adapters.onebot.v11 import permission
+from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 from nonebot.permission import Permission
 from src.common.config import BotConfig
 
@@ -87,7 +87,8 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         roulette_status[event.group_id] = 0
         kicked = await kick(bot, event, state)
         if kicked:
-            reply_msg = '米诺斯英雄们的故事......有喜剧，便也会有悲剧。舍弃了荣耀，英雄选择回归平凡......'
+            reply_msg = MessageSegment.text('米诺斯英雄们的故事......有喜剧，便也会有悲剧。舍弃了荣耀，') + MessageSegment.at(
+                event.user_id) + MessageSegment.text('选择回归平凡......')
         else:
             reply_msg = '纵使人类的战争没尽头......在这一刻，我们守护住了自己生的尊严。离开吧。但要昂首挺胸。'
     else:
