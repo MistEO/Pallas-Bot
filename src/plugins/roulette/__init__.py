@@ -1,19 +1,13 @@
 from collections import defaultdict
 from nonebot import on_message, require, get_bot, logger, get_driver
-from nonebot.exception import ActionFailed
 from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me, Rule
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
-from nonebot.permission import Permission
 from src.common.config import BotConfig
 
 import random
-
-
-async def is_roulette_type_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
-    return event.raw_message == '牛牛轮盘踢人' or event.raw_message == '牛牛轮盘禁言'
 
 
 async def is_admin(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
@@ -29,10 +23,16 @@ roulette_type = defaultdict(int)  # 0 踢人 1 禁言
 roulette_status = defaultdict(int)
 roulette_count = defaultdict(int)
 
+
+async def is_roulette_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+    return event.raw_message in ['牛牛轮盘', '牛牛轮盘踢人', '牛牛轮盘禁言'] \
+        and roulette_status[event.group_id] == 0
+
+
 roulette_msg = on_message(
     priority=5,
     block=True,
-    rule=Rule(is_roulette_type_msg) & Rule(is_admin),
+    rule=Rule(is_roulette_msg) & Rule(is_admin),
     permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
 )
 
