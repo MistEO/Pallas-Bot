@@ -51,7 +51,7 @@ async def is_shot_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> boo
     return event.raw_message == '牛牛开枪' and roulette_status[event.group_id] != 0
 
 
-async def kick(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+async def is_can_kick(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
     user_info = await get_bot(str(event.self_id)).call_api('get_group_member_info', **{
         'user_id': event.user_id,
         'group_id': event.group_id
@@ -66,11 +66,14 @@ async def kick(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
         if bot_info['role'] != 'owner':
             return False
 
+    return True
+
+
+async def kick(bot: Bot, event: GroupMessageEvent, state: T_State):
     await get_bot(str(event.self_id)).call_api('set_group_kick', **{
         'user_id': event.user_id,
         'group_id': event.group_id
     })
-    return True
 
 shot_msg = on_message(
     priority=5,
@@ -79,21 +82,31 @@ shot_msg = on_message(
     permission=permission.GROUP
 )
 
+shot_text = [
+    '无需退路。'
+    '英雄们啊，为这最强大的信念，请站在我们这边。',
+    '颤抖吧，在真正的勇敢面前。',
+    '哭嚎吧，为你们不堪一击的信念。',
+    '现在可没有后悔的余地了。']
+
 
 @shot_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     roulette_status[event.group_id] -= 1
+    can_kick = False
     if roulette_status[event.group_id] <= 0:
         roulette_status[event.group_id] = 0
-        kicked = await kick(bot, event, state)
-        if kicked:
+        can_kick = await is_can_kick(bot, event, state)
+        if can_kick:
             reply_msg = MessageSegment.text('米诺斯英雄们的故事......有喜剧，便也会有悲剧。舍弃了荣耀，') + MessageSegment.at(
                 event.user_id) + MessageSegment.text('选择回归平凡......')
         else:
-            reply_msg = '纵使人类的战争没尽头......在这一刻，我们守护住了自己生的尊严。离开吧。但要昂首挺胸。'
+            reply_msg = '听啊，悲鸣停止了。这是幸福的和平到来前的宁静。'
     else:
         roulette_count[event.group_id] += 1
-        reply_msg = '转身吧，勇士们。我们已经获得了完美的胜利，现在是该回去享受庆祝的盛典了。( {} / 6 )'.format(
-            roulette_count[event.group_id])
+        index = roulette_count[event.group_id]
+        reply_msg = shot_text[index - 1] + '( {} / 6 )'.format(index)
 
-    await roulette_msg.finish(reply_msg)
+    await roulette_msg.send(reply_msg)
+    if can_kick:
+        kick(bot, event, state)
