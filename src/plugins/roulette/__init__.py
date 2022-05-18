@@ -123,29 +123,34 @@ shot_msg = on_message(
 )
 
 shot_text = [
-    '无需退路。',
-    '英雄们啊，为这最强大的信念，请站在我们这边。',
-    '颤抖吧，在真正的勇敢面前。',
-    '哭嚎吧，为你们不堪一击的信念。',
-    '现在可没有后悔的余地了。']
+    '无需退路。( 1 / 6 )',
+    '英雄们啊，为这最强大的信念，请站在我们这边。( 2 / 6 )',
+    '颤抖吧，在真正的勇敢面前。( 3 / 6 )',
+    '哭嚎吧，为你们不堪一击的信念。( 4 / 6 )',
+    '现在可没有后悔的余地了。( 5 / 6 )']
 
 
 @shot_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     roulette_status[event.group_id] -= 1
     can_kick = False
-    if roulette_status[event.group_id] <= 0:
+    roulette_count[event.group_id] += 1
+    count = roulette_count[event.group_id]
+
+    if count == 6 and random.random() < 0.25:
+        roulette_status[event.group_id] = 0
+        reply_msg = '我的手中的这把武器，找了无数工匠都难以修缮如新。不......不该如此...... ( 6 / 6 )'
+
+    elif roulette_status[event.group_id] <= 0:
         roulette_status[event.group_id] = 0
         can_kick = await is_can_kick(bot, event, state)
         if can_kick:
             reply_msg = MessageSegment.text('米诺斯英雄们的故事......有喜剧，便也会有悲剧。舍弃了荣耀，') + MessageSegment.at(
-                event.user_id) + MessageSegment.text('选择回归平凡......')
+                event.user_id) + MessageSegment.text('选择回归平凡...... ( {} / 6 )'.format(count))
         else:
             reply_msg = '听啊，悲鸣停止了。这是幸福的和平到来前的宁静。'
     else:
-        roulette_count[event.group_id] += 1
-        index = roulette_count[event.group_id]
-        reply_msg = shot_text[index - 1] + '( {} / 6 )'.format(index)
+        reply_msg = shot_text[count - 1]
 
     await roulette_msg.send(reply_msg)
     if can_kick:
