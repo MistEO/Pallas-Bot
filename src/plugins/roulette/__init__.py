@@ -3,8 +3,9 @@ from nonebot import on_message, require, get_bot, logger, get_driver
 from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me, Rule
 from nonebot.adapters import Bot, Event
-from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent, Permission
+from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
+from nonebot.permission import Permission
 from src.common.config import BotConfig
 
 import random
