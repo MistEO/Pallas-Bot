@@ -24,8 +24,45 @@ roulette_status = defaultdict(int)
 roulette_count = defaultdict(int)
 
 
+async def roulette(messagae_handle, bot: Bot, event: GroupMessageEvent, state: T_State):
+    rand = random.randint(1, 6)
+    logger.info('Roulette rand: {}'.format(rand))
+    roulette_status[event.group_id] = rand
+    roulette_count[event.group_id] = 0
+
+    if roulette_type[event.group_id] == 0:
+        type_msg = '踢出群聊'
+    elif roulette_type[event.group_id] == 1:
+        type_msg = '禁言'
+    await messagae_handle.finish(
+        '这是一把充满荣耀与死亡的左轮手枪，六个弹槽只有一颗子弹，中弹的那个人将会被{}。勇敢的战士们啊，扣动你们的扳机吧！'.format(type_msg))
+
+
+async def is_roulette_type_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+    return event.raw_message in ['牛牛轮盘踢人', '牛牛轮盘禁言', '牛牛踢人轮盘', '牛牛禁言轮盘'] \
+        and roulette_status[event.group_id] == 0
+
+
+roulette_type_msg = on_message(
+    priority=5,
+    block=True,
+    rule=Rule(is_roulette_type_msg) & Rule(is_admin),
+    permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
+)
+
+
+@roulette_type_msg.handle()
+async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
+    if '踢人' in event.raw_message:
+        roulette_type[event.group_id] = 0
+    elif '禁言' in event.raw_message:
+        roulette_type[event.group_id] = 1
+
+    await roulette(roulette_type_msg, bot, event, state)
+
+
 async def is_roulette_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
-    return event.raw_message in ['牛牛轮盘', '牛牛轮盘踢人', '牛牛轮盘禁言', '牛牛踢人轮盘', '牛牛禁言轮盘'] \
+    return event.raw_message in ['牛牛轮盘'] \
         and roulette_status[event.group_id] == 0
 
 
@@ -33,30 +70,13 @@ roulette_msg = on_message(
     priority=5,
     block=True,
     rule=Rule(is_roulette_msg) & Rule(is_admin),
-    permission=permission.GROUP_OWNER | permission.GROUP_ADMIN
+    permission=permission.GROUP
 )
 
 
 @roulette_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    rand = random.randint(1, 6)
-    logger.info('Roulette rand: {}'.format(rand))
-    roulette_status[event.group_id] = rand
-    roulette_count[event.group_id] = 0
-
-    if '踢人' in event.raw_message:
-        roulette_type[event.group_id] = 0
-    elif '禁言' in event.raw_message:
-        roulette_type[event.group_id] = 1
-    # elif event.raw_message == '牛牛轮盘':
-    #     pass
-
-    if roulette_type[event.group_id] == 0:
-        type_msg = '踢出群聊'
-    elif roulette_type[event.group_id] == 1:
-        type_msg = '禁言'
-    await roulette_msg.finish(
-        '这是一把充满荣耀与死亡的左轮手枪，六个弹槽只有一颗子弹，中弹的那个人将会被{}。勇敢的战士们啊，扣动你们的扳机吧！'.format(type_msg))
+    await roulette(roulette_msg, bot, event, state)
 
 
 async def is_shot_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
