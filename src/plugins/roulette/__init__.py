@@ -145,7 +145,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     roulette_count[event.group_id] += 1
     count = roulette_count[event.group_id]
 
-    if count == 6 and random.random() < 0.25:
+    if count == 6 and random.random() < 0.125:
         roulette_status[event.group_id] = 0
         reply_msg = '我的手中的这把武器，找了无数工匠都难以修缮如新。不......不该如此......'
 
@@ -154,7 +154,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         can_kick = await is_can_kick(bot, event, state)
         if can_kick:
             reply_msg = MessageSegment.text('米诺斯英雄们的故事......有喜剧，便也会有悲剧。舍弃了荣耀，') + MessageSegment.at(
-                event.user_id) + MessageSegment.text('选择回归平凡...... ( {} / 6 )'.format(count))
+                event.user_id) + MessageSegment.text('选择回归平凡......')
         else:
             reply_msg = '听啊，悲鸣停止了。这是幸福的和平到来前的宁静。'
     else:
