@@ -9,6 +9,7 @@ from nonebot.permission import Permission
 from src.common.config import BotConfig
 
 import random
+from .pseudorandom import roulette_random
 
 
 async def is_admin(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
@@ -26,7 +27,7 @@ roulette_count = defaultdict(int)
 
 
 async def roulette(messagae_handle, bot: Bot, event: GroupMessageEvent, state: T_State):
-    rand = random.randint(1, 6)
+    rand = roulette_random()
     logger.info('Roulette rand: {}'.format(rand))
     roulette_status[event.group_id] = rand
     roulette_count[event.group_id] = 0
