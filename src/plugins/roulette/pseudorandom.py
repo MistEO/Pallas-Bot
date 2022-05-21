@@ -2,6 +2,7 @@ from concurrent.futures import thread
 import random
 import threading
 
+
 class RouletteRandomizer:
     def __init__(self):
         self.ROULETTE_VALUES = (1, 2, 3, 4, 5, 6)
@@ -15,12 +16,12 @@ class RouletteRandomizer:
         self.ROULETTE_MISS_DELTA = 0.001
         self.ROULETTE_MISS_LOCK = threading.RLock()
 
-
     def roulette_random(self) -> int:
         '''Returns a value between [1,6]. Reduces the probability a bit when a number is generated.'''
         self.ROULETTE_LOCK.acquire()
         try:
-            result = random.choices(self.ROULETTE_VALUES, weights=self.ROULETTE_WEIGHTS)[0]
+            result = random.choices(
+                self.ROULETTE_VALUES, weights=self.ROULETTE_WEIGHTS)[0]
             index = result - 1  # index of the weight
             if self.ROULETTE_WEIGHTS[index] > self.ROULETTE_MINIMUM_WEIGHT:
                 for i in range(len(self.ROULETTE_WEIGHTS)):
@@ -31,7 +32,6 @@ class RouletteRandomizer:
             return result
         finally:
             self.ROULETTE_LOCK.release()
-
 
     def roulette_miss_random(self) -> bool:
         '''Returns whether the shot missed or not. The probability will increase a bit if it is not missed.'''
@@ -45,5 +45,6 @@ class RouletteRandomizer:
             return is_failed
         finally:
             self.ROULETTE_MISS_LOCK.release()
+
 
 roulette_randomizer = RouletteRandomizer()
