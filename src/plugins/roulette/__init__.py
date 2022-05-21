@@ -36,7 +36,7 @@ async def roulette(messagae_handle, bot: Bot, event: GroupMessageEvent, state: T
     elif roulette_type[event.group_id] == 1:
         type_msg = '禁言'
     await messagae_handle.finish(
-        '这是一把充满荣耀与死亡的左轮手枪，六个弹槽只有一颗子弹，中弹的那个人将会被{}。勇敢的战士们啊，扣动你们的扳机吧！'.format(type_msg))
+        f'这是一把充满荣耀与死亡的左轮手枪，六个弹槽只有一颗子弹，中弹的那个人将会被{type_msg}。勇敢的战士们啊，扣动你们的扳机吧！')
 
 
 async def is_roulette_type_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
