@@ -86,7 +86,7 @@ class Chat:
     answer_threshold = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
     # answer_limit_threshold = 50     # 上限阈值，一般正常的上下文不可能发 50 遍，一般是其他 bot 的回复，禁了！
     cross_group_threshold = 2       # N 个群有相同的回复，就跨群作为全局回复
-    repeat_threshold = 3 + 1        # 复读的阈值，群里连续多少次有相同的发言，就复读
+    repeat_threshold = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
     speak_threshold = 5             # 主动发言的阈值，越小废话越多
 
     drunk_probability = 0.07        # 牛牛喝醉的概率（回复没达到阈值的话）
@@ -626,7 +626,7 @@ class Chat:
             group_msgs = Chat._message_dict[group_id]
             if len(group_msgs) >= Chat.repeat_threshold and \
                 all(item['raw_message'] == raw_message
-                    for item in group_msgs[:-Chat.repeat_threshold:-1]):
+                    for item in group_msgs[-Chat.repeat_threshold:]):
                 # 到这里说明当前群里是在复读
                 group_bot_replies = Chat._reply_dict[group_id][bot_id]
                 if len(group_bot_replies) and group_bot_replies[-1]['reply'] != raw_message:
