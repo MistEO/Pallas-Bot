@@ -9,6 +9,7 @@ from nonebot.permission import Permission
 from src.common.config import BotConfig
 
 import random
+import time
 from .pseudorandom import roulette_randomizer
 
 
@@ -21,9 +22,18 @@ async def is_admin(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
 
     return flag
 
-roulette_type = defaultdict(int)  # 0 踢人 1 禁言
-roulette_status = defaultdict(int)
+roulette_type = defaultdict(int)    # 0 踢人 1 禁言
+roulette_status = defaultdict(int)  # 0 关闭 1 开启
+roulette_time = defaultdict(int)
 roulette_count = defaultdict(int)
+timeout = 300
+
+
+def can_roulette_start(group_id: int) -> bool:
+    if roulette_status[group_id] == 0 or time.time() - roulette_time[group_id] > timeout:
+        return True
+
+    return False
 
 
 async def roulette(messagae_handle, bot: Bot, event: GroupMessageEvent, state: T_State):
@@ -31,6 +41,7 @@ async def roulette(messagae_handle, bot: Bot, event: GroupMessageEvent, state: T
     logger.info('Roulette rand: {}'.format(rand))
     roulette_status[event.group_id] = rand
     roulette_count[event.group_id] = 0
+    roulette_time[event.group_id] = time.time()
 
     if roulette_type[event.group_id] == 0:
         type_msg = '踢出群聊'
@@ -41,8 +52,9 @@ async def roulette(messagae_handle, bot: Bot, event: GroupMessageEvent, state: T
 
 
 async def is_roulette_type_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
-    return event.raw_message in ['牛牛轮盘踢人', '牛牛轮盘禁言', '牛牛踢人轮盘', '牛牛禁言轮盘'] \
-        and roulette_status[event.group_id] == 0
+    if event.raw_message in ['牛牛轮盘踢人', '牛牛轮盘禁言', '牛牛踢人轮盘', '牛牛禁言轮盘']:
+        return can_roulette_start(event.group_id)
+    return False
 
 
 async def is_config_admin(event: GroupMessageEvent) -> bool:
@@ -71,8 +83,10 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
 
 async def is_roulette_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
-    return event.raw_message in ['牛牛轮盘'] \
-        and roulette_status[event.group_id] == 0
+    if event.raw_message in ['牛牛轮盘']:
+        return can_roulette_start(event.group_id)
+
+    return False
 
 
 roulette_msg = on_message(
@@ -145,6 +159,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     can_kick = False
     roulette_count[event.group_id] += 1
     count = roulette_count[event.group_id]
+    roulette_time[event.group_id] = time.time()
 
     if count == 6 and roulette_randomizer.roulette_miss_random(event.group_id):
         roulette_status[event.group_id] = 0
