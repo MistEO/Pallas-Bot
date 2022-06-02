@@ -85,8 +85,6 @@ class ChatData:
 class Chat:
     answer_threshold = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
     answer_threshold_weights = [8, 32, 60]  # answer 阈值权重，不知道怎么解释，自己看源码吧（
-    answer_threshold_choice_list = list(
-        range(answer_threshold - len(answer_threshold_weights) + 1, answer_threshold + 1))
     cross_group_threshold = 2       # N 个群有相同的回复，就跨群作为全局回复
     repeat_threshold = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
     speak_threshold = 5             # 主动发言的阈值，越小废话越多
@@ -467,6 +465,9 @@ class Chat:
     _message_dict = {}              # 群消息缓存
     _drunkenness_dict = defaultdict(int)          # 醉酒程度，不同群应用不同的数值
 
+    _answer_threshold_choice_list = list(
+        range(answer_threshold - len(answer_threshold_weights) + 1, answer_threshold + 1))
+
     _save_reserve_size = 100        # 保存时，给内存中保留的大小
     _late_save_time = 0             # 上次保存（消息数据持久化）的时刻 ( time.time(), 秒 )
 
@@ -642,11 +643,12 @@ class Chat:
         if not context:
             return None
 
+        print(Chat._answer_threshold_choice_list)
         if Chat._drunkenness_dict[group_id] > 0:
             answer_count_threshold = 1
         else:
             answer_count_threshold = random.choices(
-                Chat.answer_threshold_choice_list, weights=Chat.answer_threshold_weights)[0]
+                Chat._answer_threshold_choice_list, weights=Chat.answer_threshold_weights)[0]
 
         if self.chat_data.to_me:
             cross_group_threshold = 1
