@@ -84,16 +84,15 @@ class ChatData:
 
 class Chat:
     answer_threshold = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
-    answer_threshold_weights = [8, 32, 60]  # answer 阈值权重，不知道怎么解释，自己看源码吧（
+    answer_threshold_weights = [7, 33, 60]  # answer 阈值权重，不知道怎么解释，自己看源码吧（
     cross_group_threshold = 2       # N 个群有相同的回复，就跨群作为全局回复
     repeat_threshold = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
     speak_threshold = 5             # 主动发言的阈值，越小废话越多
 
-    drunk_probability = 0.07        # 牛牛喝醉的概率（回复没达到阈值的话）
     split_probability = 0.5         # 按逗号分割回复语的概率
     voice_probability = 0           # 回复语音的概率（仅纯文字）
     speak_continuously_probability = 0.5  # 连续主动说话的概率
-    speak_poke_probability = 0.5    # 主动说话加上随机戳一戳群友的概率
+    speak_poke_probability = 0.6    # 主动说话加上随机戳一戳群友的概率
     speak_continuously_max_len = 2  # 连续主动说话最多几句话
 
     save_time_threshold = 3600      # 每隔多久进行一次持久化 ( 秒 )
