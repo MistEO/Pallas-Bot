@@ -642,7 +642,6 @@ class Chat:
         if not context:
             return None
 
-        print(Chat._answer_threshold_choice_list)
         if Chat._drunkenness_dict[group_id] > 0:
             answer_count_threshold = 1
         else:
