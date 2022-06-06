@@ -65,15 +65,3 @@
 
 牛牛调教群：831322617  
 开发者群：716692626
-
-## 打赏
-
-请作者喝杯咖啡吧~ （请备注牛牛项目，感谢你的资瓷 ✿✿ヽ(°▽°)ノ✿）
-
-_请注意隔壁 MAA 项目不接受任何直接赞助，如果你是从 MAA 那边找到这里的，请勿打赏，谢谢！_
-
-<div>
-<img alt="sponsor" src="https://user-images.githubusercontent.com/18511905/171821963-be1247d1-2959-4d2f-91c1-095a215dd601.jpg" width=262 height=408/>
-<img alt="sponsor" src="https://user-images.githubusercontent.com/18511905/171821974-c5b13928-c66a-4168-b472-02b7048a2eff.png" width=298 height=408/>
-</div>
-
