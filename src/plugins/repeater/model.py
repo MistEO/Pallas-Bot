@@ -84,7 +84,7 @@ class ChatData:
 
 class Chat:
     answer_threshold = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
-    answer_threshold_weights = [7, 33, 60]  # answer 阈值权重，不知道怎么解释，自己看源码吧（
+    answer_threshold_weights = [7, 23, 70]  # answer 阈值权重，不知道怎么解释，自己看源码吧（
     cross_group_threshold = 2       # N 个群有相同的回复，就跨群作为全局回复
     repeat_threshold = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
     speak_threshold = 5             # 主动发言的阈值，越小废话越多
@@ -628,7 +628,7 @@ class Chat:
             group_msgs = Chat._message_dict[group_id]
             if len(group_msgs) >= Chat.repeat_threshold and \
                 all(item['raw_message'] == raw_message
-                    for item in group_msgs[-Chat.repeat_threshold:]):
+                    for item in group_msgs[-Chat.repeat_threshold + 1:]):
                 # 到这里说明当前群里是在复读
                 group_bot_replies = Chat._reply_dict[group_id][bot_id]
                 if len(group_bot_replies) and group_bot_replies[-1]['reply'] != raw_message:
@@ -642,7 +642,11 @@ class Chat:
         if not context:
             return None
 
+        is_drunk = False
         if Chat._drunkenness_dict[group_id] > 0:
+            is_drunk = True
+
+        if is_drunk:
             answer_count_threshold = 1
         else:
             answer_count_threshold = random.choices(
@@ -670,8 +674,13 @@ class Chat:
                 pre_answer['messages'] += answer['messages']
 
         for answer in context['answers']:
+
+            count = answer['count']
+            if not is_drunk and count < answer_count_threshold:
+                continue
+
             answer_key = answer['keywords']
-            if answer_key in ban_keywords or answer['count'] < answer_count_threshold:
+            if answer_key in ban_keywords:
                 continue
 
             sample_msg = answer['messages'][0]
@@ -684,6 +693,8 @@ class Chat:
             # 别的群的 at, 忽略
             elif '[CQ:at,qq=' in sample_msg:
                 continue
+            elif is_drunk and count > 1:
+                candidate_append(candidate_answers, answer)
             else:   # 有这么 N 个群都有相同的回复，就作为全局回复
                 answers_count[answer_key] += 1
                 cur_count = answers_count[answer_key]

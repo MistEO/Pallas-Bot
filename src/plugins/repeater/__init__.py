@@ -176,13 +176,13 @@ update_sched = require('nonebot_plugin_apscheduler').scheduler
 
 
 async def is_drink_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
-    return event.get_plaintext().strip() in ['牛牛喝酒', '牛牛干杯']
+    return event.get_plaintext().strip() in ['牛牛喝酒', '牛牛干杯', '牛牛继续喝']
 
 drink_msg = on_message(
     rule=Rule(is_drink_msg),
     priority=5,
     block=True,
-    permission=IsAdmin
+    permission=permission.GROUP
 )
 
 
