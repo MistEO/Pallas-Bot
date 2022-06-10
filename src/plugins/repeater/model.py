@@ -693,7 +693,7 @@ class Chat:
             # 别的群的 at, 忽略
             elif '[CQ:at,qq=' in sample_msg:
                 continue
-            elif is_drunk and count > 1:
+            elif is_drunk and count > answer_count_threshold:
                 candidate_append(candidate_answers, answer)
             else:   # 有这么 N 个群都有相同的回复，就作为全局回复
                 answers_count[answer_key] += 1
