@@ -34,7 +34,7 @@
     python -m pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/
     ```
 
-    或者你也可以搜索如何更换为其他的国内源；如果系统无法识别 `python` 指令。则需要将 `Python` 添加到环境变量中，具体请自行搜索解决方法。
+    或者你也可以搜索如何更换为其他的国内源；如果系统无法识别 `python` 指令。则需要将 `python` 添加到环境变量中，具体请自行搜索解决方法。
 
 4. 通过手脚架安装nonebot
 
@@ -63,7 +63,7 @@
 
 7. 配置 ffmpeg （如果不希望牛牛发送语音，可以跳过这一步）
 
-    👉[安装-ffmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)
+    👉 [安装 ffmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)
 
 8. 安装并启动 Mongodb （这是启动核心功能所必须的）
 
@@ -94,12 +94,12 @@ nb run
 ```bash
 sudo apt update
 sudo apt install -y git python3 # 安装 git, python3
-sudo ldconfig   # 更新系统路径
+sudo ldconfig                   # 更新系统路径
 python3 -m pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/ # 更换 pip 源为国内源
 python -m pip install --upgrade pip # 更新 pip
 ```
 
-详情参见[安装 NoneBot2](https://v2.nonebot.dev/docs/start/installation)
+详情参见 [安装 NoneBot2](https://v2.nonebot.dev/docs/start/installation)
 
 ### 配置 Linux 运行环境
 
@@ -124,7 +124,7 @@ python -m pip install --upgrade pip # 更新 pip
 
 4. 安装并启动Mongodb
 
-    👉[Linux平台安装MongoDB](https://www.runoob.com/mongodb/mongodb-linux-install.html)
+    👉 [Linux 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-linux-install.html)
 
 5. 安装 nonebot 的 apscheduler 插件和 websockets 驱动器
 
