@@ -95,7 +95,7 @@ nb run
 sudo apt update
 sudo apt install -y git python3 # 安装 git, python3
 sudo ldconfig                   # 更新系统路径
-python3 -m pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/ # 更换 pip 源为国内源
+python -m pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/ # 更换 pip 源为国内源
 python -m pip install --upgrade pip # 更新 pip
 ```
 
