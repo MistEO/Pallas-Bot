@@ -1,187 +1,138 @@
 # Pallas-Bot的部署简单教程
-快来部署属于你自己的牛牛吧(｡･∀･)ﾉﾞ
 
-## 零、看前须知
->你需要一个额外的QQ小号和一台自己的```电脑```或者```服务器```
->
->（请不要用大号进行部署）
+快来部署属于你自己的牛牛吧 (｡･∀･)ﾉﾞ
 
-欢迎加入牛牛调教群：831322617
+## 看前提示
 
-## 一、windows系统
+- 你需要一个额外的 QQ 小号，一台自己的 `电脑` 或 `服务器`，请不要用大号进行部署
+- 你自己部署的牛牛与其他牛牛数据并不互通，是一张白纸，需要从头调教
 
-(linux系统请看[这里](#二linux系统))
+## Windows系统
 
-### （一）安装python3*（如果你已经安装过python3的话可以跳过）
+### 安装 Python3
 
-可以参考的安装教程https://zhuanlan.zhihu.com/p/43155342
-（或者你也可以自行百度其他的安装教程）
+（如果已经安装过 Python3 的话可以跳过）
 
->安装python的版本请选择3.x.x
+参考 [安装教程](https://zhuanlan.zhihu.com/p/43155342)（选择 3.x.x）， 或者你也可以自行搜索其他的安装教程
 
-### （二）下载文件
+### 下载源码
 
-打开pallas的源码仓库[https://github.com/InvoluteHell/Pallas-Bot](https://github.com/InvoluteHell/Pallas-Bot)
-> 如果你打不开这个页面，请自行百度解决github打不开的问题
+1. 打开 Pallas-Bot 的[源码仓库](https://github.com/InvoluteHell/Pallas-Bot)
 
-找到```code```这个按钮，选择```Download ZIP```这个按钮，点击就可以下载牛牛的源码了。
+2. 找到绿色的 `Code` 按钮，点击 `Download ZIP`
 
-~~如果你会用```git```的话就没有看这个教程的必要了,你完全可以试着自己独立完成~~
+~~如果你会用 `git` 的话就没有看这个教程的必要了，你完全可以试着自己独立完成~~
 
-### （三）配置运行环境
-#### 1.解压下载好的并进入根目录
-请**务必**将文件后再进行后面的操作
+### 配置 Windows 运行环境
 
-#### 2.用pip安装依赖
-这Pallas-Bot的目录打开```命令行窗口```（俗称cmd）
+1. 解压下载好的 Pallas-Bot 源码并进入根目录；请**务必**进入文件夹后再进行后面的操作
 
-##### 使用以下指令更换pip源为阿里云*（更换为国内源会比默认的国外源快很多)
+2. 在 Pallas-Bot 的目录打开 `命令行窗口`（俗称 cmd ）
+3. 更换 pip 源为阿里云*（更换为国内源会比默认的国外源快很多）
 
-```cmd 
-pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/
-```
-（或者你也可以百度如何更换为其他的国内源）
+    ```cmd
+    python -m pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/
+    ```
 
-*(如果系统无法识别pip指令，请自行百度解决方法。)*
+    或者你也可以搜索如何更换为其他的国内源；如果系统无法识别 `python` 指令。则需要将 `Python` 添加到环境变量中，具体请自行搜索解决方法。
 
-##### 通过手脚架安装nonebot
-```cmd
-pip install nb-cil
-```
-详情参见[https://v2.nonebot.dev/docs/start/installation](https://v2.nonebot.dev/docs/start/installation)
+4. 通过手脚架安装nonebot
 
-##### 在控/制台输入以下内容安装依赖
+    ```cmd
+    python -m pip install nb-cli
+    ```
 
-```cmd
-pip install -r requirements.txt
-```
+    详情参见 [安装 NoneBot2](https://v2.nonebot.dev/docs/start/installation)
 
-(如果这些依赖与其他python程序产生了冲突，请自行百度如何构建python虚拟环境)
+5. 安装依赖
 
-#### 3.输入以下指令安装nonebot的apscheduler插件和websockets驱动器
+    ```cmd
+    python -m pip install -r requirements.txt
+    ```
 
-```cmd
-nb plugin install nonebot_plugin_apscheduler
-nb driver install websockets
-```
-#### 4.在以下网页查看如何为go-cqhttp配置ffmpeg*（如果不希望牛牛发送语音，可以跳过这一步）
+    （如果这些依赖与其他 Python 程序产生了冲突，请自行搜索如何构建python虚拟环境）
 
-👉[https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)
+6. 安装 nonebot 的 apscheduler 插件和 websockets 驱动器
 
-#### 5.安装并启动Mongodb*(这是启动核心功能所必须的)*
+    ```cmd
+    nb plugin install nonebot_plugin_apscheduler
+    nb driver install websockets
+    ```
 
-参考教程👉https://www.runoob.com/mongodb/mongodb-window-install.html
+    （如果你的系统提示找不到 `nb`，请自行尝试添加相关环境变量~）
 
-只需要确认Mongodb启动即可，后面的部分会由Pallas自动完成
+7. 配置 ffmpeg （如果不希望牛牛发送语音，可以跳过这一步）
 
-### （四）启动Pallas
+    👉[安装-ffmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)
 
-在项目目录处打开cmd（命令行）窗口输入以下指令
+8. 安装并启动 Mongodb （这是启动核心功能所必须的）
+
+    👉 [Windows 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-window-install.html)
+
+    只需要确认 Mongodb 启动即可，后面的部分会由 Pallas-Bot 自动完成
+
+### 启动 Pallas-Bot
+
+在项目目录处打开 cmd（命令行）窗口输入以下指令
 
 ```cmd
 nb run
 ```
 
-### （五）访问后台
+**注意！请不要关闭这个命令行窗口！这会导致 Pallas-Bot 停止运行！**
 
-一切顺利的话，在加载完后你大概会看到一个显眼链接。把提示的链接复制到浏览器打开（本地部署的话就直接在浏览器访问```http://127.0.0.1:8080/go-cqhttp/```）
+### 访问后台并登陆账号
 
-### （六）登陆账号
+一切顺利的话，在加载完后你大概会看到一个显眼链接。把提示的链接复制到浏览器打开（本地部署的话就直接在浏览器访问 `http://127.0.0.1:8080/go-cqhttp/` ）；然后就是比较直观的操作了，直接添加你的账号并登陆即可
 
-点击左上角```添加账号```的按钮。输入小号的信息，并选择登陆设备类型，并```提交```。不出意外的话部署工作到这里就结束了。
+## Linux系统
 
-如果登陆失败就换个```设备类型```或是按**提示**进行其他操作
+（以 `Ubuntu 20.04` 为例，其它系统请自行变通）
 
-部署过程中的常见问题可以在[群里](#零看前须知)提问
-
-**注意！请不要关闭这个命令行窗口！这会导致Pallas停止运行！**
-
-## 二、Linux系统
-
-（以```ubuntu20.04```为例，其它系统请自行变通）
-
-### 临时获取权限
+### 基本环境配置
 
 ```bash
-sudo su
+sudo apt update
+sudo apt install -y git python3 # 安装 git, python3
+sudo ldconfig   # 更新系统路径
+python3 -m pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/ # 更换 pip 源为国内源
+python -m pip install --upgrade pip # 更新 pip
 ```
 
-### 安装git
+详情参见[安装 NoneBot2](https://v2.nonebot.dev/docs/start/installation)
 
-```bash 
-apt apt install -y git
-```
-### clone本仓库
+### 配置 Linux 运行环境
 
-```bash  
-git clone https://github.com/InvoluteHell/Pallas-Bot.git
-```
-### 进入项目目录
+1. 安装 nonebot
 
-```bash
-cd Pallas-Bot
-```
-### 安装python3
+    ```bash
+    python -m pip install nb-cli
+    ```
 
-```bash
-apt install -y python3
-```
-#### 更换pip源为国内源
+2. clone 本仓库并安装项目依赖
 
-```bash
-pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/
-```
+    ```bash  
+    git clone https://github.com/InvoluteHell/Pallas-Bot.git
+    python3 -m pip install -r requirements.txt
+    ```
 
-#### 更新pip
+3. 安装 ffmpeg
 
-```bash
-pip install --upgrade pip
-```
+    ```bash
+    sudo apt install -y ffmpeg
+    ```
 
-#### 通过手脚架安装nonebot
-```cmd
-pip install nb-cil
-```
-详情参见[https://v2.nonebot.dev/docs/start/installation](https://v2.nonebot.dev/docs/start/installation)
+4. 安装并启动Mongodb
 
-#### 安装依赖
+    👉[Linux平台安装MongoDB](https://www.runoob.com/mongodb/mongodb-linux-install.html)
 
-```bash
-pip install -r requirements.txt
-```
+5. 安装 nonebot 的 apscheduler 插件和 websockets 驱动器
 
-*（与已有环境冲突的话，请自行百度如何用venv创建虚拟环境）*
+    ```bash
+    nb plugin install nonebot_plugin_apscheduler
+    nb driver install websockets
+    ```
 
-### 安装ffmpeg*（不需要发语音可以跳过这一步）
+### 启动 Pallas-Bot 及登陆账号
 
-```bash
-apt install -y ffmpeg
-```
-
-### 安装并启动Mongodb
-
-参考教程👉https://www.runoob.com/mongodb/mongodb-linux-install.html
-
-### 安装nonebot的apscheduler插件和websockets驱动器
-
-```bash
-nb plugin install nonebot_plugin_apscheduler
-nb driver install websockets
-```
-
-### 启动Pallas
-
-```bash
-nb run
-```
-
-(如果8080端口已经被占用，可能会导致启动失败。请在```.env.dev```中更改访问端口
-
-### 访问后台
-
-启动成功后请访问这个地址
-```[服务器的ip]:[设定的端口]/go-cqhttp/```
-
-端口默认为```8080```
-（如果你打不开这个页面，很有可能是你没有打开对应的防火墙端口）
-在此页面设置账号信息即可
+同上面的 [Windows 教程](#启动-pallas-bot)
