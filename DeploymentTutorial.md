@@ -1,4 +1,4 @@
-# Pallas-Bot的部署简单教程
+# Pallas-Bot 的部署简单教程
 
 快来部署属于你自己的牛牛吧 (｡･∀･)ﾉﾞ
 
@@ -136,3 +136,8 @@ python -m pip install --upgrade pip # 更新 pip
 ### 启动 Pallas-Bot 及登陆账号
 
 同上面的 [Windows 教程](#启动-pallas-bot)
+
+## 开发者群
+
+QQ 群: [牛牛听话！](https://jq.qq.com/?_wv=1027&k=tlLDuWzc)   
+欢迎加入~ 
