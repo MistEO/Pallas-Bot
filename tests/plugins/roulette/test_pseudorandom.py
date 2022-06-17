@@ -17,11 +17,9 @@ class TestRouletteRandomizer(unittest.TestCase):
         for i in range(len(original_weights)):
             actual_weight = roulette.ROULETTE_WEIGHTS[GROUP][i]
             if i == index:
-                expected_weight = original_weights[i] - \
-                    5*roulette.ROULETTE_DELTA
+                expected_weight = 0.05
             else:
-                expected_weight = original_weights[i] + \
-                    roulette.ROULETTE_DELTA
+                expected_weight = 0.19
             self.assertAlmostEqual(expected_weight, actual_weight)
 
         # test group isolation
@@ -33,11 +31,9 @@ class TestRouletteRandomizer(unittest.TestCase):
             actual_weight = roulette.ROULETTE_WEIGHTS[OTHER_GROUP][i]
             print(i, index)
             if i == index:
-                expected_weight = original_weights_other[i] - \
-                    5*roulette.ROULETTE_DELTA
+                expected_weight = 0.05
             else:
-                expected_weight = original_weights_other[i] + \
-                    roulette.ROULETTE_DELTA
+                expected_weight = 0.19
             self.assertAlmostEqual(expected_weight, actual_weight)
         for i in range(len(original_weights)):
             actual_weight = roulette.ROULETTE_WEIGHTS[GROUP][i]
