@@ -15,6 +15,8 @@ import atexit
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.onebot.v11 import Message, MessageSegment
 
+from src.common.config import BotConfig
+
 mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
 
 mongo_db = mongo_client['PallasBot']
@@ -105,6 +107,7 @@ class Chat:
 
         if (isinstance(data, ChatData)):
             self.chat_data = data
+            self.config = BotConfig(data.self_id, data.group_id)
         elif (isinstance(data, GroupMessageEvent)):
             self.chat_data = ChatData(
                 group_id=data.group_id,
@@ -118,6 +121,7 @@ class Chat:
                 time=data.time,
                 bot_id=data.self_id,
             )
+            self.config = BotConfig(data.self_id, data.group_id)
         elif (isinstance(data, PrivateMessageEvent)):
             event_dict = data.dict()
             self.chat_data = ChatData(
@@ -132,6 +136,7 @@ class Chat:
                 time=data.time,
                 bot_id=data.self_id,
             )
+            self.config = BotConfig(data.self_id, data.group_id)
 
     def learn(self) -> bool:
         '''
@@ -242,8 +247,8 @@ class Chat:
             rhs_len = len(rhs_msgs)
 
             # 默认是 0, 加个 1 避免乘没了
-            lhs_drunkenness = Chat._drunkenness_dict[lhs_group_id] + 1
-            rhs_drunkenness = Chat._drunkenness_dict[rhs_group_id] + 1
+            lhs_drunkenness = BotConfig(0, lhs_group_id).drunkenness() + 1
+            rhs_drunkenness = BotConfig(0, rhs_group_id).drunkenness() + 1
 
             if lhs_len < basic_msgs_len or rhs_len < basic_msgs_len:
                 return cmp(lhs_len * lhs_drunkenness,
@@ -435,26 +440,9 @@ class Chat:
 
         return True
 
-    @staticmethod
-    def drink(group_id: int) -> None:
-        '''
-        牛牛喝酒，仅对该群有效果。提高醉酒程度（降低回复阈值的概率）
-        '''
-        Chat._drunkenness_dict[group_id] += 1
-
-    @staticmethod
-    def sober_up(group_id: int) -> bool:
-        '''
-        牛牛醒酒，仅对该群有效果。返回醒酒是否成功
-        '''
-
-        Chat._drunkenness_dict[group_id] -= 1
-        return Chat._drunkenness_dict[group_id] <= 0
-
 # private:
     _reply_dict = defaultdict(lambda: defaultdict(list))  # 牛牛回复的消息缓存，暂未做持久化
     _message_dict = {}              # 群消息缓存
-    _drunkenness_dict = defaultdict(int)          # 醉酒程度，不同群应用不同的数值
 
     _answer_threshold_choice_list = list(
         range(answer_threshold - len(answer_threshold_weights) + 1, answer_threshold + 1))
@@ -635,7 +623,7 @@ class Chat:
             return None
 
         is_drunk = False
-        if Chat._drunkenness_dict[group_id] > 0:
+        if self.config.drunkenness() > 0:
             is_drunk = True
 
         if is_drunk:
@@ -806,11 +794,6 @@ class Chat:
                     'clear_time': cur_time
                 }
             })
-
-    @staticmethod
-    def completely_sober():
-        for key in Chat._drunkenness_dict.keys():
-            Chat._drunkenness_dict[key] = 0
 
     @staticmethod
     def _find_ban_keywords(context, group_id) -> set:

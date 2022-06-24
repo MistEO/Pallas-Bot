@@ -62,7 +62,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     answers = None
     config = BotConfig(event.self_id, event.group_id)
-    if not config.is_cooldown('repeat'):
+    if config.is_cooldown('repeat'):
         answers = chat.answer()
 
     if to_learn:
@@ -181,39 +181,6 @@ async def speak_up():
 update_sched = require('nonebot_plugin_apscheduler').scheduler
 
 
-async def is_drink_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
-    return event.get_plaintext().strip() in ['牛牛喝酒', '牛牛干杯', '牛牛继续喝']
-
-drink_msg = on_message(
-    rule=Rule(is_drink_msg),
-    priority=5,
-    block=True,
-    permission=permission.GROUP
-)
-
-
-@drink_msg.handle()
-async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    drunk_duration = random.randint(60, 600)
-    logger.info(
-        'repeater | bot [{}] ready to drink in group [{}], sober up after {} sec'.format(
-            event.self_id, event.group_id, drunk_duration))
-    Chat.drink(event.group_id)
-    try:
-        await drink_msg.send('呀，博士。你今天走起路来，怎么看着摇摇晃晃的？')
-    except ActionFailed:
-        pass
-
-    await asyncio.sleep(drunk_duration)
-    ret = Chat.sober_up(event.group_id)
-    if ret:
-        logger.info(
-            'repeater | bot [{}] sober up in group [{}]'.format(
-                event.self_id, event.group_id))
-        await drink_msg.finish('呃......咳嗯，下次不能喝、喝这么多了......')
-
-
-@ update_sched.scheduled_job('cron', hour='4')
+@update_sched.scheduled_job('cron', hour='4')
 def update_data():
     Chat.clearup_context()
-    Chat.completely_sober()

@@ -1,14 +1,13 @@
 import pymongo
 import time
 from pymongo.collection import Collection
+from collections import defaultdict
 
-from dataclasses import dataclass
 from typing import Any, Optional
 
 
 class BotConfig:
     __config_mongo: Optional[Collection] = None
-    _cooldown_data = {}
 
     @classmethod
     def _get_config_mongo(cls) -> Collection:
@@ -66,6 +65,8 @@ class BotConfig:
             upsert=True
         )
 
+    _cooldown_data = {}
+
     def is_cooldown(self, action_type: str) -> bool:
         '''
         是否冷却完成
@@ -94,3 +95,29 @@ class BotConfig:
 
         BotConfig._cooldown_data[self.bot_id][self.group_id][action_type] = time.time(
         )
+
+    _drunk_data = defaultdict(int)          # 醉酒程度，不同群应用不同的数值
+
+    def drink(self) -> None:
+        '''
+        喝酒功能，增加牛牛的混沌程度（bushi
+        '''
+        BotConfig._drunk_data[self.group_id] += 1
+
+    def sober_up(self) -> bool:
+        '''
+        醒酒，降低醉酒程度，返回是否完全醒酒
+        '''
+        BotConfig._drunk_data[self.group_id] -= 1
+        return BotConfig._drunk_data[self.group_id] <= 0
+
+    def drunkenness(self) -> int:
+        '''
+        获取醉酒程度
+        '''
+        return BotConfig._drunk_data[self.group_id]
+
+    @staticmethod
+    def completely_sober():
+        for key in BotConfig._drunk_data.keys():
+            BotConfig._drunk_data[key] = 0
