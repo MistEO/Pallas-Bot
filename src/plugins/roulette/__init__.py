@@ -10,7 +10,7 @@ from src.common.config import BotConfig
 
 import random
 import time
-from .pseudorandom import roulette_randomizer
+# from .pseudorandom import roulette_randomizer
 
 
 async def is_admin(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
@@ -37,7 +37,7 @@ def can_roulette_start(group_id: int) -> bool:
 
 
 async def roulette(messagae_handle, bot: Bot, event: GroupMessageEvent, state: T_State):
-    rand = roulette_randomizer.roulette_random(event.group_id)
+    rand = random.randint(1, 6)
     logger.info('Roulette rand: {}'.format(rand))
     roulette_status[event.group_id] = rand
     roulette_count[event.group_id] = 0
@@ -161,7 +161,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     count = roulette_count[event.group_id]
     roulette_time[event.group_id] = time.time()
 
-    if count == 6 and roulette_randomizer.roulette_miss_random(event.group_id):
+    if count == 6 and random.random() < 0.125:
         roulette_status[event.group_id] = 0
         reply_msg = '我的手中的这把武器，找了无数工匠都难以修缮如新。不......不该如此......'
 
