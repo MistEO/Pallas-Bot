@@ -782,7 +782,7 @@ class Chat:
     @staticmethod
     def clearup_context() -> None:
         '''
-        清理所有超过 30 天没人说、且没有学会的话
+        清理所有超过 15 天没人说、且没有学会的话
         '''
 
         cur_time = int(time.time())
