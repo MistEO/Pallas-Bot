@@ -697,7 +697,8 @@ class Chat:
         answer_str = random.choice(final_answer['messages'])
         answer_keywords = final_answer['keywords']
 
-        if 0 < answer_str.count('，') <= 3 and random.random() < Chat.split_probability:
+        if 0 < answer_str.count('，') <= 3 and '[CQ:' not in answer_str \
+                and random.random() < Chat.split_probability:
             return (answer_str.split('，'), answer_keywords)
         return ([answer_str, ], answer_keywords)
 
