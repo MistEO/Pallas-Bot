@@ -13,21 +13,28 @@ import time
 # from .pseudorandom import roulette_randomizer
 
 
-async def is_I_am_admin(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
-    info = await get_bot(str(event.self_id)).call_api('get_group_member_info', **{
-        'user_id': event.self_id,
-        'group_id': event.group_id
-    })
-    flag: bool = info['role'] == 'admin' or info['role'] == 'owner'
-
-    return flag
-
 roulette_type = defaultdict(int)    # 0 踢人 1 禁言
 roulette_status = defaultdict(int)  # 0 关闭 1 开启
 roulette_time = defaultdict(int)
 roulette_count = defaultdict(int)
 timeout = 300
 roulette_player = defaultdict(list)
+role_cache = defaultdict(lambda: defaultdict(str))
+
+
+async def am_I_admin(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+    info = await get_bot(str(event.self_id)).call_api('get_group_member_info', **{
+        'user_id': event.self_id,
+        'group_id': event.group_id
+    })
+    role = info['role']
+    role_cache[event.self_id][event.group_id] = role
+    return role == 'admin' or role == 'owner'
+
+
+async def am_I_admin_by_cache(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+    role = role_cache[event.self_id][event.group_id]
+    return role == 'admin' or role == 'owner'
 
 
 def can_roulette_start(group_id: int) -> bool:
@@ -48,12 +55,8 @@ async def participate_in_roulette(bot: Bot, event: GroupMessageEvent, state: T_S
         # 没法禁言自己
         return False
 
-    info = await get_bot(str(event.self_id)).call_api('get_group_member_info', **{
-        'user_id': event.self_id,
-        'group_id': event.group_id
-    })
     # 群主退不了群（除非解散），所以群主牛牛不参与游戏
-    return info['role'] != 'owner'
+    return role_cache[event.self_id][event.group_id] != 'owner'
 
 
 async def roulette(messagae_handle, bot: Bot, event: GroupMessageEvent, state: T_State):
@@ -91,7 +94,7 @@ IsAdmin = permission.GROUP_OWNER | permission.GROUP_ADMIN | Permission(
 roulette_type_msg = on_message(
     priority=5,
     block=True,
-    rule=Rule(is_roulette_type_msg) & Rule(is_I_am_admin),
+    rule=Rule(is_roulette_type_msg) & Rule(am_I_admin),
     permission=IsAdmin
 )
 
@@ -116,7 +119,7 @@ async def is_roulette_msg(bot: Bot, event: GroupMessageEvent, state: T_State) ->
 roulette_msg = on_message(
     priority=5,
     block=True,
-    rule=Rule(is_roulette_msg) & Rule(is_I_am_admin),
+    rule=Rule(is_roulette_msg) & Rule(am_I_admin),
     permission=permission.GROUP
 )
 
@@ -140,11 +143,8 @@ async def is_can_kick(self_id: int, user_id: int, group_id: int) -> bool:
     if user_info['role'] == 'owner':
         return False
     elif user_info['role'] == 'admin':
-        bot_info = await get_bot(str(self_id)).call_api('get_group_member_info', **{
-            'user_id': self_id,
-            'group_id': group_id
-        })
-        if bot_info['role'] != 'owner':
+        role = role_cache[self_id][group_id]
+        if role != 'owner':
             return False
 
     return True
@@ -173,7 +173,7 @@ async def shutup(self_id: int, user_id: int, group_id: int):
 shot_msg = on_message(
     priority=5,
     block=True,
-    rule=Rule(is_shot_msg) & Rule(is_I_am_admin),
+    rule=Rule(is_shot_msg) & Rule(am_I_admin_by_cache),
     permission=permission.GROUP
 )
 
@@ -232,7 +232,7 @@ async def is_drunk(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
 player_msg = on_message(
     priority=4,  # 这里的优先级比“牛牛开枪”高，也就是说发送“牛牛开枪”的人会在数组中会出现两次，增加概率
     block=False,
-    rule=Rule(is_drunk) & Rule(is_I_am_admin),
+    rule=Rule(is_drunk) & Rule(am_I_admin_by_cache),
     permission=permission.GROUP
 )
 
