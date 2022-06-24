@@ -3,12 +3,12 @@ import random
 import os
 
 from pathlib import Path
-import time
 from nonebot import on_command, on_message, on_notice, get_driver
 from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 from nonebot.rule import Rule
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
+from src.common.config import BotConfig
 
 
 def get_music_name():
@@ -35,14 +35,13 @@ music_cmd = on_message(
     block=False,
     permission=permission.GROUP)
 
-music_time = defaultdict(lambda: defaultdict(int))
 
 @music_cmd.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
-    cur_time = int(time.time())
-    if music_time[event.group_id][event.self_id] + 6 > cur_time:
+    config = BotConfig(event.self_id, event.group_id)
+    config.cooldown = 10
+    if not config.is_cooldown('music'):
         return
-    music_time[event.group_id][event.self_id] = cur_time
-
+    config.refresh_cooldown('music')
     msg: Message = MessageSegment.record(file=Path(get_music_name()))
     await music_cmd.finish(msg)

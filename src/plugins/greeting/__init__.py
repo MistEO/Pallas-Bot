@@ -3,12 +3,12 @@ import random
 import asyncio
 
 from pathlib import Path
-import time
 from nonebot import on_command, on_message, on_notice, get_driver, get_bot
 from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 from nonebot.rule import keyword, startswith, to_me, Rule
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
+from src.common.config import BotConfig
 
 from .wiki import Wiki, nudge
 
@@ -48,15 +48,13 @@ call_me_cmd = on_message(
     block=False,
     permission=permission.GROUP)
 
-greeting_time = defaultdict(lambda: defaultdict(int))
-
 
 @call_me_cmd.handle()
 async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_State):
-    cur_time = int(time.time())
-    if greeting_time[event.group_id][event.self_id] + 6 > cur_time:
+    config = BotConfig(event.self_id, event.group_id)
+    if not config.is_cooldown('call_me'):
         return
-    greeting_time[event.group_id][event.self_id] = cur_time
+    config.refresh_cooldown('call_me')
 
     msg: Message = MessageSegment.record(file=Path(get_rand_voice()))
     await call_me_cmd.finish(msg)
@@ -70,6 +68,11 @@ to_me_cmd = on_message(
 
 @to_me_cmd.handle()
 async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_State):
+    config = BotConfig(event.self_id, event.group_id)
+    if not config.is_cooldown('to_me'):
+        return
+    config.refresh_cooldown('to_me')
+
     if len(event.get_plaintext().strip()) == 0 and not event.reply:
         msg: Message = MessageSegment.record(file=Path(get_rand_voice()))
         await to_me_cmd.finish(msg)
@@ -92,10 +95,18 @@ async def is_admin(self_id: int, group_id: int) -> bool:
 @all_notice.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     if event.notice_type == 'notify' and event.sub_type == 'poke' and event.target_id == event.self_id:
-        poke_msg: str = '[CQ:poke,qq={}]'.format(event.user_id)
+        config = BotConfig(event.self_id, event.group_id)
+        if not config.is_cooldown('poke'):
+            return
+        config.refresh_cooldown('poke')
+
         delay = random.randint(1, 3)
         await asyncio.sleep(delay)
+        config.refresh_cooldown('poke')
+
+        poke_msg: str = '[CQ:poke,qq={}]'.format(event.user_id)
         await all_notice.finish(Message(poke_msg))
+
     elif event.notice_type == 'group_increase':
         if event.user_id == event.self_id:
             msg = '我是来自米诺斯的祭司帕拉斯，会在罗德岛休息一段时间......虽然这么说，我渴望以美酒和戏剧被招待，更渴望走向战场。'
@@ -105,9 +116,11 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
         else:
             return
         await all_notice.finish(msg)
+
     elif event.notice_type == 'group_admin' and event.sub_type == 'set' and event.user_id == event.self_id:
         msg: Message = MessageSegment.record(file=Path(get_voice('任命助理')))
         await all_notice.finish(msg)
+
     elif event.notice_type == 'friend_add':
         msg: Message = MessageSegment.record(file=Path(get_voice('精英化晋升2')))
         await all_notice.finish(msg)

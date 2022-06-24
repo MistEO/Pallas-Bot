@@ -163,70 +163,62 @@ class Chat:
         self._message_insert()
         return True
 
-    def answer(self, with_limit: bool = True) -> Optional[Generator[Message, None, None]]:
+    def answer(self) -> Optional[Generator[Message, None, None]]:
         '''
         回复这句话，可能会分多次回复，也可能不回复
         '''
+        # 不回复太短的对话，大部分是“？”、“草”
+        if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
+            return None
+
+        # # 不要一直回复同一个内容
+        # if self.chat_data.raw_message == latest_reply['pre_raw_message']:
+        #     return None
+        # 有人复读了牛牛的回复，不继续回复
+        # if self.chat_data.raw_message == latest_reply['reply']:
+        #    return None
+
+        results = self._context_find()
+        if not results:
+            return None
 
         group_id = self.chat_data.group_id
         bot_id = self.chat_data.bot_id
         group_bot_replies = Chat._reply_dict[group_id][bot_id]
 
-        if with_limit:
-            # 不回复太短的对话，大部分是“？”、“草”
-            if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
-                return None
+        raw_message = self.chat_data.raw_message
+        keywords = self.chat_data.keywords
+        with Chat._reply_lock:
+            group_bot_replies.append({
+                'time': int(time.time()),
+                'pre_raw_message': raw_message,
+                'pre_keywords': keywords,
+                'reply': '[PallasBot: Reply]',  # flag
+                'reply_keywords': '[PallasBot: Reply]',  # flag
+            })
 
-            if len(group_bot_replies):
-                latest_reply = group_bot_replies[-1]
-                # 限制发音频率，最多 6 秒一次
-                if int(time.time()) - latest_reply['time'] < 6:
-                    return None
-                # # 不要一直回复同一个内容
-                # if self.chat_data.raw_message == latest_reply['pre_raw_message']:
-                #     return None
-                # 有人复读了牛牛的回复，不继续回复
-                # if self.chat_data.raw_message == latest_reply['reply']:
-                #    return None
-
-        results = self._context_find()
-
-        if results:
-            raw_message = self.chat_data.raw_message
-            keywords = self.chat_data.keywords
-            with Chat._reply_lock:
-                group_bot_replies.append({
-                    'time': int(time.time()),
-                    'pre_raw_message': raw_message,
-                    'pre_keywords': keywords,
-                    'reply': '[PallasBot: Reply]',  # flag
-                    'reply_keywords': '[PallasBot: Reply]',  # flag
-                })
-
-            def yield_results(results: Tuple[List[str], str]) -> Generator[Message, None, None]:
-                answer_list, answer_keywords = results
-                group_bot_replies = Chat._reply_dict[group_id][bot_id]
-                for item in answer_list:
-                    with Chat._reply_lock:
-                        group_bot_replies.append({
-                            'time': int(time.time()),
-                            'pre_raw_message': raw_message,
-                            'pre_keywords': keywords,
-                            'reply': item,
-                            'reply_keywords': answer_keywords,
-                        })
-                    if '[CQ:' not in item and len(item) > 1 \
-                            and random.random() < Chat.voice_probability:
-                        yield Chat._text_to_speech(item)
-                    else:
-                        yield Message(item)
-
+        def yield_results(results: Tuple[List[str], str]) -> Generator[Message, None, None]:
+            answer_list, answer_keywords = results
+            group_bot_replies = Chat._reply_dict[group_id][bot_id]
+            for item in answer_list:
                 with Chat._reply_lock:
-                    group_bot_replies = group_bot_replies[-Chat._save_reserve_size:]
+                    group_bot_replies.append({
+                        'time': int(time.time()),
+                        'pre_raw_message': raw_message,
+                        'pre_keywords': keywords,
+                        'reply': item,
+                        'reply_keywords': answer_keywords,
+                    })
+                if '[CQ:' not in item and len(item) > 1 \
+                        and random.random() < Chat.voice_probability:
+                    yield Chat._text_to_speech(item)
+                else:
+                    yield Message(item)
 
-            return yield_results(results)
+            with Chat._reply_lock:
+                group_bot_replies = group_bot_replies[-Chat._save_reserve_size:]
 
-        return None
+        return yield_results(results)
 
     @staticmethod
     def speak() -> Optional[Tuple[int, int, List[Message]]]:
@@ -360,7 +352,7 @@ class Chat:
                     and len(speak_list) < Chat.speak_continuously_max_len:
                 pre_msg = str(speak_list[-1])
                 answer = Chat(ChatData(group_id, 0, pre_msg,
-                                       pre_msg, cur_time, 0)).answer(False)
+                                       pre_msg, cur_time, 0)).answer()
                 if not answer:
                     break
                 speak_list.extend(answer)

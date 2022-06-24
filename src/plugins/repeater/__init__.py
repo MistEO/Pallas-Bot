@@ -60,19 +60,25 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     chat: Chat = Chat(event)
 
-    answers = chat.answer()
+    answers = None
+    config = BotConfig(event.self_id, event.group_id)
+    if not config.is_cooldown('repeat'):
+        answers = chat.answer()
+
     if to_learn:
         chat.learn()
 
     if not answers:
         return
 
+    config.refresh_cooldown('repeat')
     delay = random.randint(2, 5)
     for item in answers:
         logger.info(
             'repeater | bot [{}] ready to send [{}] to group [{}]'.format(event.self_id, item, event.group_id))
 
         await asyncio.sleep(delay)
+        config.refresh_cooldown('repeat')
         try:
             await any_msg.send(item)
         except ActionFailed:

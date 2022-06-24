@@ -1,4 +1,5 @@
 import pymongo
+import time
 from pymongo.collection import Collection
 
 from dataclasses import dataclass
@@ -7,6 +8,7 @@ from typing import Any, Optional
 
 class BotConfig:
     __config_mongo: Optional[Collection] = None
+    _cooldown_data = {}
 
     @classmethod
     def _get_config_mongo(cls) -> Collection:
@@ -18,11 +20,13 @@ class BotConfig:
                                             keys=[('account', pymongo.HASHED)])
         return cls.__config_mongo
 
-    def __init__(self, bot_id: int) -> None:
+    def __init__(self, bot_id: int, group_id: int = 0) -> None:
         self.bot_id = bot_id
+        self.group_id = group_id
         self._mongo_find_key = {
             'account': bot_id
         }
+        self.cooldown = 5   # 单位秒
 
     def _find_key(self, key: str) -> Any:
         info = self._get_config_mongo().find_one(self._mongo_find_key)
@@ -60,4 +64,33 @@ class BotConfig:
             self._mongo_find_key,
             {'$push': {'admins': user_id}},
             upsert=True
+        )
+
+    def is_cooldown(self, action_type: str) -> bool:
+        '''
+        是否冷却完成
+        '''
+        if self.bot_id not in BotConfig._cooldown_data:
+            return True
+
+        if self.group_id not in BotConfig._cooldown_data[self.bot_id]:
+            return True
+
+        if action_type not in BotConfig._cooldown_data[self.bot_id][self.group_id]:
+            return True
+
+        cd = BotConfig._cooldown_data[self.bot_id][self.group_id][action_type]
+        return cd + self.cooldown < time.time()
+
+    def refresh_cooldown(self, action_type: str) -> None:
+        '''
+        刷新冷却时间
+        '''
+        if self.bot_id not in BotConfig._cooldown_data:
+            BotConfig._cooldown_data[self.bot_id] = {}
+
+        if self.group_id not in BotConfig._cooldown_data[self.bot_id]:
+            BotConfig._cooldown_data[self.bot_id][self.group_id] = {}
+
+        BotConfig._cooldown_data[self.bot_id][self.group_id][action_type] = time.time(
         )
