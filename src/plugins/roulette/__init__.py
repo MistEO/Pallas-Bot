@@ -135,7 +135,7 @@ async def shutup(bot: Bot, event: GroupMessageEvent, state: T_State):
     await get_bot(str(event.self_id)).call_api('set_group_ban', **{
         'user_id': event.user_id,
         'group_id': event.group_id,
-        'duration': random.randint(1, 15) * 60
+        'duration': random.randint(5, 20) * 60
     })
 
 shot_msg = on_message(

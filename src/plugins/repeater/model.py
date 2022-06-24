@@ -173,9 +173,9 @@ class Chat:
         group_bot_replies = Chat._reply_dict[group_id][bot_id]
 
         if with_limit:
-            # # 不回复太短的对话，大部分是“？”、“草”
-            # if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
-            #     return None
+            # 不回复太短的对话，大部分是“？”、“草”
+            if self.chat_data.is_plain_text and len(self.chat_data.plain_text) < 2:
+                return None
 
             if len(group_bot_replies):
                 latest_reply = group_bot_replies[-1]
@@ -786,7 +786,7 @@ class Chat:
         '''
 
         cur_time = int(time.time())
-        expiration = cur_time - 30 * 24 * 3600  # 三十天前
+        expiration = cur_time - 15 * 24 * 3600  # 15 天前
 
         context_mongo.delete_many({
             'time': {'$lt': expiration},
