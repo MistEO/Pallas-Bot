@@ -200,17 +200,17 @@ shot_text = [
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     roulette_status[event.group_id] -= 1
     roulette_count[event.group_id] += 1
-    count = roulette_count[event.group_id]
+    shot_msg_count = roulette_count[event.group_id]
     roulette_time[event.group_id] = time.time()
     roulette_player[event.group_id].append(event.user_id)
 
-    if count == 6 and random.random() < 0.125:
+    if shot_msg_count == 6 and random.random() < 0.125:
         roulette_status[event.group_id] = 0
         roulette_player[event.group_id] = []
         await roulette_msg.finish('我的手中的这把武器，找了无数工匠都难以修缮如新。不......不该如此......')
 
     elif roulette_status[event.group_id] > 0:
-        await roulette_msg.finish(shot_text[count - 1] + f"( {count} / 6 )")
+        await roulette_msg.finish(shot_text[shot_msg_count - 1] + f"( {shot_msg_count} / 6 )")
 
     roulette_status[event.group_id] = 0
     if BotConfig(event.self_id, event.group_id).drunkenness() <= 0:
