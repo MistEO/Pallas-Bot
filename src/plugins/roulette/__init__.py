@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import Awaitable, Optional
 from nonebot import on_message, require, get_bot, logger, get_driver
 from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me, Rule
@@ -65,10 +66,11 @@ async def roulette(messagae_handle, bot: Bot, event: GroupMessageEvent, state: T
     roulette_status[event.group_id] = rand
     roulette_count[event.group_id] = 0
     roulette_time[event.group_id] = time.time()
-    roulette_player[event.group_id] = [event.user_id, ]
     partin = await participate_in_roulette(bot, event, state)
     if partin:
-        roulette_player[event.group_id].append(event.self_id)
+        roulette_player[event.group_id] = [event.self_id, event.user_id, ]
+    else:
+        roulette_player[event.group_id] = [event.user_id, ]
 
     if roulette_type[event.group_id] == 0:
         type_msg = '踢出群聊'
@@ -133,42 +135,50 @@ async def is_shot_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> boo
     return event.raw_message == '牛牛开枪' and roulette_status[event.group_id] != 0
 
 
-async def is_can_kick(self_id: int, user_id: int, group_id: int) -> bool:
+async def shot(self_id: int, user_id: int, group_id: int) -> Optional[Awaitable[None]]:
+    mode = roulette_type[group_id]
+    self_role = role_cache[self_id][group_id]
+
     if self_id == user_id:
-        return True
+        if mode == 0:   # 踢人
+            if self_role == 'owner':      # 牛牛是群主不能退群，不然群就解散了
+                return None
+
+            async def group_leave():
+                await get_bot(str(self_id)).call_api('set_group_leave', **{
+                    'group_id': group_id
+                })
+            return group_leave
+        elif mode == 1:   # 牛牛没法禁言自己
+            return None
+
     user_info = await get_bot(str(self_id)).call_api('get_group_member_info', **{
         'user_id': user_id,
         'group_id': group_id
     })
-    if user_info['role'] == 'owner':
-        return False
-    elif user_info['role'] == 'admin':
-        role = role_cache[self_id][group_id]
-        if role != 'owner':
-            return False
+    user_role = user_info['role']
 
-    return True
+    if user_role == "owner":
+        return None
+    elif user_role == "admin" and self_role != "owner":
+        return None
 
+    if mode == 0:   # 踢人
+        async def group_kick():
+            await get_bot(str(self_id)).call_api('set_group_kick', **{
+                'user_id': user_id,
+                'group_id': group_id
+            })
+        return group_kick
 
-async def kick(self_id: int, user_id: int, group_id: int):
-    if self_id == user_id:
-        await get_bot(str(self_id)).call_api('set_group_leave', **{
-            'group_id': group_id
-        })
-        return
-
-    await get_bot(str(self_id)).call_api('set_group_kick', **{
-        'user_id': user_id,
-        'group_id': group_id
-    })
-
-
-async def shutup(self_id: int, user_id: int, group_id: int):
-    await get_bot(str(self_id)).call_api('set_group_ban', **{
-        'user_id': user_id,
-        'group_id': group_id,
-        'duration': random.randint(5, 20) * 60
-    })
+    elif mode == 1:           # 禁言
+        async def group_ban():
+            await get_bot(str(self_id)).call_api('set_group_ban', **{
+                'user_id': user_id,
+                'group_id': group_id,
+                'duration': random.randint(5, 20) * 60
+            })
+        return group_ban
 
 shot_msg = on_message(
     priority=5,
@@ -178,17 +188,17 @@ shot_msg = on_message(
 )
 
 shot_text = [
-    '无需退路。( 1 / 6 )',
-    '英雄们啊，为这最强大的信念，请站在我们这边。( 2 / 6 )',
-    '颤抖吧，在真正的勇敢面前。( 3 / 6 )',
-    '哭嚎吧，为你们不堪一击的信念。( 4 / 6 )',
-    '现在可没有后悔的余地了。( 5 / 6 )']
+    '无需退路。',
+    '英雄们啊，为这最强大的信念，请站在我们这边。',
+    '颤抖吧，在真正的勇敢面前。',
+    '哭嚎吧，为你们不堪一击的信念。',
+    '现在可没有后悔的余地了。',
+    "你将在此跪拜。"]
 
 
 @shot_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     roulette_status[event.group_id] -= 1
-    can_kick = False
     roulette_count[event.group_id] += 1
     count = roulette_count[event.group_id]
     roulette_time[event.group_id] = time.time()
@@ -197,46 +207,55 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     if count == 6 and random.random() < 0.125:
         roulette_status[event.group_id] = 0
         roulette_player[event.group_id] = []
-        reply_msg = '我的手中的这把武器，找了无数工匠都难以修缮如新。不......不该如此......'
+        await roulette_msg.finish('我的手中的这把武器，找了无数工匠都难以修缮如新。不......不该如此......')
 
-    elif roulette_status[event.group_id] <= 0:
-        roulette_status[event.group_id] = 0
-        if BotConfig(event.self_id, event.group_id).drunkenness() > 0:
-            shot_user = random.choice(roulette_player[event.group_id])
-        else:
-            shot_user = event.user_id
-        can_kick = await is_can_kick(event.self_id, shot_user, event.group_id)
-        if can_kick:
+    elif roulette_status[event.group_id] > 0:
+        await roulette_msg.finish(shot_text[count - 1] + f"( {count} / 6 )")
+
+    roulette_status[event.group_id] = 0
+    if BotConfig(event.self_id, event.group_id).drunkenness() <= 0:
+        shot_func = await shot(event.self_id, event.user_id, event.group_id)
+        if shot_func:
             reply_msg = MessageSegment.text('米诺斯英雄们的故事......有喜剧，便也会有悲剧。舍弃了荣耀，') + MessageSegment.at(
-                shot_user) + MessageSegment.text('选择回归平凡......')
+                event.user_id) + MessageSegment.text('选择回归平凡......')
+            await roulette_msg.send(reply_msg)
+            await shot_func()
+            await roulette_msg.finish()
         else:
             reply_msg = '听啊，悲鸣停止了。这是幸福的和平到来前的宁静。'
-
-        roulette_player[event.group_id] = []
+            await roulette_msg.finish(reply_msg)
 
     else:
-        reply_msg = shot_text[count - 1]
+        player = roulette_player[event.group_id]
+        rand_list = player[-random.randint(1, min(len(player), 6)):][::-1]
+        shot_count = 0
+        for user_id in rand_list:
+            shot_func = await shot(event.self_id, user_id, event.group_id)
+            if shot_func:
+                shot_count += 1
+                reply_msg = MessageSegment.text('米诺斯英雄们的故事......有喜剧，便也会有悲剧。舍弃了荣耀，') + MessageSegment.at(
+                    user_id) + MessageSegment.text(f'选择回归平凡...... ( {shot_count} / 6 )')
+                await roulette_msg.send(reply_msg)
+                await shot_func()
+                if user_id == event.self_id:
+                    await roulette_msg.finish()
+            else:
+                # 这玩意相当于 return
+                await roulette_msg.finish('听啊，悲鸣停止了。这是幸福的和平到来前的宁静。')
 
-    await roulette_msg.send(reply_msg)
-    if can_kick:
-        if roulette_type[event.group_id] == 0:
-            await kick(event.self_id, shot_user, event.group_id)
-        elif roulette_type[event.group_id] == 1:
-            await shutup(event.self_id, shot_user, event.group_id)
-
-
-async def is_drunk(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
-    return BotConfig(event.self_id, event.group_id).drunkenness() > 0 and roulette_status[event.group_id] != 0
-
-
-player_msg = on_message(
-    priority=4,  # 这里的优先级比“牛牛开枪”高，也就是说发送“牛牛开枪”的人会在数组中会出现两次，增加概率
-    block=False,
-    rule=Rule(is_drunk) & Rule(am_I_admin_by_cache),
-    permission=permission.GROUP
-)
+        await roulette_msg.finish('我的手中的这把武器，找了无数工匠都难以修缮如新。不......不该如此......')
 
 
-@player_msg.handle()
-async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    roulette_player[event.group_id].append(event.user_id)
+# async def is_drunk(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+#     return BotConfig(event.self_id, event.group_id).drunkenness() > 0 and roulette_status[event.group_id] != 0
+
+# player_msg = on_message(
+#     priority=4,  # 这里的优先级比“牛牛开枪”高，也就是说发送“牛牛开枪”的人会在数组中会出现两次，增加概率
+#     block=False,
+#     rule=Rule(is_drunk) & Rule(am_I_admin_by_cache),
+#     permission=permission.GROUP
+# )
+
+# @player_msg.handle()
+# async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
+#     roulette_player[event.group_id].append(event.user_id)
