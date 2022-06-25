@@ -1,10 +1,10 @@
 from collections import defaultdict
 from typing import Awaitable, Optional
-from nonebot import on_message, require, get_bot, logger, get_driver
+from nonebot import on_message, on_request, get_bot, logger, get_driver
 from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me, Rule
 from nonebot.adapters import Bot, Event
-from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
+from nonebot.adapters.onebot.v11 import GroupMessageEvent, GroupRequestEvent
 from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 from nonebot.permission import Permission
 from src.common.config import BotConfig
@@ -135,6 +135,9 @@ async def is_shot_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> boo
     return event.raw_message == '牛牛开枪' and roulette_status[event.group_id] != 0
 
 
+kicked_users = defaultdict(set)
+
+
 async def shot(self_id: int, user_id: int, group_id: int) -> Optional[Awaitable[None]]:
     mode = roulette_type[group_id]
     self_role = role_cache[self_id][group_id]
@@ -169,6 +172,7 @@ async def shot(self_id: int, user_id: int, group_id: int) -> Optional[Awaitable[
                 'user_id': user_id,
                 'group_id': group_id
             })
+            kicked_users[group_id].add(user_id)
         return group_kick
 
     elif mode == 1:           # 禁言
@@ -244,6 +248,19 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
                 await roulette_msg.finish('听啊，悲鸣停止了。这是幸福的和平到来前的宁静。')
 
         await roulette_msg.finish('我的手中的这把武器，找了无数工匠都难以修缮如新。不......不该如此......')
+
+
+request_cmd = on_request(
+    priority=15,
+    block=False,
+)
+
+
+@request_cmd.handle()
+async def _(bot: Bot, event: GroupRequestEvent, state: T_State):
+    if event.sub_type == 'add' and event.user_id in kicked_users[event.group_id]:
+        await event.approve(bot)
+        kicked_users[event.group_id].remove(event.user_id)
 
 
 # async def is_drunk(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
