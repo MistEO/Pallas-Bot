@@ -1,5 +1,4 @@
 from collections import defaultdict
-from itertools import count
 from typing import Awaitable, Optional
 from nonebot import on_message, on_request, get_bot, logger, get_driver
 from nonebot.typing import T_State
@@ -251,7 +250,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
                 # 这玩意相当于 return
                 await roulette_msg.finish('听啊，悲鸣停止了。这是幸福的和平到来前的宁静。')
 
-        if count != 1 and count != 6:
+        if shot_count != 1 and shot_count != 6:
             await roulette_msg.finish('我的手中的这把武器，找了无数工匠都难以修缮如新。不......不该如此......')
 
 
