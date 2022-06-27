@@ -1,4 +1,5 @@
 from collections import defaultdict
+from itertools import count
 from typing import Awaitable, Optional
 from nonebot import on_message, on_request, get_bot, logger, get_driver
 from nonebot.typing import T_State
@@ -57,7 +58,10 @@ async def participate_in_roulette(bot: Bot, event: GroupMessageEvent, state: T_S
         return False
 
     # 群主退不了群（除非解散），所以群主牛牛不参与游戏
-    return role_cache[event.self_id][event.group_id] != 'owner'
+    if role_cache[event.self_id][event.group_id] == 'owner':
+        return False
+
+    return random.random() < 0.1667
 
 
 async def roulette(messagae_handle, bot: Bot, event: GroupMessageEvent, state: T_State):
@@ -168,11 +172,11 @@ async def shot(self_id: int, user_id: int, group_id: int) -> Optional[Awaitable[
 
     if mode == 0:   # 踢人
         async def group_kick():
+            kicked_users[group_id].add(user_id)
             await get_bot(str(self_id)).call_api('set_group_kick', **{
                 'user_id': user_id,
                 'group_id': group_id
             })
-            kicked_users[group_id].add(user_id)
         return group_kick
 
     elif mode == 1:           # 禁言
@@ -247,7 +251,8 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
                 # 这玩意相当于 return
                 await roulette_msg.finish('听啊，悲鸣停止了。这是幸福的和平到来前的宁静。')
 
-        await roulette_msg.finish('我的手中的这把武器，找了无数工匠都难以修缮如新。不......不该如此......')
+        if count != 1 and count != 6:
+            await roulette_msg.finish('我的手中的这把武器，找了无数工匠都难以修缮如新。不......不该如此......')
 
 
 request_cmd = on_request(
