@@ -17,7 +17,7 @@
 
 ### 下载源码
 
-1. 打开 Pallas-Bot 的[源码仓库](https://github.com/InvoluteHell/Pallas-Bot)
+1. 打开 Pallas-Bot 的 [源码仓库](https://github.com/InvoluteHell/Pallas-Bot)
 
 2. 找到绿色的 `Code` 按钮，点击 `Download ZIP`
 
@@ -31,15 +31,15 @@
 3. 更换 pip 源为阿里云*（更换为国内源会比默认的国外源快很多）
 
     ```cmd
-    python -m pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/
+    python3 -m pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/
     ```
 
-    或者你也可以搜索如何更换为其他的国内源；如果系统无法识别 `python` 指令。则需要将 `python` 添加到环境变量中，具体请自行搜索解决方法。
+    或者你也可以搜索如何更换为其他的国内源；如果系统无法识别 `python3` 指令。则需要将 `python3` 添加到环境变量中，具体请自行搜索解决方法。
 
 4. 通过手脚架安装nonebot
 
     ```cmd
-    python -m pip install nb-cli
+    python3 -m pip install nb-cli
     ```
 
     详情参见 [安装 NoneBot2](https://v2.nonebot.dev/docs/start/installation)
@@ -47,7 +47,7 @@
 5. 安装依赖
 
     ```cmd
-    python -m pip install -r requirements.txt
+    python3 -m pip install -r requirements.txt
     ```
 
     （如果这些依赖与其他 Python 程序产生了冲突，请自行搜索如何构建python虚拟环境）
@@ -95,8 +95,8 @@ nb run
 sudo apt update
 sudo apt install -y git python3 # 安装 git, python3
 sudo ldconfig                   # 更新系统路径
-python -m pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/ # 更换 pip 源为国内源
-python -m pip install --upgrade pip # 更新 pip
+python3 -m pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/ # 更换 pip 源为国内源
+python3 -m pip install --upgrade pip # 更新 pip
 ```
 
 详情参见 [安装 NoneBot2](https://v2.nonebot.dev/docs/start/installation)
@@ -106,7 +106,7 @@ python -m pip install --upgrade pip # 更新 pip
 1. 安装 nonebot
 
     ```bash
-    python -m pip install nb-cli
+    python3 -m pip install nb-cli
     ```
 
 2. clone 本仓库并安装项目依赖
