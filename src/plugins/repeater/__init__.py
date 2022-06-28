@@ -13,6 +13,7 @@ from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.onebot.v11 import permission
 from nonebot.permission import Permission
+from nonebot.permission import SUPERUSER
 from src.common.config import BotConfig
 
 from .model import Chat
@@ -99,7 +100,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 async def is_config_admin(event: GroupMessageEvent) -> bool:
     return BotConfig(event.self_id).is_admin(event.user_id)
 
-IsAdmin = permission.GROUP_OWNER | permission.GROUP_ADMIN | Permission(
+IsAdmin = permission.GROUP_OWNER | permission.GROUP_ADMIN | SUPERUSER |Permission(
     is_config_admin)
 
 
