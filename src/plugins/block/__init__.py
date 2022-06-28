@@ -1,32 +1,46 @@
-import random
 import asyncio
-import re
 import time
 import os
 import threading
 
-from nonebot import on_message, require, get_bot, logger, get_driver
-from nonebot.exception import ActionFailed
+from nonebot import on_message
 from nonebot.typing import T_State
-from nonebot.rule import keyword, to_me, Rule
-from nonebot.adapters import Bot, Event
+from nonebot.rule import Rule
+from nonebot.adapters import Bot
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.onebot.v11 import permission
-from nonebot.permission import Permission
 from src.common.config import BotConfig
+
+accounts_dir = 'accounts'
+accounts = []
+accounts_refresh_time = 0
+accounts_refresh_lock = threading.Lock()
+
+def refresh_accounts():
+    global accounts_dir
+    global accounts
+    global accounts_refresh_time
+    global accounts_refresh_lock
+
+    if time.time() - accounts_refresh_time < 60 and accounts:
+        return
+
+    if not accounts and not os.path.exists(accounts_dir):
+        return
+
+    with accounts_refresh_lock:
+        accounts_refresh_time = time.time()    
+        accounts = [
+            int(d) for d in os.listdir(accounts_dir) if d.isnumeric()
+        ]
 
 
 async def is_other_bot(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
     # 不响应其他牛牛的消息
-    accounts_dir = 'accounts'
+    global accounts
 
-    if os.path.exists(accounts_dir):
-        accounts = [int(d) for d in os.listdir(accounts_dir)
-                    if d.isnumeric()]
-        if event.user_id in accounts:
-            return True
-
-    return False
+    refresh_accounts()
+    return event.user_id in accounts
 
 other_bot_msg = on_message(
     priority=1,
