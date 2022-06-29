@@ -1,3 +1,4 @@
+import asyncio
 from collections import defaultdict
 from typing import Awaitable, Optional
 from nonebot import on_message, on_request, get_bot, logger, get_driver
@@ -7,6 +8,7 @@ from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, GroupRequestEvent
 from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 from nonebot.permission import Permission
+from paddle import rand
 from src.common.config import BotConfig
 
 import random
@@ -221,13 +223,13 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     roulette_status[event.group_id] = 0
     if BotConfig(event.self_id, event.group_id).drunkenness() <= 0:
-        shot_func = await shot(event.self_id, event.user_id, event.group_id)
-        if shot_func:
+        shot_awaitable = await shot(event.self_id, event.user_id, event.group_id)
+        if shot_awaitable:
             reply_msg = MessageSegment.text('米诺斯英雄们的故事......有喜剧，便也会有悲剧。舍弃了荣耀，') + MessageSegment.at(
                 event.user_id) + MessageSegment.text('选择回归平凡......')
             await roulette_msg.send(reply_msg)
-            await shot_func()
-            await roulette_msg.finish()
+            await asyncio.sleep(random.randint(5, 20))
+            await shot_awaitable()
         else:
             reply_msg = '听啊，悲鸣停止了。这是幸福的和平到来前的宁静。'
             await roulette_msg.finish(reply_msg)
@@ -236,19 +238,29 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         player = roulette_player[event.group_id]
         rand_list = player[-random.randint(1, min(len(player), 6)):][::-1]
         shot_count = 0
+        shot_awaitable_list = []
         for user_id in rand_list:
-            shot_func = await shot(event.self_id, user_id, event.group_id)
-            if shot_func:
-                shot_count += 1
-                reply_msg = MessageSegment.text('米诺斯英雄们的故事......有喜剧，便也会有悲剧。舍弃了荣耀，') + MessageSegment.at(
-                    user_id) + MessageSegment.text(f'选择回归平凡...... ( {shot_count} / 6 )')
-                await roulette_msg.send(reply_msg)
-                await shot_func()
-                if user_id == event.self_id:
-                    await roulette_msg.finish()
-            else:
-                # 这玩意相当于 return
-                await roulette_msg.finish('听啊，悲鸣停止了。这是幸福的和平到来前的宁静。')
+            shot_awaitable = await shot(event.self_id, user_id, event.group_id)
+            if not shot_awaitable:
+                continue
+
+            shot_count += 1
+            shot_awaitable_list.append(shot_awaitable)
+
+            reply_msg = MessageSegment.text('米诺斯英雄们的故事......有喜剧，便也会有悲剧。舍弃了荣耀，') + MessageSegment.at(
+                user_id) + MessageSegment.text(f'选择回归平凡...... ( {shot_count} / 6 )')
+            await roulette_msg.send(reply_msg)
+
+            if user_id == event.self_id:
+                has_self = True
+                break
+
+        asyncio.sleep(random.randint(5, 20))
+        for shot_awaitable in shot_awaitable_list:
+            await shot_awaitable()
+
+        if has_self:
+            return
 
         if shot_count != 1 and shot_count != 6:
             await roulette_msg.finish('我的手中的这把武器，找了无数工匠都难以修缮如新。不......不该如此......')
@@ -263,8 +275,8 @@ request_cmd = on_request(
 @request_cmd.handle()
 async def _(bot: Bot, event: GroupRequestEvent, state: T_State):
     if event.sub_type == 'add' and event.user_id in kicked_users[event.group_id]:
-        await event.approve(bot)
         kicked_users[event.group_id].remove(event.user_id)
+        await event.approve(bot)
 
 
 # async def is_drunk(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
