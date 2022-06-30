@@ -56,20 +56,22 @@
 
     ```cmd
     nb plugin install nonebot_plugin_apscheduler
+    nb plugin install nonebot_plugin_gocqhttp
     nb driver install websockets
     ```
 
     （如果你的系统提示找不到 `nb`，请自行尝试添加相关环境变量~）
 
-7. 配置 ffmpeg （如果不希望牛牛发送语音，可以跳过这一步）
-
-    👉 [安装 ffmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)
-
-8. 安装并启动 Mongodb （这是启动核心功能所必须的）
+7. 安装并启动 Mongodb （这是启动核心功能所必须的）
 
     👉 [Windows 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-window-install.html)
 
     只需要确认 Mongodb 启动即可，后面的部分会由 Pallas-Bot 自动完成
+
+8. 配置 ffmpeg （如果不希望牛牛发送语音，可以跳过这一步）
+
+    👉 [安装 ffmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)
+
 
 ### 启动 Pallas-Bot
 
@@ -99,8 +101,6 @@ python3 -m pip config set global.index-url http://mirrors.aliyun.com/pypi/simple
 python3 -m pip install --upgrade pip # 更新 pip
 ```
 
-详情参见 [安装 NoneBot2](https://v2.nonebot.dev/docs/start/installation)
-
 ### 配置 Linux 运行环境
 
 1. 安装 nonebot
@@ -109,28 +109,33 @@ python3 -m pip install --upgrade pip # 更新 pip
     python3 -m pip install nb-cli
     ```
 
+    详情参见 [安装 NoneBot2](https://v2.nonebot.dev/docs/start/installation)
+
 2. clone 本仓库并安装项目依赖
 
     ```bash  
     git clone https://github.com/InvoluteHell/Pallas-Bot.git
+    cd Pallas-Bot
     python3 -m pip install -r requirements.txt
     ```
 
-3. 安装 ffmpeg
-
-    ```bash
-    sudo apt install -y ffmpeg
-    ```
-
-4. 安装并启动Mongodb
-
-    👉 [Linux 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-linux-install.html)
-
-5. 安装 nonebot 的 apscheduler 插件和 websockets 驱动器
+3. 安装 nonebot 的 apscheduler 插件和 websockets 驱动器
 
     ```bash
     nb plugin install nonebot_plugin_apscheduler
+    nb plugin install nonebot_plugin_gocqhttp
     nb driver install websockets
+    ```
+
+4. 安装并启动 Mongodb （这是启动核心功能所必须的）
+
+    👉 [Linux 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-linux-install.html)
+
+
+3. 安装 ffmpeg （如果不希望牛牛发送语音，可以跳过这一步）
+
+    ```bash
+    sudo apt install -y ffmpeg
     ```
 
 ### 启动 Pallas-Bot 及登陆账号
