@@ -239,6 +239,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         rand_list = player[-random.randint(1, min(len(player), 6)):][::-1]
         shot_count = 0
         shot_awaitable_list = []
+        has_self = False
         for user_id in rand_list:
             shot_awaitable = await shot(event.self_id, user_id, event.group_id)
             if not shot_awaitable:
