@@ -255,7 +255,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
                 has_self = True
                 break
 
-        asyncio.sleep(random.randint(5, 20))
+        await asyncio.sleep(random.randint(5, 20))
         for shot_awaitable in shot_awaitable_list:
             await shot_awaitable()
 
