@@ -41,10 +41,6 @@
 
 群管理员 **回复** 牛牛说的那句话 “不可以” 即可，同样的若超过 N 个群都禁止了这句话，就会作为全局禁止，在任何群都不发
 
-## 牛牛只发语音不发文字怎么办？
-
-多半是被屏蔽了，多挂几天就好了( ´_ゝ` )
-
 ## 怎么把牛牛拉到自己的群里呢？
 
 ~~加好友，再邀请加群，即可。牛牛都会自动同意的~~
@@ -62,6 +58,16 @@
 ## 如何配置一只自己的牛牛？
 
 欢迎查看 [Pallas-Bot 部署简单教程](DeploymentTutorial.md)
+
+## 致谢
+
+### 开源库
+
+[nonebot2](https://github.com/nonebot/nonebot2): 跨平台 Python 异步聊天机器人框架  
+[go-cqhttp](https://github.com/Mrs4s/go-cqhttp): cqhttp的golang实现，轻量、原生跨平台.  
+[nonebot-plugin-gocqhttp](https://github.com/mnixry/nonebot-plugin-gocqhttp): 一款在NoneBot2中直接运行go-cqhttp的插件, 无需额外下载安装  
+[jieba_fast](https://github.com/deepcs233/jieba_fast): 高效的中文分词库  
+~~[python-pinyin](https://github.com/mozillazg/python-pinyin): 汉字转拼音(pypinyin)~~
 
 ## QQ群
 
