@@ -667,6 +667,10 @@ class Chat:
             if self.chat_data.is_image and '[CQ:' not in sample_msg:
                 # 图片消息不回复纯文本。图片经常是表情包，后面的纯文本啥都有，很乱
                 continue
+            if not self.chat_data.to_me and sample_msg.startswith('牛牛'):
+                # 这种一般是学反过来的，比如有人教“牛牛你好”——“你好”（反复发了好几次，互为上下文了）
+                # 然后下次有人发“你好”，突然回个“牛牛你好”，有点莫名其妙的
+                continue
 
             if answer['group_id'] == group_id:
                 candidate_append(candidate_answers, answer)
