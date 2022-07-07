@@ -9,14 +9,13 @@ from nonebot.adapters.onebot.v11 import GroupMessageEvent, GroupRequestEvent
 from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 from nonebot.permission import Permission
 from paddle import rand
-from src.common.config import BotConfig
+from src.common.config import BotConfig, GroupConfig
 
 import random
 import time
 # from .pseudorandom import roulette_randomizer
 
 
-roulette_type = defaultdict(int)    # 0 踢人 1 禁言
 roulette_status = defaultdict(int)  # 0 关闭 1 开启
 roulette_time = defaultdict(int)
 roulette_count = defaultdict(int)
@@ -49,7 +48,7 @@ async def participate_in_roulette(bot: Bot, event: GroupMessageEvent, state: T_S
     if BotConfig(event.self_id, event.group_id).drunkenness() <= 0:
         return False
 
-    if roulette_type[event.group_id] == 1:
+    if GroupConfig(event.group_id).roulette_mode() == 1:
         # 没法禁言自己
         return False
 
@@ -72,9 +71,10 @@ async def roulette(messagae_handle, bot: Bot, event: GroupMessageEvent, state: T
     else:
         roulette_player[event.group_id] = [event.user_id, ]
 
-    if roulette_type[event.group_id] == 0:
+    mode = GroupConfig(event.group_id).roulette_mode()
+    if mode == 0:
         type_msg = '踢出群聊'
-    elif roulette_type[event.group_id] == 1:
+    elif mode == 1:
         type_msg = '禁言'
     await messagae_handle.finish(
         f'这是一把充满荣耀与死亡的左轮手枪，六个弹槽只有一颗子弹，中弹的那个人将会被{type_msg}。勇敢的战士们啊，扣动你们的扳机吧！')
@@ -105,9 +105,10 @@ roulette_type_msg = on_message(
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     plaintext = event.get_plaintext().strip()
     if '踢人' in plaintext:
-        roulette_type[event.group_id] = 0
+        mode = 0
     elif '禁言' in plaintext:
-        roulette_type[event.group_id] = 1
+        mode = 1
+    GroupConfig(event.group_id).set_roulette_mode(mode)
 
     await roulette(roulette_type_msg, bot, event, state)
 
@@ -140,7 +141,7 @@ kicked_users = defaultdict(set)
 
 
 async def shot(self_id: int, user_id: int, group_id: int) -> Optional[Awaitable[None]]:
-    mode = roulette_type[group_id]
+    mode = GroupConfig(group_id).roulette_mode()
     self_role = role_cache[self_id][group_id]
 
     if self_id == user_id:

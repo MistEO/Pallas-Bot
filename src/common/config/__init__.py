@@ -121,3 +121,57 @@ class BotConfig:
     def completely_sober():
         for key in BotConfig._drunk_data.keys():
             BotConfig._drunk_data[key] = 0
+
+
+class GroupConfig:
+    __config_mongo: Optional[Collection] = None
+
+    @classmethod
+    def _get_config_mongo(cls) -> Collection:
+        if cls.__config_mongo is None:
+            mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
+            mongo_db = mongo_client['PallasBot']
+            cls.__config_mongo = mongo_db['group_config']
+            cls.__config_mongo.create_index(name='group_index',
+                                            keys=[('group_id', pymongo.HASHED)])
+        return cls.__config_mongo
+
+    def __init__(self, group_id: int) -> None:
+        self.group_id = group_id
+        self._mongo_find_key = {
+            'group_id': group_id
+        }
+
+    def _find_key(self, key: str) -> Any:
+        info = self._get_config_mongo().find_one(self._mongo_find_key)
+        if info and key in info:
+            return info[key]
+        else:
+            return None
+
+    _roulette_mode = {}    # 0 踢人 1 禁言
+
+    def roulette_mode(self) -> int:
+        '''
+        获取轮盘模式
+
+        :return: 0 踢人 1 禁言
+        '''
+        if self.group_id not in GroupConfig._roulette_mode:
+            mode = self._find_key('roulette_mode')
+            GroupConfig._roulette_mode[self.group_id] = mode if mode is not None else 0
+
+        return GroupConfig._roulette_mode[self.group_id]
+
+    def set_roulette_mode(self, mode: int) -> None:
+        '''
+        设置轮盘模式
+
+        :param mode: 0 踢人 1 禁言
+        '''
+        GroupConfig._roulette_mode[self.group_id] = mode
+        self._get_config_mongo().update_one(
+            self._mongo_find_key,
+            {'$set': {'roulette_mode': mode}},
+            upsert=True
+        )
