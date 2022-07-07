@@ -32,6 +32,9 @@ async def am_I_admin(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool
     role_cache[event.self_id][event.group_id] = role
     return role == 'admin' or role == 'owner'
 
+async def am_I_admin_by_cache(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+    role = role_cache[event.self_id][event.group_id]
+    return role == 'admin' or role == 'owner'
 
 def can_roulette_start(group_id: int) -> bool:
     if roulette_status[group_id] == 0 or time.time() - roulette_time[group_id] > timeout:
@@ -188,7 +191,7 @@ async def shot(self_id: int, user_id: int, group_id: int) -> Optional[Awaitable[
 shot_msg = on_message(
     priority=5,
     block=True,
-    rule=Rule(is_shot_msg),
+    rule=Rule(is_shot_msg) & Rule(am_I_admin_by_cache),
     permission=permission.GROUP
 )
 
@@ -282,7 +285,7 @@ async def is_drink_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bo
 drink_msg = on_message(
     priority=4,
     block=False,
-    rule=Rule(is_drink_msg),
+    rule=Rule(is_drink_msg) & Rule(am_I_admin_by_cache),
     permission=permission.GROUP
 )
 
