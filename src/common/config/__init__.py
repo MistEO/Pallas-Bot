@@ -97,6 +97,7 @@ class BotConfig:
         )
 
     _drunk_data = defaultdict(int)          # 醉酒程度，不同群应用不同的数值
+    _sleep_until = defaultdict(lambda: defaultdict(int))    # 牛牛起床的时间
 
     def drink(self) -> None:
         '''
@@ -116,6 +117,18 @@ class BotConfig:
         获取醉酒程度
         '''
         return BotConfig._drunk_data[self.group_id]
+
+    def is_sleep(self) -> bool:
+        '''
+        牛牛睡了么？
+        '''
+        return BotConfig._sleep_until[self.bot_id][self.group_id] > time.time()
+
+    def sleep(self, seconds: int) -> None:
+        '''
+        牛牛睡觉
+        '''
+        BotConfig._sleep_until[self.bot_id][self.group_id] = time.time() + seconds
 
     @staticmethod
     def completely_sober():

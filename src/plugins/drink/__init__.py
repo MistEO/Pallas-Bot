@@ -32,14 +32,23 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     config = BotConfig(event.self_id, event.group_id)
     config.drink()
+
+    drunkenness = config.drunkenness()
+    go_to_sleep = random.random() < 0.02 * drunkenness
+    if go_to_sleep:
+        config.sleep(drunkenness + random.random() * 3600)
+
     try:
-        await drink_msg.send('呀，博士。你今天走起路来，怎么看着摇摇晃晃的？')
+        if go_to_sleep:
+            await drink_msg.send('呀，博士。你今天走起路来，怎么看着摇…摇……晃…………')
+            await drink_msg.send('Zzz……')
+        else:
+            await drink_msg.send('呀，博士。你今天走起路来，怎么看着摇摇晃晃的？')
     except ActionFailed:
         pass
 
     await asyncio.sleep(drunk_duration)
-    ret = config.sober_up()
-    if ret:
+    if config.sober_up() and not config.is_sleep():
         logger.info('drink | bot [{}] sober up in group [{}]'.format(
             event.self_id, event.group_id))
         await drink_msg.finish('呃......咳嗯，下次不能喝、喝这么多了......')

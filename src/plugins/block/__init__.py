@@ -16,6 +16,7 @@ accounts = []
 accounts_refresh_time = 0
 accounts_refresh_lock = threading.Lock()
 
+
 def refresh_accounts():
     global accounts_dir
     global accounts
@@ -29,7 +30,7 @@ def refresh_accounts():
         return
 
     with accounts_refresh_lock:
-        accounts_refresh_time = time.time()    
+        accounts_refresh_time = time.time()
         accounts = [
             int(d) for d in os.listdir(accounts_dir) if d.isnumeric()
         ]
@@ -51,5 +52,21 @@ other_bot_msg = on_message(
 
 
 @other_bot_msg.handle()
+async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
+    await asyncio.sleep(0)
+
+
+async def is_sleep(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+    return BotConfig(event.self_id, event.group_id).is_sleep()
+
+any_msg = on_message(
+    priority=4,
+    block=True,
+    rule=Rule(is_sleep),
+    permission=permission.GROUP  # | permission.PRIVATE_FRIEND
+)
+
+
+@any_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     await asyncio.sleep(0)
