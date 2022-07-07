@@ -36,11 +36,16 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     drunkenness = config.drunkenness()
     go_to_sleep = random.random() < 0.02 * drunkenness
     if go_to_sleep:
-        config.sleep(drunkenness + random.random() * 3600)
+        sleep_duration = (drunkenness + random.random()) * 1200
+        logger.info(
+            'drink | bot [{}] go to sleep in group [{}], wake up after {} sec'.format(
+                event.self_id, event.group_id, sleep_duration))
+        config.sleep(sleep_duration)
 
     try:
         if go_to_sleep:
             await drink_msg.send('呀，博士。你今天走起路来，怎么看着摇…摇……晃…………')
+            await asyncio.sleep(1)
             await drink_msg.send('Zzz……')
         else:
             await drink_msg.send('呀，博士。你今天走起路来，怎么看着摇摇晃晃的？')

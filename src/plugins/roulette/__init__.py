@@ -8,7 +8,6 @@ from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, GroupRequestEvent
 from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 from nonebot.permission import Permission
-from paddle import rand
 from src.common.config import BotConfig, GroupConfig
 
 import random
