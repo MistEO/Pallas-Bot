@@ -34,9 +34,10 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     config.drink()
 
     drunkenness = config.drunkenness()
-    go_to_sleep = random.random() < 0.02 * drunkenness
+    go_to_sleep = random.random() < 0.02
     if go_to_sleep:
-        sleep_duration = (min(drunkenness, 12) + random.random()) * 3600
+        # 34 是期望概率
+        sleep_duration = (min(drunkenness, 34) + random.random()) * 800
         logger.info(
             'drink | bot [{}] go to sleep in group [{}], wake up after {} sec'.format(
                 event.self_id, event.group_id, sleep_duration))
