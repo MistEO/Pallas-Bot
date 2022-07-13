@@ -32,9 +32,11 @@ async def am_I_admin(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool
     role_cache[event.self_id][event.group_id] = role
     return role == 'admin' or role == 'owner'
 
+
 async def am_I_admin_by_cache(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
     role = role_cache[event.self_id][event.group_id]
     return role == 'admin' or role == 'owner'
+
 
 def can_roulette_start(group_id: int) -> bool:
     if roulette_status[group_id] == 0 or time.time() - roulette_time[group_id] > timeout:
@@ -221,13 +223,17 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         await roulette_msg.finish(shot_text[shot_msg_count - 1] + f"( {shot_msg_count} / 6 )")
 
     roulette_status[event.group_id] = 0
+
+    async def let_the_bullets_fly():
+        await asyncio.sleep(random.randint(5, 20))
+
     if BotConfig(event.self_id, event.group_id).drunkenness() <= 0:
         shot_awaitable = await shot(event.self_id, event.user_id, event.group_id)
         if shot_awaitable:
             reply_msg = MessageSegment.text('米诺斯英雄们的故事......有喜剧，便也会有悲剧。舍弃了荣耀，') + MessageSegment.at(
                 event.user_id) + MessageSegment.text('选择回归平凡......')
             await roulette_msg.send(reply_msg)
-            await asyncio.sleep(random.randint(5, 20))
+            await let_the_bullets_fly()
             await shot_awaitable()
         else:
             reply_msg = '听啊，悲鸣停止了。这是幸福的和平到来前的宁静。'
@@ -236,34 +242,24 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     else:
         player = roulette_player[event.group_id]
         rand_list = player[-random.randint(1, min(len(player), 6)):][::-1]
-        shot_count = 0
         shot_awaitable_list = []
-        has_self = False
         for user_id in rand_list:
             shot_awaitable = await shot(event.self_id, user_id, event.group_id)
             if not shot_awaitable:
                 continue
 
-            shot_count += 1
             shot_awaitable_list.append(shot_awaitable)
 
             reply_msg = MessageSegment.text('米诺斯英雄们的故事......有喜剧，便也会有悲剧。舍弃了荣耀，') + MessageSegment.at(
-                user_id) + MessageSegment.text(f'选择回归平凡...... ( {shot_count} / 6 )')
+                user_id) + MessageSegment.text(f'选择回归平凡...... ( {len(shot_awaitable_list)} / 6 )')
             await roulette_msg.send(reply_msg)
 
-            if user_id == event.self_id:
-                has_self = True
-                break
-
-        await asyncio.sleep(random.randint(5, 20))
-        for shot_awaitable in shot_awaitable_list:
-            await shot_awaitable()
-
-        if has_self:
+        if not shot_awaitable_list:
             return
 
-        if shot_count != 1 and shot_count != 6:
-            await roulette_msg.finish('我的手中的这把武器，找了无数工匠都难以修缮如新。不......不该如此......')
+        await let_the_bullets_fly()
+        for shot_awaitable in shot_awaitable_list:
+            await shot_awaitable()
 
 
 request_cmd = on_request(
