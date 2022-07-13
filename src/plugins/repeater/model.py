@@ -68,7 +68,8 @@ class ChatData:
 
         keywords_list = jieba_fast.analyse.extract_tags(
             self.plain_text, topK=ChatData._keywords_size)
-        if len(keywords_list) < 2:
+        self.keywords_len = len(keywords_list)
+        if self.keywords_len < 2:
             return self.plain_text
         else:
             # keywords_list.sort()
@@ -631,6 +632,8 @@ class Chat:
         else:
             answer_count_threshold = random.choices(
                 Chat._answer_threshold_choice_list, weights=Chat.answer_threshold_weights)[0]
+            if self.chat_data.keywords_len == ChatData._keywords_size:
+                answer_count_threshold -= 1
 
         if self.chat_data.to_me:
             cross_group_threshold = 1
