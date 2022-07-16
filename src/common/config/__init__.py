@@ -32,16 +32,16 @@ class BotConfig:
     _cache_time_out = 600
 
     def _find_key(self, key: str) -> Any:
-        if self.group_id not in BotConfig._cache or \
-                self.group_id not in BotConfig._cache_time or \
-                BotConfig._cache_time[self.group_id] + BotConfig._cache_time_out < time.time():
+        if self.bot_id not in BotConfig._cache or \
+                self.bot_id not in BotConfig._cache_time or \
+                BotConfig._cache_time[self.bot_id] + BotConfig._cache_time_out < time.time():
             # print("refresh bot config from mongodb")
             info = self._get_config_mongo().find_one(self._mongo_find_key)
-            BotConfig._cache[self.group_id] = info
-            BotConfig._cache_time[self.group_id] = time.time()
+            BotConfig._cache[self.bot_id] = info
+            BotConfig._cache_time[self.bot_id] = time.time()
 
-        if self.group_id in BotConfig._cache:
-            _cache_bot = BotConfig._cache[self.group_id]
+        if self.bot_id in BotConfig._cache:
+            _cache_bot = BotConfig._cache[self.bot_id]
             if _cache_bot and key in _cache_bot:
                 return _cache_bot[key]
 
