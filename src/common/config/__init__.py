@@ -27,12 +27,25 @@ class BotConfig:
         }
         self.cooldown = 5   # 单位秒
 
+    _cache = {}
+    _cache_time = {}
+    _cache_time_out = 600
+
     def _find_key(self, key: str) -> Any:
-        info = self._get_config_mongo().find_one(self._mongo_find_key)
-        if info and key in info:
-            return info[key]
-        else:
-            return None
+        if self.group_id not in BotConfig._cache or \
+                self.group_id not in BotConfig._cache_time or \
+                BotConfig._cache_time[self.group_id] + BotConfig._cache_time_out < time.time():
+            # print("refresh bot config from mongodb")
+            info = self._get_config_mongo().find_one(self._mongo_find_key)
+            BotConfig._cache[self.group_id] = info
+            BotConfig._cache_time[self.group_id] = time.time()
+
+        if self.group_id in BotConfig._cache:
+            _cache_group = BotConfig._cache[self.group_id]
+            if key in _cache_group:
+                return _cache_group[key]
+
+        return None
 
     def security(self) -> bool:
         '''
@@ -128,7 +141,8 @@ class BotConfig:
         '''
         牛牛睡觉
         '''
-        BotConfig._sleep_until[self.bot_id][self.group_id] = time.time() + seconds
+        BotConfig._sleep_until[self.bot_id][self.group_id] = time.time(
+        ) + seconds
 
     @staticmethod
     def completely_sober():
@@ -155,12 +169,25 @@ class GroupConfig:
             'group_id': group_id
         }
 
+    _cache = {}
+    _cache_time = {}
+    _cache_time_out = 600
+
     def _find_key(self, key: str) -> Any:
-        info = self._get_config_mongo().find_one(self._mongo_find_key)
-        if info and key in info:
-            return info[key]
-        else:
-            return None
+        if self.group_id not in GroupConfig._cache or \
+                self.group_id not in GroupConfig._cache_time or \
+                GroupConfig._cache_time[self.group_id] + GroupConfig._cache_time_out < time.time():
+            # print("refresh bot config from mongodb")
+            info = self._get_config_mongo().find_one(self._mongo_find_key)
+            GroupConfig._cache[self.group_id] = info
+            GroupConfig._cache_time[self.group_id] = time.time()
+
+        if self.group_id in GroupConfig._cache:
+            _cache_group = GroupConfig._cache[self.group_id]
+            if key in _cache_group:
+                return _cache_group[key]
+
+        return None
 
     _roulette_mode = {}    # 0 踢人 1 禁言
 
