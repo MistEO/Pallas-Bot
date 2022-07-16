@@ -100,7 +100,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 async def is_config_admin(event: GroupMessageEvent) -> bool:
     return BotConfig(event.self_id).is_admin(event.user_id)
 
-IsAdmin = permission.GROUP_OWNER | permission.GROUP_ADMIN | SUPERUSER |Permission(
+IsAdmin = permission.GROUP_OWNER | permission.GROUP_ADMIN | SUPERUSER | Permission(
     is_config_admin)
 
 

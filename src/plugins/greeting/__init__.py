@@ -8,7 +8,7 @@ from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, Gro
 from nonebot.rule import keyword, startswith, to_me, Rule
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
-from src.common.config import BotConfig
+from src.common.config import BotConfig, GroupConfig, UserConfig
 
 from .wiki import Wiki, nudge
 
@@ -124,3 +124,14 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     elif event.notice_type == 'friend_add':
         msg: Message = MessageSegment.record(file=Path(get_voice('精英化晋升2')))
         await all_notice.finish(msg)
+
+    # 被禁言自动退群
+    elif event.notice_type == 'group_ban' and event.sub_type == 'ban' and event.user_id == event.self_id:
+        await get_bot(str(event.self_id)).call_api('set_group_leave', **{
+            'group_id': event.group_id,
+        })
+
+    # 被踢了拉黑该群（所以拉黑了又能做什么呢）
+    elif event.notice_type == 'group_decrease' and event.sub_type == 'kick_me':
+        GroupConfig(event.group_id).ban()
+        UserConfig(event.operator_id).ban()

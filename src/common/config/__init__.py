@@ -41,9 +41,9 @@ class BotConfig:
             BotConfig._cache_time[self.group_id] = time.time()
 
         if self.group_id in BotConfig._cache:
-            _cache_group = BotConfig._cache[self.group_id]
-            if key in _cache_group:
-                return _cache_group[key]
+            _cache_bot = BotConfig._cache[self.group_id]
+            if _cache_bot and key in _cache_bot:
+                return _cache_bot[key]
 
         return None
 
@@ -52,21 +52,21 @@ class BotConfig:
         账号是否安全（不处于风控等异常状态）
         '''
         security = self._find_key('security')
-        return security if security is not None else False
+        return True if security else False
 
     def auto_accept(self) -> bool:
         '''
         是否自动接受加群、加好友请求
         '''
         accept = self._find_key('auto_accept')
-        return accept if accept is not None else False
+        return True if accept else False
 
     def is_admin(self, user_id: int) -> bool:
         '''
         是否是管理员
         '''
         admins = self._find_key('admins')
-        return user_id in admins if admins is not None else False
+        return user_id in admins if admins else False
 
     def add_admin(self, user_id: int) -> None:
         '''
@@ -184,7 +184,7 @@ class GroupConfig:
 
         if self.group_id in GroupConfig._cache:
             _cache_group = GroupConfig._cache[self.group_id]
-            if key in _cache_group:
+            if _cache_group and key in _cache_group:
                 return _cache_group[key]
 
         return None
@@ -215,3 +215,91 @@ class GroupConfig:
             {'$set': {'roulette_mode': mode}},
             upsert=True
         )
+
+    _ban_cache = {}
+
+    def ban(self) -> None:
+        '''
+        拉黑该群
+        '''
+        GroupConfig._ban_cache[self.group_id] = True
+
+        self._get_config_mongo().update_one(
+            self._mongo_find_key,
+            {'$set': {'banned': True}},
+            upsert=True
+        )
+
+    def is_banned(self) -> bool:
+        '''
+        群是否被拉黑
+        '''
+        if self.group_id not in GroupConfig._ban_cache:
+            banned = self._find_key('banned')
+            GroupConfig._ban_cache[self.group_id] = True if banned else False
+
+        return GroupConfig._ban_cache[self.group_id]
+
+
+class UserConfig:
+    __config_mongo: Optional[Collection] = None
+
+    @classmethod
+    def _get_config_mongo(cls) -> Collection:
+        if cls.__config_mongo is None:
+            mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
+            mongo_db = mongo_client['PallasBot']
+            cls.__config_mongo = mongo_db['user_config']
+            cls.__config_mongo.create_index(name='user_index',
+                                            keys=[('user_id', pymongo.HASHED)])
+        return cls.__config_mongo
+
+    def __init__(self, user_id: int) -> None:
+        self.user_id = user_id
+        self._mongo_find_key = {
+            'user_id': user_id
+        }
+
+    _cache = {}
+    _cache_time = {}
+    _cache_time_out = 600
+
+    def _find_key(self, key: str) -> Any:
+        if self.user_id not in UserConfig._cache or \
+                self.user_id not in UserConfig._cache_time or \
+                UserConfig._cache_time[self.user_id] + UserConfig._cache_time_out < time.time():
+            # print("refresh group config from mongodb")
+            info = self._get_config_mongo().find_one(self._mongo_find_key)
+            UserConfig._cache[self.user_id] = info
+            UserConfig._cache_time[self.user_id] = time.time()
+
+        if self.user_id in UserConfig._cache:
+            _cache_user = UserConfig._cache[self.user_id]
+            if _cache_user and key in _cache_user:
+                return _cache_user[key]
+
+        return None
+
+    _ban_cache = {}
+
+    def ban(self) -> None:
+        '''
+        拉黑这个人
+        '''
+        UserConfig._ban_cache[self.user_id] = True
+
+        self._get_config_mongo().update_one(
+            self._mongo_find_key,
+            {'$set': {'banned': True}},
+            upsert=True
+        )
+
+    def is_banned(self) -> bool:
+        '''
+        是否被拉黑
+        '''
+        if self.user_id not in UserConfig._ban_cache:
+            banned = self._find_key('banned')
+            UserConfig._ban_cache[self.user_id] = True if banned else False
+
+        return UserConfig._ban_cache[self.user_id]
