@@ -177,7 +177,7 @@ class GroupConfig:
         if self.group_id not in GroupConfig._cache or \
                 self.group_id not in GroupConfig._cache_time or \
                 GroupConfig._cache_time[self.group_id] + GroupConfig._cache_time_out < time.time():
-            # print("refresh bot config from mongodb")
+            # print("refresh group config from mongodb")
             info = self._get_config_mongo().find_one(self._mongo_find_key)
             GroupConfig._cache[self.group_id] = info
             GroupConfig._cache_time[self.group_id] = time.time()
