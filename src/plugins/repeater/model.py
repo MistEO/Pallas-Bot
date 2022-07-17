@@ -62,18 +62,27 @@ class ChatData:
         return '[CQ:image,' in self.raw_message or '[CQ:face,' in self.raw_message
 
     @cached_property
+    def _keywords_list(self):
+        if not self.is_plain_text and len(self.plain_text) == 0:
+            return []
+
+        return jieba_fast.analyse.extract_tags(
+            self.plain_text, topK=ChatData._keywords_size)
+
+    @cached_property
+    def keywords_len(self) -> int:
+        return len(self._keywords_list)
+
+    @cached_property
     def keywords(self) -> str:
         if not self.is_plain_text and len(self.plain_text) == 0:
             return self.raw_message
 
-        keywords_list = jieba_fast.analyse.extract_tags(
-            self.plain_text, topK=ChatData._keywords_size)
-        self.keywords_len = len(keywords_list)
         if self.keywords_len < 2:
             return self.plain_text
         else:
             # keywords_list.sort()
-            return ' '.join(keywords_list)
+            return ' '.join(self._keywords_list)
 
     @cached_property
     def keywords_pinyin(self) -> str:
