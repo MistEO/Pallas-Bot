@@ -86,7 +86,9 @@ async def roulette(messagae_handle, bot: Bot, event: GroupMessageEvent, state: T
 
 async def is_roulette_type_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
     if event.get_plaintext().strip() in ['牛牛轮盘踢人', '牛牛轮盘禁言', '牛牛踢人轮盘', '牛牛禁言轮盘']:
-        return can_roulette_start(event.group_id)
+        if can_roulette_start(event.group_id):
+            admin = await am_I_admin(bot, event, state)
+            return admin
     return False
 
 
@@ -100,7 +102,7 @@ IsAdmin = permission.GROUP_OWNER | permission.GROUP_ADMIN | Permission(
 roulette_type_msg = on_message(
     priority=5,
     block=True,
-    rule=Rule(is_roulette_type_msg) & Rule(am_I_admin),
+    rule=Rule(is_roulette_type_msg),
     permission=IsAdmin
 )
 
@@ -119,7 +121,9 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
 async def is_roulette_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
     if event.get_plaintext().strip() in ['牛牛轮盘']:
-        return can_roulette_start(event.group_id)
+        if can_roulette_start(event.group_id):
+            admin = await am_I_admin(bot, event, state)
+            return admin
 
     return False
 
@@ -127,7 +131,7 @@ async def is_roulette_msg(bot: Bot, event: GroupMessageEvent, state: T_State) ->
 roulette_msg = on_message(
     priority=5,
     block=True,
-    rule=Rule(is_roulette_msg) & Rule(am_I_admin),
+    rule=Rule(is_roulette_msg),
     permission=permission.GROUP
 )
 
@@ -138,7 +142,11 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
 
 async def is_shot_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
-    return roulette_status[event.group_id] != 0 and event.get_plaintext().strip() == '牛牛开枪'
+    if roulette_status[event.group_id] != 0 and event.get_plaintext().strip() == '牛牛开枪':
+        admin = await am_I_admin_by_cache(bot, event, state)
+        return admin
+
+    return False
 
 
 kicked_users = defaultdict(set)
@@ -193,7 +201,7 @@ async def shot(self_id: int, user_id: int, group_id: int) -> Optional[Awaitable[
 shot_msg = on_message(
     priority=5,
     block=True,
-    rule=Rule(is_shot_msg) & Rule(am_I_admin_by_cache),
+    rule=Rule(is_shot_msg),
     permission=permission.GROUP
 )
 
@@ -276,12 +284,16 @@ async def _(bot: Bot, event: GroupRequestEvent, state: T_State):
 
 
 async def is_drink_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
-    return roulette_status[event.group_id] != 0 and event.get_plaintext().strip() in ['牛牛喝酒', '牛牛干杯', '牛牛继续喝']
+    if roulette_status[event.group_id] != 0 and event.get_plaintext().strip() in ['牛牛喝酒', '牛牛干杯', '牛牛继续喝']:
+        admin = await am_I_admin_by_cache(bot, event, state)
+        return admin
+
+    return False
 
 drink_msg = on_message(
     priority=4,
     block=False,
-    rule=Rule(is_drink_msg) & Rule(am_I_admin_by_cache),
+    rule=Rule(is_drink_msg),
     permission=permission.GROUP
 )
 
