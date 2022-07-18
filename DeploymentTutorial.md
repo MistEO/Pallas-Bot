@@ -146,20 +146,6 @@ python3 -m pip install --upgrade pip # 更新 pip
 
 多半是被腾讯风控了（ WebUI 上点开账号可以看到输出提示），多挂几天就好了 ( ´_ゝ` )
 
-### WebUI 上账号怎么只有 `强制停止` 按钮，但没有开始启动按钮？
-
-好问题。插件本身的 bug, 可以去 <https://github.com/mnixry/nonebot-plugin-gocqhttp/issues/196> 催催插件作者，或者有大佬帮忙去给原插件修复一下就更好啦~
-
-~~因为我个人不懂 web 实在不知道怎么修~~, 这里提供两种临时的解决方案供参考，任选其一即可
-
-- 通过 api 请求来启动账号
-
-    ```bash
-    curl -v -X PUT "http://127.0.0.1:8080/go-cqhttp/api/<牛牛的 QQ 账号>/process" # 如果你配置了网页的登陆账号密码，可以加上参数 --user "登陆账户:登陆密码"
-    ```
-
-- 直接重启 nb, 应该会自动启动所有账号的
-
 ### 突然报错 accounts/binary/accounts.pkl 怎么回事？
 
 <https://github.com/mnixry/nonebot-plugin-gocqhttp/issues/186> 也是插件本身的 bug, 建议自己每次添加/删除账号后，手动备份一下这个文件，如果之前没备份，那就只能删除了这个文件重新配一下账号吧_(:з」∠)_
