@@ -24,18 +24,13 @@ class Config(ABC):
     _mongo_find_key: Optional[dict] = None
     _key_id: Optional[int] = None
     _cache: Optional[dict] = None
-    _cache_time: Optional[dict] = None
-    _cache_timeout: Optional[int] = None
 
     @classmethod
     def _find_key(cls, key: str) -> Any:
-        if cls._key_id not in cls._cache or \
-                cls._key_id not in cls._cache_time or \
-                cls._cache_time[cls._key_id] + cls._cache_timeout < time.time():
+        if cls._key_id not in cls._cache:
             # print("refresh config from mongodb")
             info = cls._get_config_mongo().find_one(cls._mongo_find_key)
             cls._cache[cls._key_id] = info
-            cls._cache_time[cls._key_id] = time.time()
 
         if cls._key_id in cls._cache:
             key_cache = cls._cache[cls._key_id]
@@ -50,8 +45,6 @@ class Config(ABC):
         self.__class__._key_id = key_id
         self.__class__._mongo_find_key = {key: key_id}
         self.__class__._cache = {}
-        self.__class__._cache_time = {}
-        self.__class__._cache_timeout = 600
 
 
 class BotConfig(Config):
