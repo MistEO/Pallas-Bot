@@ -236,6 +236,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         await asyncio.sleep(random.randint(5, 20))
 
     if BotConfig(event.self_id, event.group_id).drunkenness() <= 0:
+        roulette_player[event.group_id] = []
         shot_awaitable = await shot(event.self_id, event.user_id, event.group_id)
         if shot_awaitable:
             reply_msg = MessageSegment.text('米诺斯英雄们的故事......有喜剧，便也会有悲剧。舍弃了荣耀，') + MessageSegment.at(
@@ -250,6 +251,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     else:
         player = roulette_player[event.group_id]
         rand_list = player[-random.randint(1, min(len(player), 6)):][::-1]
+        roulette_player[event.group_id] = []
         shot_awaitable_list = []
         for user_id in rand_list:
             shot_awaitable = await shot(event.self_id, user_id, event.group_id)
