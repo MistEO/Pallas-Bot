@@ -2,12 +2,13 @@ import asyncio
 import time
 import os
 import threading
+from typing import Union
 
-from nonebot import on_message
+from nonebot import on_message, on_notice
 from nonebot.typing import T_State
 from nonebot.rule import Rule
 from nonebot.adapters import Bot
-from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
+from nonebot.adapters.onebot.v11 import GroupMessageEvent, GroupIncreaseNoticeEvent, PokeNotifyEvent
 from nonebot.adapters.onebot.v11 import permission
 from src.common.config import BotConfig
 
@@ -47,26 +48,24 @@ other_bot_msg = on_message(
     priority=1,
     block=True,
     rule=Rule(is_other_bot),
-    permission=permission.GROUP  # | permission.PRIVATE_FRIEND
+    permission=permission.GROUP
 )
 
 
-@other_bot_msg.handle()
-async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    await asyncio.sleep(0)
-
-
-async def is_sleep(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+async def is_sleep(bot: Bot, event: Union[GroupMessageEvent, GroupIncreaseNoticeEvent, PokeNotifyEvent], state: T_State) -> bool:
+    if not event.group_id:
+        return False
     return BotConfig(event.self_id, event.group_id).is_sleep()
 
 any_msg = on_message(
     priority=4,
     block=True,
     rule=Rule(is_sleep),
-    permission=permission.GROUP  # | permission.PRIVATE_FRIEND
+    permission=permission.GROUP
 )
 
-
-@any_msg.handle()
-async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    await asyncio.sleep(0)
+any_notice = on_notice(
+    priority=4,
+    block=True,
+    rule=Rule(is_sleep)
+)
