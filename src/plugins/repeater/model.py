@@ -117,7 +117,7 @@ class Chat:
 
         if (isinstance(data, ChatData)):
             self.chat_data = data
-            self.config = BotConfig(data.self_id, data.group_id)
+            self.config = BotConfig(0, data.group_id)
         elif (isinstance(data, GroupMessageEvent)):
             self.chat_data = ChatData(
                 group_id=data.group_id,
@@ -331,6 +331,21 @@ class Chat:
                     }
                 }, {
                     '$sample': {'size': 1}  # 随机一条
+                }, {
+                    '$project': {
+                        'answers': {
+                            '$filter': {
+                                'input': '$answers',
+                                'as': 'answers',
+                                'cond': {
+                                    '$eq': [
+                                        '$$answers.group_id', group_id
+                                    ]
+                                }
+                            }
+                        },
+                        "ban": 1
+                    }
                 }
             ])
 
