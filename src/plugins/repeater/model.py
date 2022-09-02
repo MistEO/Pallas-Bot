@@ -698,6 +698,8 @@ class Chat:
                 # 这种一般是学反过来的，比如有人教“牛牛你好”——“你好”（反复发了好几次，互为上下文了）
                 # 然后下次有人发“你好”，突然回个“牛牛你好”，有点莫名其妙的
                 continue
+            if sample_msg.startswith("[CQ:xml"):
+                continue
 
             if answer['group_id'] == group_id:
                 candidate_append(candidate_answers, answer)
