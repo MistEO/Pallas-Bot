@@ -20,7 +20,6 @@ wenxin_ak = ''
 wenxin_sk = ''
 
 dream_key = '牛牛做梦'
-is_running = False
 
 
 async def is_sleep(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
@@ -52,20 +51,20 @@ def gen_images(text: str) -> Optional[List[str]]:
 
 @dream_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    global is_running
-    if is_running:
-        return
-
     context = event.get_plaintext().replace(dream_key, '').strip()
     if not context:
         return
 
-    is_running = True
+    config = BotConfig(event.self_id, event.group_id)
+    config.cooldown = 120
+    if not config.is_cooldown('dream'):
+        return
+    config.refresh_cooldown('dream')
+
     await dream_msg.send('Zzz……')
     start = time.time()
     images_list = await asyncify(gen_images)(context)
     if not images_list:
-        is_running = False
         return
 
     duration = time.time() - start
@@ -74,5 +73,3 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         await dream_msg.send(msg)
         duration /= 2
         await asyncio.sleep(duration)
-
-    is_running = False
