@@ -76,7 +76,7 @@ def gen_text(text: str) -> Optional[List[str]]:
         if in_quotes:
             continue
 
-        if result[pos] in ['。', '！', '？', '；', ' ', '：', '~', '…']:
+        if result[pos] in ['。', '！', '？', '；', '：', '~', '…', '”']:
             yield result[pre_pos:pos+1].strip()
             pre_pos = pos + 1
 
