@@ -54,10 +54,10 @@ def gen_images(text: str) -> Optional[List[str]]:
 def gen_text(text: str) -> Optional[List[str]]:
     input_dict = {
         "text": f"作文题目：{text}\n正文：",
-        "seq_len": 256,
+        "seq_len": 512,
         "topp": 0.9,
         "penalty_score": 1.2,
-        "min_dec_len": 64,
+        "min_dec_len": 128,
         "is_unidirectional": 0,
         "task_prompt": "zuowen"
     }
@@ -69,16 +69,21 @@ def gen_text(text: str) -> Optional[List[str]]:
     pre_pos = 0
     in_quotes = False
     for pos in range(len(result)):
-        if result[pos] == '“':
+        char = result[pos]
+        if char == '“':
             in_quotes = True
-        elif result[pos] == '”':
+        elif char == '”':
             in_quotes = False
         if in_quotes:
             continue
 
-        if result[pos] in ['。', '！', '？', '；', '：', '~', '…', '”']:
-            yield result[pre_pos:pos+1].strip()
-            pre_pos = pos + 1
+        if char in ['。', '！', '？', '；', '：', '~', '…', '”', '—']:
+            next_char = result[pos + 1] if pos + 1 < len(result) else ''
+            next_pos = pos + 1
+            if char == next_char:   # 比如 省略号，破折号，这种经常是俩连着的
+                next_pos += 1
+            yield result[pre_pos:next_pos].strip()
+            pre_pos = next_pos
 
     yield result[pre_pos:].strip() + '……'
     yield 'Zzz……'
