@@ -14,3 +14,7 @@ pydantic~=1.9.0
 pymongo~=3.12.1
 jieba-fast~=0.53
 pypinyin~=0.41.0
+
+# dream
+wenxin-api~=0.0.5.1
+asyncer~=0.0.1
