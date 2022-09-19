@@ -51,6 +51,9 @@ def gen_images(text: str) -> Optional[List[str]]:
     return response['imgUrls']
 
 
+marks = ['。', '！', '？', '；', '：', '~', '…', '”', '—']
+
+
 def gen_text(text: str) -> Optional[List[str]]:
     input_dict = {
         "text": f"作文题目：{text}\n正文：",
@@ -69,6 +72,9 @@ def gen_text(text: str) -> Optional[List[str]]:
     pre_pos = 0
     in_quotes = False
     for pos in range(len(result)):
+        if pos <= pre_pos:
+            continue
+
         char = result[pos]
         if char == '“':
             in_quotes = True
@@ -77,12 +83,17 @@ def gen_text(text: str) -> Optional[List[str]]:
         if in_quotes:
             continue
 
-        if char in ['。', '！', '？', '；', '：', '~', '…', '”', '—']:
-            next_char = result[pos + 1] if pos + 1 < len(result) else ''
+        if char in marks:
             next_pos = pos + 1
-            if char == next_char:   # 比如 省略号，破折号，这种经常是俩连着的
-                next_pos += 1
-            yield result[pre_pos:next_pos].strip()
+            for i in range(next_pos, len(result)):
+                if result[i] in marks:
+                    next_pos += 1
+                else:
+                    break
+
+            seg = result[pre_pos:next_pos].strip()
+            if seg:
+                yield seg
             pre_pos = next_pos
 
     yield result[pre_pos:].strip() + '……'
@@ -108,6 +119,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         start = time.time()
         images_list = await asyncify(gen_images)(context)
         if not images_list:
+            await dream_msg.send('……')
             return
 
         duration = time.time() - start
@@ -120,8 +132,15 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     else:
         text_list = await asyncify(gen_text)(context)
         if not text_list:
+            await dream_msg.send('……')
             return
 
+        first = True
         for text in text_list:
+            if not text:
+                continue
+            if first:
+                first = False
+            else:
+                await asyncio.sleep(len(text) / 10)
             await dream_msg.send(text)
-            await asyncio.sleep(random.randint(2, 5))
