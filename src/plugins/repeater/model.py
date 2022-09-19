@@ -51,7 +51,7 @@ class ChatData:
     time: int
     bot_id: int
 
-    _keywords_size: int = 3
+    _keywords_size: int = 2
 
     @cached_property
     def is_plain_text(self) -> bool:
@@ -78,7 +78,7 @@ class ChatData:
         if not self.is_plain_text and len(self.plain_text) == 0:
             return self.raw_message
 
-        if self.keywords_len < 2:
+        if self.keywords_len == 0:
             return self.plain_text
         else:
             # keywords_list.sort()
