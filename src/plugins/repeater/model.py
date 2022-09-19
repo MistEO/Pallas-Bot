@@ -117,7 +117,7 @@ class Chat:
 
         if (isinstance(data, ChatData)):
             self.chat_data = data
-            self.config = BotConfig(0, data.group_id)
+            self.config = BotConfig(data.bot_id, data.group_id)
         elif (isinstance(data, GroupMessageEvent)):
             self.chat_data = ChatData(
                 group_id=data.group_id,
@@ -256,13 +256,8 @@ class Chat:
             lhs_len = len(lhs_msgs)
             rhs_len = len(rhs_msgs)
 
-            # 默认是 0, 加个 1 避免乘没了
-            lhs_drunkenness = BotConfig(0, lhs_group_id).drunkenness() + 1
-            rhs_drunkenness = BotConfig(0, rhs_group_id).drunkenness() + 1
-
             if lhs_len < basic_msgs_len or rhs_len < basic_msgs_len:
-                return cmp(lhs_len * lhs_drunkenness,
-                           rhs_len * rhs_drunkenness)
+                return cmp(lhs_len, rhs_len)
 
             lhs_duration = lhs_msgs[-1]['time'] - lhs_msgs[0]['time']
             rhs_duration = rhs_msgs[-1]['time'] - rhs_msgs[0]['time']
@@ -270,8 +265,7 @@ class Chat:
             if not lhs_duration or not rhs_duration:
                 return cmp(lhs_len, rhs_len)
 
-            return cmp(lhs_len * lhs_drunkenness / lhs_duration,
-                       rhs_len * rhs_drunkenness / rhs_duration)
+            return cmp(lhs_len / lhs_duration, rhs_len / rhs_duration)
 
         # 按群聊热度排序
         popularity = sorted(Chat._message_dict.items(),

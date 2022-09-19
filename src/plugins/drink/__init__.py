@@ -25,19 +25,17 @@ drink_msg = on_message(
 
 @drink_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    group_config = GroupConfig(event.group_id, cooldown=3)
-    if not group_config.is_cooldown('drink'):
+    config = BotConfig(event.self_id, event.group_id, cooldown=3)
+    if not config.is_cooldown('drink'):
         return
-    group_config.refresh_cooldown('drink')
+    config.refresh_cooldown('drink')
 
     drunk_duration = random.randint(60, 600)
     logger.info(
         'drink | bot [{}] ready to drink in group [{}], sober up after {} sec'.format(
             event.self_id, event.group_id, drunk_duration))
 
-    config = BotConfig(event.self_id, event.group_id)
     config.drink()
-
     drunkenness = config.drunkenness()
     go_to_sleep = random.random() < (
         0.02 if drunkenness <= 50
