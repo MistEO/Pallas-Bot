@@ -85,12 +85,11 @@ def gen_text(text: str) -> Optional[List[str]]:
     yield 'Zzz……'
 
 
-async def send_images(handle, context):
+async def send_images(handle, context: str) -> bool:
     start = time.time()
     images_list = await asyncify(gen_images)(context)
     if not images_list:
-        await handle.send('……')
-        return
+        return False
 
     duration = time.time() - start
     for image in images_list:
@@ -99,12 +98,13 @@ async def send_images(handle, context):
         duration /= 2
         await asyncio.sleep(duration)
 
+    return True
 
-async def send_text(handle, context):
+
+async def send_text(handle, context: str) -> bool:
     text_list = await asyncify(gen_text)(context)
     if not text_list:
-        await handle.send('……')
-        return
+        return False
 
     first = True
     for text in text_list:
@@ -116,15 +116,18 @@ async def send_text(handle, context):
             await asyncio.sleep(len(text) / 10)
         await handle.send(text)
 
+    return True
 
-async def is_sleep(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
-    if not event.group_id:
+
+async def can_dream(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+    if not wenxin_ak or not wenxin_sk:
         return False
-    return wenxin_ak and wenxin_sk and BotConfig(event.self_id, event.group_id).is_sleep()
+    config = BotConfig(event.self_id, event.group_id)
+    return config.is_sleep() or config.drunkenness()
 
 dream_key = '牛牛做梦'
 dream_msg = on_message(
-    rule=startswith(dream_key) & Rule(is_sleep),
+    rule=startswith(dream_key) & Rule(can_dream),
     priority=3,
     block=True,
     permission=permission.GROUP
@@ -137,15 +140,19 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     if not context:
         return
 
-    config = GroupConfig(event.group_id, cooldown=120)
-    if not config.is_cooldown('dream'):
+    group_config = GroupConfig(event.group_id, cooldown=120)
+    if not group_config.is_cooldown('dream'):
         return
-    config.refresh_cooldown('dream')
+    group_config.refresh_cooldown('dream')
 
     await dream_msg.send('Zzz……')
 
-    rand = random.random() < 0.25
-    if rand:
-        await send_images(dream_msg, context)
-    else:
-        await send_text(dream_msg, context)
+    bot_config = BotConfig(event.self_id, event.group_id)
+    ret = False
+    if bot_config.is_sleep():
+        ret = await send_images(dream_msg, context)
+    elif bot_config.drunkenness():
+        ret = await send_text(dream_msg, context)
+
+    if not ret:
+        await dream_msg.finish('……')
