@@ -8,7 +8,7 @@ from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, Gro
 from nonebot.rule import Rule
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
-from src.common.config import BotConfig
+from src.common.config import BotConfig, GroupConfig
 
 
 def get_music_name():
@@ -37,9 +37,8 @@ music_cmd = on_message(
 
 
 @music_cmd.handle()
-async def handle_first_receive(bot: Bot, event: Event, state: T_State):
-    config = BotConfig(event.self_id, event.group_id)
-    config.cooldown = 10
+async def _(bot: Bot, event: Event, state: T_State):
+    config = GroupConfig(event.group_id, cooldown=10)
     if not config.is_cooldown('music'):
         return
     config.refresh_cooldown('music')

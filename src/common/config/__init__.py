@@ -48,7 +48,7 @@ class Config(ABC):
 
 
 class BotConfig(Config):
-    def __init__(self, bot_id: int, group_id: int = 0) -> None:
+    def __init__(self, bot_id: int, group_id: int = 0, cooldown: int = 5) -> None:
         super().__init__(
             table='config',
             key='account',
@@ -56,8 +56,7 @@ class BotConfig(Config):
 
         self.bot_id = bot_id
         self.group_id = group_id
-
-        self.cooldown = 5   # 单位秒
+        self.cooldown = cooldown
 
     def security(self) -> bool:
         '''
@@ -163,13 +162,14 @@ class BotConfig(Config):
 
 
 class GroupConfig(Config):
-    def __init__(self, group_id: int) -> None:
+    def __init__(self, group_id: int, cooldown: int = 5) -> None:
         super().__init__(
             table='group_config',
             key='group_id',
             key_id=group_id)
 
         self.group_id = group_id
+        self.cooldown = cooldown
 
     _roulette_mode = {}    # 0 踢人 1 禁言
 
@@ -221,6 +221,30 @@ class GroupConfig(Config):
             GroupConfig._ban_cache[self.group_id] = True if banned else False
 
         return GroupConfig._ban_cache[self.group_id]
+
+    _cooldown_data = {}
+
+    def is_cooldown(self, action_type: str) -> bool:
+        '''
+        是否冷却完成
+        '''
+        if self.group_id not in GroupConfig._cooldown_data:
+            return True
+
+        if action_type not in GroupConfig._cooldown_data[self.group_id]:
+            return True
+
+        cd = GroupConfig._cooldown_data[self.group_id][action_type]
+        return cd + self.cooldown < time.time()
+
+    def refresh_cooldown(self, action_type: str) -> None:
+        '''
+        刷新冷却时间
+        '''
+        if self.group_id not in GroupConfig._cooldown_data:
+            GroupConfig._cooldown_data[self.group_id] = {}
+
+        GroupConfig._cooldown_data[self.group_id][action_type] = time.time()
 
 
 class UserConfig(Config):
