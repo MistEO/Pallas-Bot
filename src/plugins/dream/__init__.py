@@ -201,7 +201,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     await draw_msg.send('Zzz……')
 
-    ret = await send_text(draw_msg, context)
+    ret = await send_images(draw_msg, context)
 
     if not ret:
         await draw_msg.finish('……')
