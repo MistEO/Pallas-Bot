@@ -25,10 +25,24 @@ wenxin_api.ak = wenxin_ak
 wenxin_api.sk = wenxin_sk
 
 
+image_style_list = [
+    '古风', '油画', '水彩画', '卡通画', '二次元',
+    '浮世绘', '蒸汽波艺术', 'low poly', '像素风格', '概念艺术',
+    '未来主义', '赛博朋克', '写实风格', '洛丽塔风格', '巴洛克风格',
+    '超现实主义',
+]
+
 def gen_images(text: str) -> Optional[List[str]]:
+    rand_style = random.choice(image_style_list)
+    for style in image_style_list:
+        if style in text:
+            rand_style = style
+            break
+
     input_dict = {
-        "text": text,
-        "style": random.choice(['水彩', '油画', '粉笔画', '卡通', '蜡笔画', '儿童画'])
+        'text': text,
+        'style': rand_style,
+        'resolution': '1024*1024',
     }
     response = TextToImage.create(**input_dict)
     if 'imgUrls' not in response:
@@ -41,13 +55,13 @@ marks = ['。', '！', '？', '；', '：', '~', '…', '”', '—']
 
 def gen_text(text: str) -> Optional[List[str]]:
     input_dict = {
-        "text": f"作文题目：{text}\n正文：",
-        "seq_len": 512,
-        "topp": 0.9,
-        "penalty_score": 1.2,
-        "min_dec_len": 128,
-        "is_unidirectional": 0,
-        "task_prompt": "zuowen"
+        'text': f'作文题目：{text}\n正文：',
+        'seq_len': 512,
+        'topp': 0.9,
+        'penalty_score': 1.2,
+        'min_dec_len': 128,
+        'is_unidirectional': 0,
+        'task_prompt': 'zuowen'
     }
     response = Composition.create(**input_dict)
     if 'result' not in response:
@@ -118,6 +132,7 @@ async def send_text(handle, context: str) -> bool:
 
     return True
 
+cd_key = 'dream'
 
 async def can_dream(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
     if not wenxin_ak or not wenxin_sk:
@@ -141,9 +156,9 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         return
 
     group_config = GroupConfig(event.group_id, cooldown=120)
-    if not group_config.is_cooldown('dream'):
+    if not group_config.is_cooldown(cd_key):
         return
-    group_config.refresh_cooldown('dream')
+    group_config.refresh_cooldown(cd_key)
 
     await dream_msg.send('Zzz……')
 
@@ -156,3 +171,37 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     if not ret:
         await dream_msg.finish('……')
+
+
+async def can_draw(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+    if not wenxin_ak or not wenxin_sk:
+        return False
+    config = BotConfig(event.self_id, event.group_id)
+    return config.drunkenness()
+
+draw_key = '牛牛画画'
+draw_msg = on_message(
+    rule=startswith(draw_key) & Rule(can_draw),
+    priority=3,
+    block=True,
+    permission=permission.GROUP
+)
+
+
+@draw_msg.handle()
+async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
+    context = event.get_plaintext().replace(draw_key, '', 1).strip()
+    if not context:
+        return
+
+    group_config = GroupConfig(event.group_id, cooldown=120)
+    if not group_config.is_cooldown(cd_key):
+        return
+    group_config.refresh_cooldown(cd_key)
+
+    await draw_msg.send('Zzz……')
+
+    ret = await send_text(draw_msg, context)
+
+    if not ret:
+        await draw_msg.finish('……')
