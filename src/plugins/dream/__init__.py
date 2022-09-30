@@ -32,7 +32,8 @@ image_style_list = [
     '超现实主义',
 ]
 
-def gen_images(text: str) -> Optional[List[str]]:
+
+def gen_draw(text: str) -> Optional[List[str]]:
     rand_style = random.choice(image_style_list)
     for style in image_style_list:
         if style in text:
@@ -44,7 +45,11 @@ def gen_images(text: str) -> Optional[List[str]]:
         'style': rand_style,
         'resolution': '1024*1024',
     }
-    response = TextToImage.create(**input_dict)
+    try:
+        response = TextToImage.create(**input_dict)
+    except:
+        return None
+
     if 'imgUrls' not in response:
         return None
     return response['imgUrls']
@@ -63,7 +68,11 @@ def gen_text(text: str) -> Optional[List[str]]:
         'is_unidirectional': 0,
         'task_prompt': 'zuowen'
     }
-    response = Composition.create(**input_dict)
+    try:
+        response = Composition.create(**input_dict)
+    except:
+        return None
+
     if 'result' not in response:
         return None
 
@@ -99,9 +108,9 @@ def gen_text(text: str) -> Optional[List[str]]:
     yield 'Zzz……'
 
 
-async def send_images(handle, context: str) -> bool:
+async def send_draw(handle, context: str) -> bool:
     start = time.time()
-    images_list = await asyncify(gen_images)(context)
+    images_list = await asyncify(gen_draw)(context)
     if not images_list:
         return False
 
@@ -134,6 +143,7 @@ async def send_text(handle, context: str) -> bool:
 
 cd_key = 'dream'
 
+
 async def can_dream(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
     if not wenxin_ak or not wenxin_sk:
         return False
@@ -165,7 +175,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     bot_config = BotConfig(event.self_id, event.group_id)
     ret = False
     if bot_config.is_sleep():
-        ret = await send_images(dream_msg, context)
+        ret = await send_draw(dream_msg, context)
     elif bot_config.drunkenness():
         ret = await send_text(dream_msg, context)
 
@@ -201,7 +211,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     await draw_msg.send('Zzz……')
 
-    ret = await send_images(draw_msg, context)
+    ret = await send_draw(draw_msg, context)
 
     if not ret:
         await draw_msg.finish('……')
