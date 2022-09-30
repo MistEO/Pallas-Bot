@@ -56,7 +56,7 @@ marks = ['。', '！', '？', '；', '：', '~', '…', '”', '—']
 def gen_text(text: str) -> Optional[List[str]]:
     input_dict = {
         'text': f'作文题目：{text}\n正文：',
-        'seq_len': 512,
+        'seq_len': 256,
         'topp': 0.9,
         'penalty_score': 1.2,
         'min_dec_len': 128,
