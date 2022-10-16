@@ -10,12 +10,14 @@ import wenxin_api
 from wenxin_api.tasks.text_to_image import TextToImage
 from wenxin_api.tasks.composition import Composition
 
-from nonebot import on_message
+from nonebot import on_message, logger
 from nonebot.typing import T_State
 from nonebot.rule import Rule, startswith
 from nonebot.adapters import Bot
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, MessageSegment, Message, permission
-from src.common.config import BotConfig, GroupConfig
+
+if __name__ != "__main__":
+    from src.common.config import BotConfig, GroupConfig
 
 # https://wenxin.baidu.com/moduleApi/ernieVilg
 wenxin_ak = ''
@@ -47,9 +49,11 @@ def gen_draw(text: str) -> Optional[List[str]]:
     }
     try:
         response = TextToImage.create(**input_dict)
-    except:
+    except Exception as err:
+        logger.error("dream | gen_draw error: " + str(err))
         return None
 
+    logger.info("dream | gen_draw response: " + str(response))
     if 'imgUrls' not in response:
         return None
     return response['imgUrls']
@@ -70,9 +74,11 @@ def gen_text(text: str) -> Optional[List[str]]:
     }
     try:
         response = Composition.create(**input_dict)
-    except:
+    except Exception as err:
+        logger.error("dream | gen_text error: " + str(err))
         return None
 
+    logger.info("dream | gen_text response: " + str(response))
     if 'result' not in response:
         return None
 
@@ -215,3 +221,14 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     if not ret:
         await draw_msg.finish('……')
+
+
+if __name__ == "__main__":
+    res = gen_text('牛牛')
+    print("gen_text ret:", res)
+
+    # res = gen_text('牛牛')
+    # print("gen_text ret:", res)
+    # if res:
+    #     for item in res:
+    #         print(item)
