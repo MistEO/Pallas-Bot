@@ -22,6 +22,7 @@ if __name__ != "__main__":
 # https://wenxin.baidu.com/moduleApi/ernieVilg
 wenxin_ak = ''
 wenxin_sk = ''
+enable_探索无限_style = False
 
 wenxin_api.ak = wenxin_ak
 wenxin_api.sk = wenxin_sk
@@ -36,7 +37,8 @@ image_style_list = [
 
 
 def gen_draw(text: str) -> Optional[List[str]]:
-    rand_style = random.choice(image_style_list)
+    rand_style = '探索无限' if enable_探索无限_style else random.choice(
+        image_style_list)
     for style in image_style_list:
         if style in text:
             rand_style = style
@@ -224,8 +226,8 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
 
 if __name__ == "__main__":
-    res = gen_text('牛牛')
-    print("gen_text ret:", res)
+    res = gen_draw('明日方舟')
+    print("gen_draw ret:", res)
 
     # res = gen_text('牛牛')
     # print("gen_text ret:", res)
