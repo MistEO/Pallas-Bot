@@ -9,7 +9,7 @@ from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.onebot.v11 import permission
 from nonebot.permission import Permission
-from src.common.config import BotConfig
+from src.common.config import BotConfig, GroupConfig
 
 
 async def is_drink_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
@@ -25,8 +25,7 @@ drink_msg = on_message(
 
 @drink_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    config = BotConfig(event.self_id, event.group_id)
-    config.cooldown = 3
+    config = BotConfig(event.self_id, event.group_id, cooldown=3)
     if not config.is_cooldown('drink'):
         return
     config.refresh_cooldown('drink')
@@ -37,7 +36,6 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
             event.self_id, event.group_id, drunk_duration))
 
     config.drink()
-
     drunkenness = config.drunkenness()
     go_to_sleep = random.random() < (
         0.02 if drunkenness <= 50

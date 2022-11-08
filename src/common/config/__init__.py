@@ -48,7 +48,7 @@ class Config(ABC):
 
 
 class BotConfig(Config):
-    def __init__(self, bot_id: int, group_id: int = 0) -> None:
+    def __init__(self, bot_id: int, group_id: int = 0, cooldown: int = 5) -> None:
         super().__init__(
             table='config',
             key='account',
@@ -56,8 +56,7 @@ class BotConfig(Config):
 
         self.bot_id = bot_id
         self.group_id = group_id
-
-        self.cooldown = 5   # 单位秒
+        self.cooldown = cooldown
 
     def security(self) -> bool:
         '''
@@ -121,27 +120,27 @@ class BotConfig(Config):
         BotConfig._cooldown_data[self.bot_id][self.group_id][action_type] = time.time(
         )
 
-    _drunk_data = defaultdict(int)          # 醉酒程度，不同群应用不同的数值
+    _drunk_data = defaultdict(lambda: defaultdict(int))     # 醉酒程度，不同群应用不同的数值
     _sleep_until = defaultdict(lambda: defaultdict(int))    # 牛牛起床的时间
 
     def drink(self) -> None:
         '''
         喝酒功能，增加牛牛的混沌程度（bushi
         '''
-        BotConfig._drunk_data[self.group_id] += 1
+        BotConfig._drunk_data[self.bot_id][self.group_id] += 1
 
     def sober_up(self) -> bool:
         '''
         醒酒，降低醉酒程度，返回是否完全醒酒
         '''
-        BotConfig._drunk_data[self.group_id] -= 1
-        return BotConfig._drunk_data[self.group_id] <= 0
+        BotConfig._drunk_data[self.bot_id][self.group_id] -= 1
+        return BotConfig._drunk_data[self.bot_id][self.group_id] <= 0
 
     def drunkenness(self) -> int:
         '''
         获取醉酒程度
         '''
-        return BotConfig._drunk_data[self.group_id]
+        return BotConfig._drunk_data[self.bot_id][self.group_id]
 
     def is_sleep(self) -> bool:
         '''
@@ -158,18 +157,18 @@ class BotConfig(Config):
 
     @staticmethod
     def completely_sober():
-        for key in BotConfig._drunk_data.keys():
-            BotConfig._drunk_data[key] = 0
+        BotConfig._drunk_data = defaultdict(lambda: defaultdict(int))
 
 
 class GroupConfig(Config):
-    def __init__(self, group_id: int) -> None:
+    def __init__(self, group_id: int, cooldown: int = 5) -> None:
         super().__init__(
             table='group_config',
             key='group_id',
             key_id=group_id)
 
         self.group_id = group_id
+        self.cooldown = cooldown
 
     _roulette_mode = {}    # 0 踢人 1 禁言
 
@@ -221,6 +220,30 @@ class GroupConfig(Config):
             GroupConfig._ban_cache[self.group_id] = True if banned else False
 
         return GroupConfig._ban_cache[self.group_id]
+
+    _cooldown_data = {}
+
+    def is_cooldown(self, action_type: str) -> bool:
+        '''
+        是否冷却完成
+        '''
+        if self.group_id not in GroupConfig._cooldown_data:
+            return True
+
+        if action_type not in GroupConfig._cooldown_data[self.group_id]:
+            return True
+
+        cd = GroupConfig._cooldown_data[self.group_id][action_type]
+        return cd + self.cooldown < time.time()
+
+    def refresh_cooldown(self, action_type: str) -> None:
+        '''
+        刷新冷却时间
+        '''
+        if self.group_id not in GroupConfig._cooldown_data:
+            GroupConfig._cooldown_data[self.group_id] = {}
+
+        GroupConfig._cooldown_data[self.group_id][action_type] = time.time()
 
 
 class UserConfig(Config):

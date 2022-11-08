@@ -51,7 +51,7 @@ class ChatData:
     time: int
     bot_id: int
 
-    _keywords_size: int = 3
+    _keywords_size: int = 2
 
     @cached_property
     def is_plain_text(self) -> bool:
@@ -78,7 +78,7 @@ class ChatData:
         if not self.is_plain_text and len(self.plain_text) == 0:
             return self.raw_message
 
-        if self.keywords_len < 2:
+        if self.keywords_len == 0:
             return self.plain_text
         else:
             # keywords_list.sort()
@@ -117,7 +117,7 @@ class Chat:
 
         if (isinstance(data, ChatData)):
             self.chat_data = data
-            self.config = BotConfig(0, data.group_id)
+            self.config = BotConfig(data.bot_id, data.group_id)
         elif (isinstance(data, GroupMessageEvent)):
             self.chat_data = ChatData(
                 group_id=data.group_id,
@@ -256,13 +256,8 @@ class Chat:
             lhs_len = len(lhs_msgs)
             rhs_len = len(rhs_msgs)
 
-            # 默认是 0, 加个 1 避免乘没了
-            lhs_drunkenness = BotConfig(0, lhs_group_id).drunkenness() + 1
-            rhs_drunkenness = BotConfig(0, rhs_group_id).drunkenness() + 1
-
             if lhs_len < basic_msgs_len or rhs_len < basic_msgs_len:
-                return cmp(lhs_len * lhs_drunkenness,
-                           rhs_len * rhs_drunkenness)
+                return cmp(lhs_len, rhs_len)
 
             lhs_duration = lhs_msgs[-1]['time'] - lhs_msgs[0]['time']
             rhs_duration = rhs_msgs[-1]['time'] - rhs_msgs[0]['time']
@@ -270,8 +265,7 @@ class Chat:
             if not lhs_duration or not rhs_duration:
                 return cmp(lhs_len, rhs_len)
 
-            return cmp(lhs_len * lhs_drunkenness / lhs_duration,
-                       rhs_len * rhs_drunkenness / rhs_duration)
+            return cmp(lhs_len / lhs_duration, rhs_len / rhs_duration)
 
         # 按群聊热度排序
         popularity = sorted(Chat._message_dict.items(),
@@ -687,7 +681,7 @@ class Chat:
                 continue
 
             answer_key = answer['keywords']
-            if answer_key in ban_keywords:
+            if answer_key in ban_keywords or answer_key == keywords:
                 continue
 
             sample_msg = answer['messages'][0]
@@ -697,6 +691,8 @@ class Chat:
             if not self.chat_data.to_me and sample_msg.startswith('牛牛'):
                 # 这种一般是学反过来的，比如有人教“牛牛你好”——“你好”（反复发了好几次，互为上下文了）
                 # 然后下次有人发“你好”，突然回个“牛牛你好”，有点莫名其妙的
+                continue
+            if sample_msg.startswith("[CQ:xml"):
                 continue
 
             if answer['group_id'] == group_id:

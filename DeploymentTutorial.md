@@ -72,6 +72,11 @@
 
     👉 [安装 ffmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)
 
+9. 配置文心文生图 key （如果不需要 `牛牛做梦` 功能，可以跳过这一步）
+
+    1. 前往 [文心大模型](https://wenxin.baidu.com/moduleApi/ernieVilg) 申请你的 key
+    2. 修改牛牛代码 `src/plugins/dream/__init__.py`，将 `wenxin_ak` 和 `wenxin_sk` 改成你申请到的两个字符串
+
 ### 启动 Pallas-Bot
 
 在项目目录处打开 cmd（命令行）窗口输入以下指令
@@ -135,6 +140,11 @@ python3 -m pip install --upgrade pip # 更新 pip
     ```bash
     sudo apt install -y ffmpeg
     ```
+
+6. 配置文心文生图 key （如果不需要 `牛牛做梦` 功能，可以跳过这一步）
+
+    1. 前往 [文心大模型](https://wenxin.baidu.com/moduleApi/ernieVilg) 申请你的 key
+    2. 修改牛牛代码 `src/plugins/dream/__init__.py`，将 `wenxin_ak` 和 `wenxin_sk` 改成你申请到的两个字符串
 
 ### 启动 Pallas-Bot 及登陆账号
 
