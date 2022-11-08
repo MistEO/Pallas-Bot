@@ -22,4 +22,6 @@ RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
 RUN rm requirements.txt
 
+RUN pip install nonebot-adapter-onebot
+
 COPY ./ /app/
