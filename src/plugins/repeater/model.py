@@ -845,14 +845,18 @@ class Chat:
                         ban_keywords.add(ban_key)
         return ban_keywords
 
+    @staticmethod
+    def sync():
+        Chat._sync()
+        Chat._sync_blacklist()
+
 
 # Auto sync on program start
 Chat.update_global_blacklist()
 
 
 def _chat_sync():
-    Chat._sync()
-    Chat._sync_blacklist()
+    Chat.sync()
 
 
 # Auto sync on program exit
