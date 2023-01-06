@@ -17,7 +17,7 @@ wiki.download_pallas_voices()
 
 
 def get_voice(name: str):
-    oper = '帕拉斯'
+    oper = 'CN'
     file = wiki.voice_exists(oper, name)
     if not file:
         file = wiki.download_operator_voices(oper, name)
