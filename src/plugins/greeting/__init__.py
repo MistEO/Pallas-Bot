@@ -118,11 +118,11 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
         await all_notice.finish(msg)
 
     elif event.notice_type == 'group_admin' and event.sub_type == 'set' and event.user_id == event.self_id:
-        msg: Message = MessageSegment.record(file=Path(get_voice('任命助理')))
+        msg: Message = MessageSegment.record(file=Path(get_voice('001')))
         await all_notice.finish(msg)
 
     elif event.notice_type == 'friend_add':
-        msg: Message = MessageSegment.record(file=Path(get_voice('精英化晋升2')))
+        msg: Message = MessageSegment.record(file=Path(get_voice('014')))
         await all_notice.finish(msg)
 
     # 被禁言自动退群
