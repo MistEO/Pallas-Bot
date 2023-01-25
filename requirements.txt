@@ -10,7 +10,7 @@ requests~=2.22.0
 requests-html~=0.10.0
 
 # repeater
-pydantic~=1.9.0
+pydantic~=1.10.0
 pymongo~=3.12.1
 jieba-fast~=0.53
 pypinyin~=0.41.0
