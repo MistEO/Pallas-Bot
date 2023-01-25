@@ -4,11 +4,11 @@ import urllib.parse
 import requests
 from requests_html import HTMLSession, HTML
 
-nudge = ['问候', '闲置', '交谈1', '交谈2', '交谈3',
-         '晋升后交谈1', '晋升后交谈2', '信赖提升后交谈1', '信赖提升后交谈2', '信赖提升后交谈3',
-         '戳一下', '信赖触摸',
-         '干员报到', '精英化晋升1',
-         '编入队伍', '任命队长']
+nudge = ['042', '010', '002', '003', '004',
+         '005', '006', '007', '008', '009',
+         '034', '036',
+         '011', '013',
+         '017', '001']
 
 voices_source = 'resource/voices'
 
@@ -86,7 +86,7 @@ class Wiki(DownloadTools):
 
     def download_pallas_voices(self):
         try:
-            name = '帕拉斯'
+            name = 'CN'
             url = 'https://static.prts.wiki/voice/char_485_pallas/'
             talks = [f'{name}_{item}.wav' for item in nudge]
 
