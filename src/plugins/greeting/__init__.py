@@ -9,10 +9,11 @@ from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 from src.common.config import BotConfig, GroupConfig, UserConfig
 
-from .wiki import WikiVoice, voice_dict
+from .wiki import WikiVoice
 
 wiki = WikiVoice()
 operator = 'Pallas'
+wiki.download_voices(operator, 'char_485_pallas')
 
 target_msgs = ['牛牛', '帕拉斯']
 
