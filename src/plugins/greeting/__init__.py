@@ -1,4 +1,3 @@
-from collections import defaultdict
 import random
 import asyncio
 
@@ -10,26 +9,10 @@ from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 from src.common.config import BotConfig, GroupConfig, UserConfig
 
-from .wiki import Wiki, nudge
+from .wiki import WikiVoice, voice_dict
 
-wiki = Wiki()
-wiki.download_pallas_voices()
-
-
-def get_voice(name: str):
-    oper = 'CN'
-    file = wiki.voice_exists(oper, name)
-    if not file:
-        file = wiki.download_operator_voices(oper, name)
-        if not file:
-            return False
-    return file
-
-
-def get_rand_voice():
-    name = random.choice(nudge)
-    return get_voice(name)
-
+wiki = WikiVoice()
+operator = 'Pallas'
 
 target_msgs = ['牛牛', '帕拉斯']
 
@@ -56,7 +39,8 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
         return
     config.refresh_cooldown('call_me')
 
-    msg: Message = MessageSegment.record(file=Path(get_rand_voice()))
+    msg: Message = MessageSegment.record(
+        file=Path(wiki.get_random_voice(operator)))
     await call_me_cmd.finish(msg)
 
 to_me_cmd = on_message(
@@ -74,7 +58,8 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
     config.refresh_cooldown('to_me')
 
     if len(event.get_plaintext().strip()) == 0 and not event.reply:
-        msg: Message = MessageSegment.record(file=Path(get_rand_voice()))
+        msg: Message = MessageSegment.record(
+            file=Path(wiki.get_random_voice(operator)))
         await to_me_cmd.finish(msg)
 
 all_notice = on_notice(
@@ -118,11 +103,13 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
         await all_notice.finish(msg)
 
     elif event.notice_type == 'group_admin' and event.sub_type == 'set' and event.user_id == event.self_id:
-        msg: Message = MessageSegment.record(file=Path(get_voice('001')))
+        msg: Message = MessageSegment.record(
+            file=Path(wiki.get_voice_filename(operator, '任命助理')))
         await all_notice.finish(msg)
 
     elif event.notice_type == 'friend_add':
-        msg: Message = MessageSegment.record(file=Path(get_voice('014')))
+        msg: Message = MessageSegment.record(
+            file=Path(wiki.get_voice_filename(operator, '精英化晋升2')))
         await all_notice.finish(msg)
 
     # 被禁言自动退群

@@ -1,24 +1,31 @@
 import os
 import traceback
-import urllib.parse
 import requests
-from requests_html import HTMLSession, HTML
+import random
 
-nudge = ['042', '010', '002', '003', '004',
-         '005', '006', '007', '008', '009',
-         '034', '036',
-         '011', '013',
-         '017', '001']
+# 这里的值是CN不代表是中文语音，wiki的定义有点怪，所有语言都叫CN_xx
+# 实际的url类似 'https://static.prts.wiki/voice_jp/char_485_pallas/CN_01.wav'
+voice_dict = {
+    '问候': 'CN_042',
+    '闲置': 'CN_010',
+    '交谈1': 'CN_002',
+    '交谈2': 'CN_003',
+    '交谈3': 'CN_004',
+    '晋升后交谈1': 'CN_005',
+    '晋升后交谈2': 'CN_006',
+    '信赖提升后交谈1': 'CN_007',
+    '信赖提升后交谈2': 'CN_008',
+    '信赖提升后交谈3': 'CN_009',
+    '戳一下': 'CN_034',
+    '信赖触摸': 'CN_036',
+    '干员报到': 'CN_011',
+    '精英化晋升1': 'CN_013',
+    '编入队伍': 'CN_017',
+    '任命队长': 'CN_001'
+}
+
 
 voices_source = 'resource/voices'
-
-
-def make_folder(path):
-    if not os.path.exists(path):
-        try:
-            os.makedirs(path)
-        except FileExistsError:
-            pass
 
 
 class DownloadTools:
@@ -38,71 +45,50 @@ class DownloadTools:
                     return stream.content
         except Exception:
             print(traceback.format_exc())
-        return False
+        return None
 
 
-class Wiki(DownloadTools):
-    def __init__(self):
-        self.wiki_url = 'http://prts.wiki'
-        self.wiki_session = HTMLSession()
-
-    def get_page(self, url) -> HTML:
-        req = self.wiki_session.get(url)
-        return getattr(req, 'html')
-
-    def request_pic_from_wiki(self, name):
-        # noinspection PyBroadException
-        try:
-            html = self.get_page(f'{self.wiki_url}/w/文件:{name}.png')
-            file = html.find('#file > a', first=True)
-            furl = self.wiki_url + file.attrs['href']
-            return self.request_file(furl, stringify=False)
-        except Exception:
-            print(traceback.format_exc())
-        return False
-
-    def request_voice_from_wiki(self, operator, url, filename):
-        file = f'{voices_source}/{operator}/{filename}'
-        if os.path.exists(file):
-            return file
-
-        res = self.request_file(url, stringify=False)
-        if res:
-            make_folder(f'{voices_source}/{operator}')
-            with open(file, mode='wb+') as src:
-                src.write(res)
-            return file
-
-    def download_operator_voices(self, operator, name):
-        try:
-            filename = f'{operator}_{name}.wav'
-            url = 'https://static.prts.wiki/voice/char_485_pallas/'
-            print('Downing', filename)
-            return self.request_voice_from_wiki(
-                name, url + filename, filename)
-        except Exception as e:
-            print(repr(e))
-        return False
-
-    def download_pallas_voices(self):
-        try:
-            name = 'CN'
-            url = 'https://static.prts.wiki/voice/char_485_pallas/'
-            talks = [f'{name}_{item}.wav' for item in nudge]
-
-            for filename in talks:
-                print('Downing', filename)
-                self.request_voice_from_wiki(
-                    name, url + filename, filename)
-
-        except Exception as e:
-            print(repr(e))
-
-    @staticmethod
-    def voice_exists(operator, name):
+class WikiVoice(DownloadTools):
+    def download_voice_from_wiki(self, operator, url, filename):
         folder = f'{voices_source}/{operator}'
-        file = f'{folder}/{operator}_{name}.wav'
-        if not os.path.exists(file):
-            make_folder(folder)
-            return False
-        return file
+        f = f'{folder}/{filename}'
+        print('Downloading', url, "as", filename, "to", folder)
+        if os.path.exists(f):
+            print("Already exists")
+            return
+
+        content = self.request_file(url, stringify=False)
+        if content:
+            os.makedirs(folder, exist_ok=True)
+            with open(f, mode='wb+') as voice:
+                voice.write(content)
+        else:
+            print("Download failed!")
+
+    def download_voices(self, folder, oper_id):
+        base_url = f'https://static.prts.wiki/voice/{oper_id}/'
+        for key, web_file in voice_dict.items():
+            url = f'{base_url}{web_file}.wav'
+            filename = f'{key}.wav'
+            self.download_voice_from_wiki(folder, url, filename)
+
+    def get_voice_filename(self, operator, key):
+        if key not in voice_dict:
+            return None
+
+        f = f'{voices_source}/{operator}/{key}.wav'
+        if not os.path.exists(f):
+            return None
+        return f
+
+    def get_random_voice(self, operator):
+        key = random.choice(list(voice_dict.keys()))
+        return self.get_voice_filename(operator, key)
+
+
+if __name__ == '__main__':
+    operator = 'Pallas'
+    wiki = WikiVoice()
+    wiki.download_voices('Pallas', 'char_485_pallas')
+
+    print(wiki.get_random_voice(operator))
