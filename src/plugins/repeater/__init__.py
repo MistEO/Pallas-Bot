@@ -186,3 +186,31 @@ update_sched = require('nonebot_plugin_apscheduler').scheduler
 def update_data():
     Chat.sync()
     Chat.clearup_context()
+
+
+change_name_sched = require('nonebot_plugin_apscheduler').scheduler
+
+
+@change_name_sched.scheduled_job('cron', hour='*/2')
+async def change_name():
+    target_id, group_id, bot_id = Chat.get_change_name_id()
+    if not target_id:
+        return
+    logger.info(
+            'get_name | bot ready to change name by using [{}] in group [{}]'.format(
+                target_id, group_id))
+
+    info = await get_bot(str(bot_id)).call_api('get_group_member_info', **{
+            'group_id': group_id,
+            'user_id': target_id,
+            'no_cache': True
+        })
+    card = info['card']
+    logger.info(
+            'get_name | bot ready to change name to[{}] in group [{}]'.format(
+                card, group_id))
+    await get_bot(str(bot_id)).call_api('set_group_card', **{
+            'group_id': group_id,
+            'user_id': bot_id,
+            'card': card
+        })

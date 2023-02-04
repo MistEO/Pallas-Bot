@@ -459,6 +459,17 @@ class Chat:
 
         return True
 
+    @staticmethod
+    def get_change_name_id():
+        group_id = random.choice(list(Chat._message_dict))
+        target_id = random.choice(Chat._message_dict[group_id])['user_id']
+        group_replies = Chat._reply_dict[group_id]
+        if not len(group_replies):
+            return None,None,None
+        bot_id = random.choice(
+                [bid for bid in group_replies.keys() if bid])
+        return target_id, group_id, bot_id
+
 # private:
     _reply_dict = defaultdict(lambda: defaultdict(list))  # 牛牛回复的消息缓存，暂未做持久化
     _message_dict = {}              # 群消息缓存
