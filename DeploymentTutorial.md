@@ -6,6 +6,8 @@
 
 - 你需要一个额外的 QQ 小号，一台自己的 `电脑` 或 `服务器`，请不要用大号进行部署
 - 你自己部署的牛牛与其他牛牛数据并不互通，是一张白纸，需要从头调教
+- Pallas-Bot 需要 python 环境为 python3.8 | python3.9 | python3.10
+- 提供 `requirements.txt` 文件，可以自行安装依赖，但是推荐使用 poetry 进行依赖管理
 
 ## Windows系统
 
@@ -28,62 +30,47 @@
 1. 解压下载好的 Pallas-Bot 源码并进入根目录；请**务必**进入文件夹后再进行后面的操作
 
 2. 在 Pallas-Bot 的目录打开 `命令行窗口`（俗称 cmd ）
-3. 更换 pip 源为阿里云*（更换为国内源会比默认的国外源快很多）
+
+3. 安装 poetry 管理 python 环境
 
     ```cmd
-    python3 -m pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/
-    ```
+   python3 -m pip install poetry    
+   ```
+   如果系统无法识别 `python3` 指令。则需要将 `python3` 添加到环境变量中，具体请自行搜索解决方法。
 
-    或者你也可以搜索如何更换为其他的国内源；如果系统无法识别 `python3` 指令。则需要将 `python3` 添加到环境变量中，具体请自行搜索解决方法。
+4. 安装依赖
 
-4. 通过手脚架安装nonebot
+   ```cmd
+   poetry install
+   ```
 
-    ```cmd
-    python3 -m pip install nb-cli
-    ```
-
-    详情参见 [安装 NoneBot2](https://v2.nonebot.dev/docs/start/installation)
-
-5. 安装依赖
-
-    ```cmd
-    python3 -m pip install -r requirements.txt
-    ```
-
-    （如果这些依赖与其他 Python 程序产生了冲突，请自行搜索如何构建python虚拟环境）
-
-6. 安装 nonebot 的 apscheduler 插件和 websockets 驱动器
-
-    ```cmd
-    nb plugin install nonebot_plugin_apscheduler
-    nb plugin install nonebot_plugin_gocqhttp
-    nb driver install websockets
-    ```
-
-    （如果你的系统提示找不到 `nb`，请自行尝试添加相关环境变量~）
-
-7. 安装并启动 Mongodb （这是启动核心功能所必须的）
+5. 安装并启动 Mongodb （这是启动核心功能所必须的）
 
     👉 [Windows 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-window-install.html)
 
     只需要确认 Mongodb 启动即可，后面的部分会由 Pallas-Bot 自动完成
 
-8. 配置 ffmpeg （如果不希望牛牛发送语音，可以跳过这一步）
+6. 配置 ffmpeg （如果不希望牛牛发送语音，可以跳过这一步）
 
     👉 [安装 ffmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)
 
-9. 配置文心文生图 key （如果不需要 `牛牛做梦` 功能，可以跳过这一步）
+7. 配置文心文生图 key （如果不需要 `牛牛做梦` 功能，可以跳过这一步）
 
     1. 前往 [文心大模型](https://wenxin.baidu.com/moduleApi/ernieVilg) 申请你的 key
     2. 修改牛牛代码 `src/plugins/dream/__init__.py`，将 `wenxin_ak` 和 `wenxin_sk` 改成你申请到的两个字符串
 
 ### 启动 Pallas-Bot
-
 在项目目录处打开 cmd（命令行）窗口输入以下指令
 
-```cmd
-nb run
-```
+   ```cmd
+   poetry shell
+   ```
+
+进入虚拟环境后输入以下指令启动 Pallas-Bot
+
+   ```cmd
+   nb run
+   ```
 
 **注意！请不要关闭这个命令行窗口！这会导致 Pallas-Bot 停止运行！**
 
@@ -103,45 +90,30 @@ sudo apt install -y git python3 # 安装 git, python3
 sudo ldconfig                   # 更新系统路径
 python3 -m pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/ # 更换 pip 源为国内源
 python3 -m pip install --upgrade pip # 更新 pip
+python3 -m pip install poetry   # 安装 poetry
 ```
 
 ### 配置 Linux 运行环境
 
-1. 安装 nonebot
-
-    ```bash
-    python3 -m pip install nb-cli
-    ```
-
-    详情参见 [安装 NoneBot2](https://v2.nonebot.dev/docs/start/installation)
-
-2. clone 本仓库并安装项目依赖
+1. clone 本仓库并安装项目依赖
 
     ```bash  
     git clone https://github.com/InvoluteHell/Pallas-Bot.git
     cd Pallas-Bot
-    python3 -m pip install -r requirements.txt
+    poetry install
     ```
 
-3. 安装 nonebot 的 apscheduler 插件和 websockets 驱动器
-
-    ```bash
-    nb plugin install nonebot_plugin_apscheduler
-    nb plugin install nonebot_plugin_gocqhttp
-    nb driver install websockets
-    ```
-
-4. 安装并启动 Mongodb （这是启动核心功能所必须的）
+2. 安装并启动 Mongodb （这是启动核心功能所必须的）
 
     👉 [Linux 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-linux-install.html)
 
-5. 安装 ffmpeg （如果不希望牛牛发送语音，可以跳过这一步）
+3. 安装 ffmpeg （如果不希望牛牛发送语音，可以跳过这一步）
 
     ```bash
     sudo apt install -y ffmpeg
     ```
 
-6. 配置文心文生图 key （如果不需要 `牛牛做梦` 功能，可以跳过这一步）
+4. 配置文心文生图 key （如果不需要 `牛牛做梦` 功能，可以跳过这一步）
 
     1. 前往 [文心大模型](https://wenxin.baidu.com/moduleApi/ernieVilg) 申请你的 key
     2. 修改牛牛代码 `src/plugins/dream/__init__.py`，将 `wenxin_ak` 和 `wenxin_sk` 改成你申请到的两个字符串
@@ -161,6 +133,27 @@ python3 -m pip install --upgrade pip # 更新 pip
 <https://github.com/mnixry/nonebot-plugin-gocqhttp/issues/186> 也是插件本身的 bug, 建议自己每次添加/删除账号后，手动备份一下这个文件，如果之前没备份，那就只能删除了这个文件重新配一下账号吧_(:з」∠)_
 
 当然要是有大佬帮忙给插件写个备份机制就更好啦 ✿✿ヽ(°▽°)ノ✿
+
+### 使用的是国外的机子怎么办
+
+因为项目默认使用的是国内的 pip 源，所以如果你的机子在国外，那么在安装依赖的时候可能会出现下载失败的情况。
+
+解决方法是在 `pyproject.toml` 中删除以下内容：
+
+```toml
+[[tool.poetry.source]]
+name = "aliyun"
+url = "https://mirrors.aliyun.com/pypi/simple"
+default = true
+```
+
+然后重新安装依赖即可。
+
+也可以使用如下命令重新导出一份`requirements.txt`文件，然后使用国外的源安装依赖：
+
+```bash
+poetry export --without-hashes -f requirements.txt --output requirements.txt
+```
 
 ## 开发者群
 
