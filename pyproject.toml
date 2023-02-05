@@ -6,11 +6,27 @@ authors = []
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.7.3"
-nonebot2 = "^2.0.0-beta.1"
+python = "^3.8"
+nonebot2 = {extras = ["fastapi"], version = "^2.0.0rc3"}
+nonebot-adapter-onebot = "^2.2.1"
+requests = "^2.28.2"
+requests-html = "^0.10.0"
+pydantic = "^1.10.4"
+pymongo = "^4.3.3"
+jieba-fast = "^0.53"
+pypinyin = "^0.48.0"
+wenxin-api = "^0.2.1"
+asyncer = "^0.0.2"
+nonebot-plugin-apscheduler = "^0.2.0"
+nonebot-plugin-gocqhttp = "^0.6.4"
 
 [tool.poetry.dev-dependencies]
 nb-cli = "^0.6.0"
+
+[[tool.poetry.source]]
+name = "aliyun"
+url = "https://mirrors.aliyun.com/pypi/simple"
+default = true
 
 [tool.nonebot]
 plugins = ["nonebot_plugin_apscheduler", "nonebot_plugin_gocqhttp"]
