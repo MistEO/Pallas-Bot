@@ -134,6 +134,27 @@ python3 -m pip install poetry   # 安装 poetry
 
 当然要是有大佬帮忙给插件写个备份机制就更好啦 ✿✿ヽ(°▽°)ノ✿
 
+### 使用的是国外的机子怎么办
+
+因为项目默认使用的是国内的 pip 源，所以如果你的机子在国外，那么在安装依赖的时候可能会出现下载失败的情况。
+
+解决方法是在 `pyproject.toml` 中删除以下内容：
+
+```toml
+[[tool.poetry.source]]
+name = "aliyun"
+url = "https://mirrors.aliyun.com/pypi/simple"
+default = true
+```
+
+然后重新安装依赖即可。
+
+也可以使用如下命令重新导出一份`requirements.txt`文件，然后使用国外的源安装依赖：
+
+```bash
+poetry export --without-hashes -f requirements.txt --output requirements.txt
+```
+
 ## 开发者群
 
 QQ 群: [牛牛听话！](https://jq.qq.com/?_wv=1027&k=tlLDuWzc)  
