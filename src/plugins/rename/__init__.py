@@ -4,8 +4,7 @@ from src.plugins.repeater.model import Chat
 
 change_name_sched = require('nonebot_plugin_apscheduler').scheduler
 
-
-@change_name_sched.scheduled_job('interval', seconds=5)
+@change_name_sched.scheduled_job('cron', hour='*/1')
 async def change_name():
     rand_messages = Chat.get_random_message_from_each_group()
     if not rand_messages:
