@@ -13,6 +13,24 @@ from .wiki import WikiVoice
 
 wiki = WikiVoice()
 operator = 'Pallas'
+greeting_voices = [
+    '交谈1',
+    '交谈2',
+    '交谈3',
+    '晋升后交谈1',
+    '晋升后交谈2',
+    '信赖提升后交谈1',
+    '信赖提升后交谈2',
+    '信赖提升后交谈3',
+    '闲置',
+    '干员报到',
+    '精英化晋升1',
+    '编入队伍',
+    '任命队长',
+    '戳一下',
+    '信赖触摸',
+    '问候',
+]
 wiki.download_voices(operator, 'char_485_pallas')
 
 target_msgs = ['牛牛', '帕拉斯']
@@ -41,7 +59,7 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
     config.refresh_cooldown('call_me')
 
     msg: Message = MessageSegment.record(
-        file=Path(wiki.get_random_voice(operator)))
+        file=Path(wiki.get_random_voice(operator, greeting_voices)))
     await call_me_cmd.finish(msg)
 
 to_me_cmd = on_message(
@@ -60,7 +78,7 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
 
     if len(event.get_plaintext().strip()) == 0 and not event.reply:
         msg: Message = MessageSegment.record(
-            file=Path(wiki.get_random_voice(operator)))
+            file=Path(wiki.get_random_voice(operator, greeting_voices)))
         await to_me_cmd.finish(msg)
 
 all_notice = on_notice(
