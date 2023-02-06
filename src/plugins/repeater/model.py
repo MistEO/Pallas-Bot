@@ -304,61 +304,15 @@ class Chat:
                     'reply_keywords': '[PallasBot: Speak]',
                 })
 
-            available_time = cur_time - 24 * 3600
-            speak_context = context_mongo.aggregate([
-                {
-                    '$match': {
-                        'count': {
-                            '$gt': Chat.answer_threshold
-                        },
-                        'time': {
-                            '$gt': available_time
-                        },
-                        # 上面两行为了加快查找速度，对查找到的结果不产生影响
-                        'answers.group_id': group_id,
-                        'answers.time': {
-                            '$gt': available_time
-                        },
-                        'answers.count': {
-                            '$gt': Chat.answer_threshold
-                        }
-                    }
-                }, {
-                    '$sample': {'size': 1}  # 随机一条
-                }, {
-                    '$project': {
-                        'answers': {
-                            '$filter': {
-                                'input': '$answers',
-                                'as': 'answers',
-                                'cond': {
-                                    '$eq': [
-                                        '$$answers.group_id', group_id
-                                    ]
-                                }
-                            }
-                        },
-                        "ban": 1
-                    }
-                }
-            ])
-
-            speak_context = list(speak_context)
-            if not speak_context:
-                continue
-
             ban_keywords = Chat._find_ban_keywords(
-                context=speak_context[0], group_id=group_id)
-            messages = [answer['messages']
-                        for answer in speak_context[0]['answers']
-                        if answer['count'] >= Chat.answer_threshold
-                        and answer['keywords'] not in ban_keywords
-                        and answer['group_id'] == group_id]
-
-            if not messages:
+                context='', group_id=group_id)
+            available_messages = [msg for msg in Chat._message_dict[group_id] 
+                                  if msg['keywords'] not in ban_keywords]
+            if not available_messages:
                 continue
 
-            speak = random.choice(random.choice(messages))
+            rand_message = random.choice(available_messages)
+            speak = rand_message["raw_message"]
 
             bot_id = random.choice(
                 [bid for bid in group_replies.keys() if bid])
