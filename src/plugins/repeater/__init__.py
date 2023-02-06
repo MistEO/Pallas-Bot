@@ -186,3 +186,4 @@ update_sched = require('nonebot_plugin_apscheduler').scheduler
 def update_data():
     Chat.sync()
     Chat.clearup_context()
+

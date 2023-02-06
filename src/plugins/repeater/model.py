@@ -459,6 +459,19 @@ class Chat:
 
         return True
 
+    @staticmethod
+    def get_change_name_id():
+        # 模仿自由发言，被夺舍的群友得是经常发言的，不然没人认识，需要用到_message_dict
+        group_target_list = []
+        for group_id in list(Chat._message_dict):
+            group_target_list.append((group_id, random.choice(Chat._message_dict[group_id])['user_id']))
+            group_replies = Chat._reply_dict[group_id]
+            if not len(group_replies):
+                return
+            bot_id = random.choice(
+                    [bid for bid in group_replies.keys() if bid])
+        return group_target_list, bot_id
+
 # private:
     _reply_dict = defaultdict(lambda: defaultdict(list))  # 牛牛回复的消息缓存，暂未做持久化
     _message_dict = {}              # 群消息缓存
