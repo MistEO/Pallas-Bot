@@ -26,7 +26,7 @@ async def change_name():
             })
         # 有时会获取不了群友的群昵称，不知道为啥
         await asyncio.sleep(5)
-        card = info['card']
+        card = info['card'] if info['card'] else info['nickname']
         logger.info(
                 'rename | bot [{}] ready to change name to[{}] in group [{}]'.format(
                     bot_id, card, group_id))
