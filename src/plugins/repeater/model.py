@@ -306,7 +306,7 @@ class Chat:
 
             ban_keywords = Chat._find_ban_keywords(
                 context='', group_id=group_id)
-            available_messages = [msg for msg in Chat._message_dict[group_id] 
+            available_messages = [msg for msg in Chat._message_dict[group_id]
                                   if msg['keywords'] not in ban_keywords]
             if not available_messages:
                 continue
@@ -422,8 +422,8 @@ class Chat:
         '''
 
         return {group_id: random.choice(group_msgs)
-                                  for group_id, group_msgs in Chat._message_dict.items()
-                                  if group_msgs}
+                for group_id, group_msgs in Chat._message_dict.items()
+                if group_msgs}
 
 # private:
     _reply_dict = defaultdict(lambda: defaultdict(list))  # 牛牛回复的消息缓存，暂未做持久化
@@ -655,10 +655,11 @@ class Chat:
             if self.chat_data.is_image and '[CQ:' not in sample_msg:
                 # 图片消息不回复纯文本。图片经常是表情包，后面的纯文本啥都有，很乱
                 continue
-            if not self.chat_data.to_me and sample_msg.startswith('牛牛'):
-                # 这种一般是学反过来的，比如有人教“牛牛你好”——“你好”（反复发了好几次，互为上下文了）
-                # 然后下次有人发“你好”，突然回个“牛牛你好”，有点莫名其妙的
-                continue
+            if sample_msg.startswith('牛牛'):
+                if not self.chat_data.to_me or len(sample_msg) <= 6:
+                    # 这种一般是学反过来的，比如有人教“牛牛你好”——“你好”（反复发了好几次，互为上下文了）
+                    # 然后下次有人发“你好”，突然回个“牛牛你好”，有点莫名其妙的
+                    continue
             if sample_msg.startswith("[CQ:xml"):
                 continue
 
