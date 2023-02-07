@@ -14,9 +14,11 @@ import atexit
 
 from nonebot.adapters import Event
 
-mongo_client = pymongo.MongoClient('127.0.0.1', 27017)
+from configs.config import address,port,database
 
-mongo_db = mongo_client['PallasBot']
+mongo_client = pymongo.MongoClient(address, port)
+
+mongo_db = mongo_client[database]
 
 message_mongo = mongo_db['message']
 message_mongo.create_index(name='time_index',

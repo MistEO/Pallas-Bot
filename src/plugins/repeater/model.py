@@ -17,9 +17,11 @@ from nonebot.adapters.onebot.v11 import Message, MessageSegment
 
 from src.common.config import BotConfig
 
-mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
+from configs.config import address,port,database
 
-mongo_db = mongo_client['PallasBot']
+mongo_client = pymongo.MongoClient(address, port, w=0)
+
+mongo_db = mongo_client[database]
 
 message_mongo = mongo_db['message']
 message_mongo.create_index(name='time_index',
