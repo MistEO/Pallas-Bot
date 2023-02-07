@@ -155,6 +155,24 @@ default = true
 poetry export --without-hashes -f requirements.txt --output requirements.txt
 ```
 
+### 部署完成后打不开页面怎么办
+
+部署完成后，访问 `<ip>:8080/go-cqhttp/` ，页面打不开。
+
+https://github.com/MistEO/Pallas-Bot/issues/38#issue-1380252508
+
+这个问题一般出现在Linux部署上，首先检查你的防火墙是否关闭，用的云服务器需要查看安全组是否放行了牛牛的端口，默认是8080.
+
+如果检查完成，确认不是防火墙的问题，则执行以下操作
+
+```
+将 .env 第一行改为 ENVIRONMENT=prod
+将 .env.dev 第一行改为 HOST=0.0.0.0
+二选一
+```
+
+
+
 ## 开发者群
 
 QQ 群: [牛牛听话！](https://jq.qq.com/?_wv=1027&k=tlLDuWzc)  
