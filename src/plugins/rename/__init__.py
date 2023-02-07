@@ -7,14 +7,14 @@ from src.plugins.repeater.model import Chat
 change_name_sched = require('nonebot_plugin_apscheduler').scheduler
 
 
-@change_name_sched.scheduled_job('cron', hour='*/1')
+@change_name_sched.scheduled_job('cron', minute='*/1')
 async def change_name():
     rand_messages = Chat.get_random_message_from_each_group()
     if not rand_messages:
         return
 
     for group_id, target_msg in rand_messages.items():
-        if random.random() > 0.2:  # 20% 概率改名字
+        if random.random() > 0.005:  # 期望约每 3 个多小时改一次
             continue
 
         target_user_id = target_msg['user_id']
