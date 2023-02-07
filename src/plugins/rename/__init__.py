@@ -1,5 +1,6 @@
 import random
 from nonebot import require, logger, get_bot
+from nonebot.exception import ActionFailed
 
 from src.plugins.repeater.model import Chat
 
@@ -13,7 +14,7 @@ async def change_name():
         return
 
     for group_id, target_msg in rand_messages.items():
-        if random.random() > 0.2: # 20% 概率改名字
+        if random.random() > 0.2:  # 20% 概率改名字
             continue
 
         target_user_id = target_msg['user_id']
@@ -21,18 +22,27 @@ async def change_name():
         logger.info(
             'rename | bot [{}] ready to change name by using [{}] in group [{}]'.format(
                 bot_id, target_user_id, group_id))
-        # 获取群友昵称
-        info = await get_bot(str(bot_id)).call_api('get_group_member_info', **{
-            'group_id': group_id,
-            'user_id': target_user_id,
-            'no_cache': True
-        })
+        try:
+            # 获取群友昵称
+            info = await get_bot(str(bot_id)).call_api('get_group_member_info', **{
+                'group_id': group_id,
+                'user_id': target_user_id,
+                'no_cache': True
+            })
+        except ActionFailed:
+            # 可能这人退群了
+            continue
+
         card = info['card'] if info['card'] else info['nickname']
         logger.info(
             'rename | bot [{}] ready to change name to[{}] in group [{}]'.format(
                 bot_id, card, group_id))
-        await get_bot(str(bot_id)).call_api('set_group_card', **{
-            'group_id': group_id,
-            'user_id': bot_id,
-            'card': card
-        })
+        try:
+            await get_bot(str(bot_id)).call_api('set_group_card', **{
+                'group_id': group_id,
+                'user_id': bot_id,
+                'card': card
+            })
+        except ActionFailed:
+            # 可能牛牛退群了
+            continue
