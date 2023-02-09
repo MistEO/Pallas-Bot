@@ -14,7 +14,7 @@ async def change_name():
         return
 
     for group_id, target_msg in rand_messages.items():
-        if random.random() > 0.005:  # 期望约每 3 个多小时改一次
+        if random.random() > 0.002:  # 期望约每8个多小时改一次
             continue
 
         target_user_id = target_msg['user_id']
