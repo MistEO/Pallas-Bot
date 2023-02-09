@@ -59,7 +59,7 @@ async def change_name():
             })
 
             # 酒后夺舍！改群友的！
-            if config.drunkenness() and is_bot_admin(bot_id, group_id, True):
+            if config.drunkenness() and await is_bot_admin(bot_id, group_id, True):
                 await bot.call_api('set_group_card', **{
                     'group_id': group_id,
                     'user_id': target_user_id,
