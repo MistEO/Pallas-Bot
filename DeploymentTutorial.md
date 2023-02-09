@@ -36,6 +36,7 @@
     ```cmd
    python3 -m pip install poetry    
    ```
+
    如果系统无法识别 `python3` 指令。则需要将 `python3` 添加到环境变量中，具体请自行搜索解决方法。
 
 4. 安装依赖
@@ -55,6 +56,7 @@
     👉 [安装 ffmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)
 
 ### 启动 Pallas-Bot
+
 在项目目录处打开 cmd（命令行）窗口输入以下指令
 
    ```cmd
