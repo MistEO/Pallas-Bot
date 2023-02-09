@@ -118,13 +118,7 @@ python3 -m pip install poetry   # 安装 poetry
 
 ### 牛牛只发语音不发文字怎么办？
 
-多半是被腾讯风控了（ WebUI 上点开账号可以看到输出提示），多挂几天就好了 ( ´_ゝ` )
-
-### 突然报错 accounts/binary/accounts.pkl 怎么回事？
-
-<https://github.com/mnixry/nonebot-plugin-gocqhttp/issues/186> 也是插件本身的 bug, 建议自己每次添加/删除账号后，手动备份一下这个文件，如果之前没备份，那就只能删除了这个文件重新配一下账号吧_(:з」∠)_
-
-当然要是有大佬帮忙给插件写个备份机制就更好啦 ✿✿ヽ(°▽°)ノ✿
+多半是被腾讯风控了（ WebUI 上点开账号可以看到输出提示），自己拿手机登下随便找个群发句话，应该会有提示让你验证。如果没有就多挂几天吧，可能过几天就好了 ( ´_ゝ` )
 
 ### 使用的是国外的机子怎么办
 
@@ -141,7 +135,7 @@ default = true
 
 然后重新安装依赖即可。
 
-也可以使用如下命令重新导出一份`requirements.txt`文件，然后使用国外的源安装依赖：
+也可以使用如下命令重新导出一份 `requirements.txt` 文件，然后使用国外的源安装依赖：
 
 ```bash
 poetry export --without-hashes -f requirements.txt --output requirements.txt
