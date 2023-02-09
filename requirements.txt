@@ -67,7 +67,6 @@ uvloop==0.17.0 ; sys_platform != "win32" and sys_platform != "cygwin" and platfo
 w3lib==2.1.1 ; python_version >= "3.8" and python_version < "4.0"
 watchfiles==0.18.1 ; python_version >= "3.8" and python_version < "4.0"
 websockets==10.4 ; python_version >= "3.8" and python_version < "4.0"
-wenxin-api==0.2.1 ; python_version >= "3.8" and python_version < "4.0"
 win32-setctime==1.1.0 ; python_version >= "3.8" and python_version < "4.0" and sys_platform == "win32"
 yarl==1.8.2 ; python_version >= "3.8" and python_version < "4.0"
 zipp==3.12.0 ; python_version >= "3.8" and python_version < "4.0"
