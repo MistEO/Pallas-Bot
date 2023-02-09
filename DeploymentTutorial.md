@@ -35,7 +35,8 @@ sudo apt-get install build-essential
 
 - 打开下载的exe程序，选择`使用C++的桌面开发`，并在右侧列表选中`MSVC VS 2022 C++ x64/x86 生成工具`，`用于Windows的 C++ CMake 工具`，根据你的系统版本选择`Windows 10 SDK`或者`Windows 11 SDK`其中的一个，然后点击安装，等待安装完成即可
 
-附一张安装VS的图
+- 附一张安装VS的图
+
 <img width="214" alt="image" src="https://user-images.githubusercontent.com/109732988/217851134-9cd2b3b5-3da0-4f05-8b7d-3117a5ffe6b0.png">
 
 
