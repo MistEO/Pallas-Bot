@@ -20,5 +20,5 @@ async def handle_request(bot: Bot, event: GroupRequestEvent, state: T_State):
                 not GroupConfig(event.group_id).is_banned() and
                 not UserConfig(event.user_id).is_banned()
             ) or \
-                bot_config.is_admin(event.user_id):
+                bot_config.is_admin_of_bot(event.user_id):
             await event.approve(bot)

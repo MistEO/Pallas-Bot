@@ -8,6 +8,7 @@ from nonebot.rule import keyword, startswith, to_me, Rule
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 from src.common.config import BotConfig, GroupConfig, UserConfig
+from src.common.utils import is_bot_admin
 
 from .wiki import WikiVoice
 
@@ -86,16 +87,6 @@ all_notice = on_notice(
     block=False)
 
 
-async def is_admin(self_id: int, group_id: int) -> bool:
-    info = await get_bot(str(self_id)).call_api('get_group_member_info', **{
-        'user_id': self_id,
-        'group_id': group_id
-    })
-    flag: bool = info['role'] == 'admin' or info['role'] == 'owner'
-
-    return flag
-
-
 @all_notice.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     if event.notice_type == 'notify' and event.sub_type == 'poke' and event.target_id == event.self_id:
@@ -114,7 +105,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     elif event.notice_type == 'group_increase':
         if event.user_id == event.self_id:
             msg = '我是来自米诺斯的祭司帕拉斯，会在罗德岛休息一段时间......虽然这么说，我渴望以美酒和戏剧被招待，更渴望走向战场。'
-        elif await is_admin(event.self_id, event.group_id):
+        elif await is_bot_admin(event.self_id, event.group_id):
             msg: Message = MessageSegment.at(event.user_id) + MessageSegment.text(
                 '博士，欢迎加入这盛大的庆典！我是来自米诺斯的祭司帕拉斯......要来一杯美酒么？')
         else:

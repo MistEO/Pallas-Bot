@@ -72,14 +72,14 @@ class BotConfig(Config):
         accept = self._find_key('auto_accept')
         return True if accept else False
 
-    def is_admin(self, user_id: int) -> bool:
+    def is_admin_of_bot(self, user_id: int) -> bool:
         '''
         是否是管理员
         '''
         admins = self._find_key('admins')
         return user_id in admins if admins else False
 
-    def add_admin(self, user_id: int) -> None:
+    def add_bot_admin(self, user_id: int) -> None:
         '''
         添加管理员
         '''

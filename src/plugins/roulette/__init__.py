@@ -93,7 +93,7 @@ async def is_roulette_type_msg(bot: Bot, event: GroupMessageEvent, state: T_Stat
 
 
 async def is_config_admin(event: GroupMessageEvent) -> bool:
-    return BotConfig(event.self_id).is_admin(event.user_id)
+    return BotConfig(event.self_id).is_admin_of_bot(event.user_id)
 
 IsAdmin = permission.GROUP_OWNER | permission.GROUP_ADMIN | Permission(
     is_config_admin)
