@@ -29,9 +29,15 @@ async def change_name():
         logger.info(
             'rename | bot [{}] ready to change name by using [{}] in group [{}]'.format(
                 bot_id, target_user_id, group_id))
+
+        bot = get_bot(str(bot_id))
+        if not bot:
+            logger.error("rename | no bot: " + str(bot_id))
+            continue
+
         try:
             # 获取群友昵称
-            info = await get_bot(str(bot_id)).call_api('get_group_member_info', **{
+            info = await bot.call_api('get_group_member_info', **{
                 'group_id': group_id,
                 'user_id': target_user_id,
                 'no_cache': True
@@ -46,7 +52,7 @@ async def change_name():
                 bot_id, card, group_id))
         try:
             # 改牛牛自己的群名片
-            await get_bot(str(bot_id)).call_api('set_group_card', **{
+            await bot.call_api('set_group_card', **{
                 'group_id': group_id,
                 'user_id': bot_id,
                 'card': card
@@ -54,14 +60,14 @@ async def change_name():
 
             # 酒后夺舍！改群友的！
             if config.drunkenness() and is_bot_admin(bot_id, group_id, True):
-                await get_bot(str(bot_id)).call_api('set_group_card', **{
+                await bot.call_api('set_group_card', **{
                     'group_id': group_id,
                     'user_id': target_user_id,
                     'card': random.choice(['帕拉斯', '牛牛', '牛牛喝酒', '牛牛干杯', '牛牛继续喝'])
                 })
 
             # 戳一戳
-            await get_bot(str(bot_id)).call_api('send_group_msg', **{
+            await bot.call_api('send_group_msg', **{
                 'message': Message('[CQ:poke,qq={}]'.format(target_user_id)),
                 'group_id': group_id
             })
