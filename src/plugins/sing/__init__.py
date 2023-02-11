@@ -29,6 +29,8 @@ sing_msg = on_message(
 
 inference_locker = Lock()
 
+SING_COOLDOWN_KEY = 'sing'
+
 
 @sing_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
@@ -37,12 +39,12 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         return
 
     config = BotConfig(event.self_id, event.group_id, cooldown=60)
-    if not config.is_cooldown('sing'):
+    if not config.is_cooldown(SING_COOLDOWN_KEY):
         return
-    config.refresh_cooldown('sing')
+    config.refresh_cooldown(SING_COOLDOWN_KEY)
 
     async def failed():
-        config.refresh_cooldown('sing', reset=True)
+        config.refresh_cooldown(SING_COOLDOWN_KEY, reset=True)
         await sing_msg.finish('我习惯了站着不动思考。有时候啊，也会被大家突然戳一戳，看看睡着了没有。')
 
     # 下载 -> 切片 -> 人声分离 -> 音色转换（SVC） -> 混音
@@ -81,6 +83,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     if not result:
         await failed()
 
+    config.refresh_cooldown(SING_COOLDOWN_KEY, reset=True)
     msg: Message = MessageSegment.record(file=result)
     await sing_msg.finish(msg)
 
@@ -103,12 +106,12 @@ async def _(bot: Bot, event: Event, state: T_State):
     if not config.is_cooldown('music'):
         return
     config.refresh_cooldown('music')
-    
+
     def get_music_name():
         resource_path = "resource/music/"
         all_music = os.listdir(resource_path)
         music = random.choice(all_music)
         return resource_path + music
-    
+
     msg: Message = MessageSegment.record(file=Path(get_music_name()))
     await play_cmd.finish(msg)
