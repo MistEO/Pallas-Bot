@@ -32,6 +32,10 @@ inference_locker = Lock()
 
 @sing_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
+    song_id = event.get_plaintext().replace(cmd, '').strip()
+    if not song_id or not song_id.isdigit():
+        return
+
     config = BotConfig(event.self_id, event.group_id, cooldown=60)
     if not config.is_cooldown('sing'):
         return
@@ -45,7 +49,6 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     # 其他 人声分离和音色转换是吃 GPU 的，所以要加锁，不然显存不够用
     await sing_msg.send('欢呼吧！')
 
-    song_id = event.get_plaintext().replace(cmd, '').strip()
     # 从网易云下载
     path = await asyncify(get_song_path)(song_id)
     if not path:
