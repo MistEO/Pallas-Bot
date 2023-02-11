@@ -61,7 +61,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         await sing_msg.finish('我习惯了站着不动思考。有时候啊，也会被大家突然戳一戳，看看睡着了没有。')
 
     # 下载 -> 切片 -> 人声分离 -> 音色转换（SVC） -> 混音
-    # 其他 人声分离和音色转换是吃 GPU 的，所以要加锁，不然显存不够用
+    # 其中 人声分离和音色转换是吃 GPU 的，所以要加锁，不然显存不够用
     await sing_msg.send('欢呼吧！')
 
     # 从网易云下载
