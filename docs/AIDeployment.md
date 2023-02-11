@@ -17,7 +17,7 @@
 
     - CPU  
 
-        需要 8G 或更高内存，否则跑不起来，而且比较慢，E3 1230 v3 合成 60 秒音频大概三五分钟（体感，我没具体测）
+        该功能本身约需要 4G 内存，而且比较慢，E3 1230 v2 合成 60 秒音频大概三五分钟（体感，我没具体测）
 
         ```
         python -m pip install -r src/plugins/sing/requirements.txt
@@ -26,7 +26,7 @@
 
     - GPU  
 
-        需要 6G 或更高*显存*，否则跑不起来，P106-100 合成 60 秒音频大概需要 30 秒
+        需要 5G 或更高**显存**，否则跑不起来，P106-100 (差不多 GTX1060 的性能）合成 60 秒音频大概需要 30 秒
 
         ```
         python -m pip install -r src/plugins/sing/requirements.txt
