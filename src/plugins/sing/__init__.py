@@ -18,10 +18,11 @@ from .slicer import slice
 from .svc_inference import inference
 from .mixer import mix
 
-cmd = '牛牛唱歌'
+SING_CMD = '牛牛唱歌'
+SING_COOLDOWN_KEY = 'sing'
 
 sing_msg = on_message(
-    rule=startswith(cmd),
+    rule=startswith(SING_CMD),
     priority=5,
     block=False,
     permission=permission.GROUP
@@ -29,12 +30,12 @@ sing_msg = on_message(
 
 inference_locker = Lock()
 
-SING_COOLDOWN_KEY = 'sing'
-
 
 @sing_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    song_id = event.get_plaintext().replace(cmd, '').strip()
+    global inference_locker
+
+    song_id = event.get_plaintext().replace(SING_CMD, '').strip()
     if not song_id or not song_id.isdigit():
         return
 
