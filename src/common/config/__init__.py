@@ -107,7 +107,7 @@ class BotConfig(Config):
         cd = BotConfig._cooldown_data[self.bot_id][self.group_id][action_type]
         return cd + self.cooldown < time.time()
 
-    def refresh_cooldown(self, action_type: str) -> None:
+    def refresh_cooldown(self, action_type: str, reset: bool = False) -> None:
         '''
         刷新冷却时间
         '''
@@ -118,7 +118,7 @@ class BotConfig(Config):
             BotConfig._cooldown_data[self.bot_id][self.group_id] = {}
 
         BotConfig._cooldown_data[self.bot_id][self.group_id][action_type] = time.time(
-        )
+        ) if not reset else 0
 
     _drunk_data = defaultdict(lambda: defaultdict(int))     # 醉酒程度，不同群应用不同的数值
     _sleep_until = defaultdict(lambda: defaultdict(int))    # 牛牛起床的时间
