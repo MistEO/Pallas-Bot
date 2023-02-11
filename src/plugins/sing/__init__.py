@@ -67,9 +67,10 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     # 人声分离
     def separate_with_locker():
         with inference_locker:
-            return separate(chunk, Path('resource/sing/'))
+            res = separate(chunk, Path('resource/sing/'))
+        return res
 
-    separated = await asyncify(separate_with_locker)(chunk, Path('resource/sing/'))
+    separated = await asyncify(separate_with_locker)()
     if not separated:
         await failed()
 
@@ -78,9 +79,10 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     # 音色转换（SVC）
     def inference_with_locker():
         with inference_locker:
-            return inference(vocals, Path('resource/sing/svc/'))
-        
-    svc = await asyncify(inference_with_locker)(vocals, Path('resource/sing/svc/'))
+            res = inference(vocals, Path('resource/sing/svc/'))
+        return res
+
+    svc = await asyncify(inference_with_locker)()
     if not svc:
         await failed()
 
