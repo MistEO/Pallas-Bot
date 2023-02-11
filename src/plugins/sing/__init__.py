@@ -1,10 +1,12 @@
 from pathlib import Path
 from threading import Lock
 from asyncer import asyncify
+import random
+import os
 
 from nonebot import on_message
 from nonebot.typing import T_State
-from nonebot.rule import startswith
+from nonebot.rule import startswith, Rule
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 
@@ -78,3 +80,32 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     msg: Message = MessageSegment.record(file=result)
     await sing_msg.finish(msg)
+
+
+def get_music_name():
+    resource_path = "resource/music/"
+    all_music = os.listdir(resource_path)
+    music = random.choice(all_music)
+    return resource_path + music
+
+
+# 青春版唱歌（bushi
+async def message_equal(bot: "Bot", event: "Event", state: T_State) -> bool:
+    return event.raw_message in ['牛牛唱歌', '欢乐水牛']
+
+
+play_cmd = on_message(
+    rule=Rule(message_equal),
+    priority=13,
+    block=False,
+    permission=permission.GROUP)
+
+
+@play_cmd.handle()
+async def _(bot: Bot, event: Event, state: T_State):
+    config = GroupConfig(event.group_id, cooldown=10)
+    if not config.is_cooldown('music'):
+        return
+    config.refresh_cooldown('music')
+    msg: Message = MessageSegment.record(file=Path(get_music_name()))
+    await play_cmd.finish(msg)
