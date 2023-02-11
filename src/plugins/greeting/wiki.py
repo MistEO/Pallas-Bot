@@ -1,7 +1,6 @@
 import os
-import traceback
-import requests
 import random
+from src.common.utils.download_tools import DownloadTools
 
 # 这里的值是CN不代表是中文语音，wiki的定义有点怪，所有语言都叫CN_xx
 # 实际的url类似 'https://static.prts.wiki/voice_jp/char_485_pallas/CN_01.wav'
@@ -31,26 +30,6 @@ voice_dict = {
 voices_source = 'resource/voices'
 
 
-class DownloadTools:
-    @staticmethod
-    def request_file(url, stringify=True):
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 10_3_1 like Mac OS X) '
-                          'AppleWebKit/603.1.30 (KHTML, like Gecko) Version/10.0 Mobile/14E304 Safari/602.1'
-        }
-        # noinspection PyBroadException
-        try:
-            stream = requests.get(url, headers=headers, stream=True)
-            if stream.status_code == 200:
-                if stringify:
-                    return str(stream.content, encoding='utf-8')
-                else:
-                    return stream.content
-        except Exception:
-            print(traceback.format_exc())
-        return None
-
-
 class WikiVoice(DownloadTools):
     def download_voice_from_wiki(self, operator, url, filename):
         folder = f'{voices_source}/{operator}'
@@ -60,7 +39,7 @@ class WikiVoice(DownloadTools):
             print("Already exists")
             return
 
-        content = self.request_file(url, stringify=False)
+        content = self.request_file(url)
         if content:
             os.makedirs(folder, exist_ok=True)
             with open(f, mode='wb+') as voice:

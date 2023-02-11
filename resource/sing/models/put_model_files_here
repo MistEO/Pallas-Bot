@@ -1,0 +1,6 @@
+resource/sing/models/
+├── config.json
+├── D_60000.pth
+├── G_60000.pth
+├── hubert-soft-0d54a1f4.pt
+└── put_model_files_here

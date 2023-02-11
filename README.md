@@ -68,7 +68,13 @@
 
 ## 如何配置一只自己的牛牛？
 
-欢迎查看 [Pallas-Bot 部署简单教程](DeploymentTutorial.md)
+### 基础功能篇
+
+欢迎查看 [部署教程](docs/Deployment.md)
+
+### AI 篇
+
+欢迎查看 [部署教程（AI 篇）](docs/AIDeployment.md)
 
 ## 致谢
 
