@@ -19,21 +19,35 @@ from .svc_inference import inference
 from .mixer import mix
 
 SING_CMD = '牛牛唱歌'
+SING_CONTINUE_CMDS = ['牛牛继续唱', '牛牛接着唱']
 SING_COOLDOWN_KEY = 'sing'
 
+async def is_to_sing(bot: "Bot", event: "Event", state: T_State) -> bool:
+    return SING_CMD in event.get_plaintext() or event.get_plaintext() in SING_CONTINUE_CMDS
+
 sing_msg = on_message(
-    rule=startswith(SING_CMD),
+    rule=Rule(is_to_sing),
     priority=5,
     block=False,
     permission=permission.GROUP
 )
 
 inference_locker = Lock()
+chunk_progess = {}
 
 
 @sing_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    song_id = event.get_plaintext().replace(SING_CMD, '').strip()
+
+    if SING_CMD in event.get_plaintext():
+        song_id = event.get_plaintext().replace(SING_CMD, '').strip()
+        chunk_index = 0
+    elif event.group_id in chunk_progess:
+        song_id = chunk_progess[event.group_id]['song_id']
+        chunk_index = chunk_progess[event.group_id]['chunk_index']
+    else:
+        return
+
     if not song_id or not song_id.isdigit():
         return
 
@@ -60,9 +74,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     if not slices_list:
         await failed()
 
-    # TODO: 记录每个群上次唱到哪了
-    idx = 0
-    chunk = slices_list[idx]
+    chunk = slices_list[chunk_index]
 
     # 人声分离
     def separate_with_locker():
@@ -92,6 +104,13 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         await failed()
 
     config.refresh_cooldown(SING_COOLDOWN_KEY, reset=True)
+
+    is_over = chunk_index + 1 >= len(slices_list)
+    chunk_progess[event.group_id] = {
+        'song_id': song_id if not is_over else None,
+        'chunk_index': chunk_index + 1 if not is_over else 0
+    }
+
     msg: Message = MessageSegment.record(file=result)
     await sing_msg.finish(msg)
 
