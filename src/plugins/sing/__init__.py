@@ -33,8 +33,6 @@ inference_locker = Lock()
 
 @sing_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    global inference_locker
-
     song_id = event.get_plaintext().replace(SING_CMD, '').strip()
     if not song_id or not song_id.isdigit():
         return
@@ -63,19 +61,26 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         await failed()
 
     # TODO: 记录每个群上次唱到哪了
-    # 人声分离
     idx = 0
     chunk = slices_list[idx]
-    with inference_locker:
-        separated = await asyncify(separate)(chunk, Path('resource/sing/'))
+
+    # 人声分离
+    def separate_with_locker():
+        with inference_locker:
+            return separate(chunk, Path('resource/sing/'))
+
+    separated = await asyncify(separate_with_locker)(chunk, Path('resource/sing/'))
     if not separated:
         await failed()
 
     vocals, no_vocals = separated
 
     # 音色转换（SVC）
-    with inference_locker:
-        svc = await asyncify(inference)(vocals, Path('resource/sing/svc/'))
+    def inference_with_locker():
+        with inference_locker:
+            return inference(vocals, Path('resource/sing/svc/'))
+        
+    svc = await asyncify(inference_with_locker)(vocals, Path('resource/sing/svc/'))
     if not svc:
         await failed()
 
