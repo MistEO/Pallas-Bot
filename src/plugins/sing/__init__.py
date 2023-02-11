@@ -85,13 +85,6 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     await sing_msg.finish(msg)
 
 
-def get_music_name():
-    resource_path = "resource/music/"
-    all_music = os.listdir(resource_path)
-    music = random.choice(all_music)
-    return resource_path + music
-
-
 # 青春版唱歌（bushi
 async def message_equal(bot: "Bot", event: "Event", state: T_State) -> bool:
     return event.raw_message in ['牛牛唱歌', '欢乐水牛']
@@ -110,5 +103,12 @@ async def _(bot: Bot, event: Event, state: T_State):
     if not config.is_cooldown('music'):
         return
     config.refresh_cooldown('music')
+    
+    def get_music_name():
+        resource_path = "resource/music/"
+        all_music = os.listdir(resource_path)
+        music = random.choice(all_music)
+        return resource_path + music
+    
     msg: Message = MessageSegment.record(file=Path(get_music_name()))
     await play_cmd.finish(msg)
