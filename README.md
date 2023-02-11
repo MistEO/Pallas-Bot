@@ -52,6 +52,13 @@
 
 群管理员 **回复** 牛牛说的那句话 “不可以” 即可，同样的若超过 N 个群都禁止了这句话，就会作为全局禁止，在任何群都不发
 
+## 牛牛的一些其他小功能
+
+- `牛牛喝酒`：进入狂暴醉酒状态（bushi，废话会特别多
+- 随机修改自己的群名片为近期发言的人，夺舍！期望时间 8 小时一次
+- `牛牛轮盘` & `牛牛开枪`：需要给牛牛管理员才能使用，试试你就知道是啥功能了.jpg
+- `牛牛唱歌 <网易云歌曲 ID>`：AI 牛牛翻唱！（人声提取 + 音色转换）
+
 ## 怎么把牛牛拉到自己的群里呢？
 
 ~~加好友，再邀请加群，即可。牛牛都会自动同意的~~
@@ -84,7 +91,8 @@
 [go-cqhttp](https://github.com/Mrs4s/go-cqhttp): cqhttp的golang实现，轻量、原生跨平台.  
 [nonebot-plugin-gocqhttp](https://github.com/mnixry/nonebot-plugin-gocqhttp): 一款在NoneBot2中直接运行go-cqhttp的插件, 无需额外下载安装  
 [jieba_fast](https://github.com/deepcs233/jieba_fast): 高效的中文分词库  
-~~[python-pinyin](https://github.com/mozillazg/python-pinyin): 汉字转拼音(pypinyin)~~
+[demucs](https://github.com/facebookresearch/demucs): Code for the paper Hybrid Spectrogram and Waveform Source Separation  
+[so-vits-svc](https://github.com/innnky/so-vits-svc): 基于vits与softvc的歌声音色转换模型  
 
 ## QQ群
 
