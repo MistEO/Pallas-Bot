@@ -12,7 +12,7 @@ from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, Gro
 
 from src.common.config import BotConfig, GroupConfig
 
-from .ncm_loader import get_song_path
+from .ncm_loader import download
 from .separater import separate
 from .slicer import slice
 from .svc_inference import inference
@@ -21,6 +21,7 @@ from .mixer import mix
 SING_CMD = '牛牛唱歌'
 SING_CONTINUE_CMDS = ['牛牛继续唱', '牛牛接着唱']
 SING_COOLDOWN_KEY = 'sing'
+
 
 async def is_to_sing(bot: "Bot", event: "Event", state: T_State) -> bool:
     return SING_CMD in event.get_plaintext() or event.get_plaintext() in SING_CONTINUE_CMDS
@@ -65,7 +66,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     await sing_msg.send('欢呼吧！')
 
     # 从网易云下载
-    origin = await asyncify(get_song_path)(song_id)
+    origin = await asyncify(download)(song_id)
     if not origin:
         await failed()
 

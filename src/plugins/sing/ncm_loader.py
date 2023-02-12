@@ -26,13 +26,13 @@ else:
     ncm.login.LoginViaAnonymousAccount()
 
 
-def get_song_path(song_id):
+def download(song_id):
     folder = Path("resource/sing/ncm")
     path = folder / f"{song_id}.mp3"
     if os.path.exists(path):
         return path
 
-    url = get_song_url(song_id)
+    url = get_audio_url(song_id)
     if not url:
         return None
 
@@ -47,7 +47,7 @@ def get_song_path(song_id):
     return path
 
 
-def get_song_url(song_id):
+def get_audio_url(song_id):
     response = ncm.track.GetTrackAudio(song_id)
     return response["data"][0]["url"]
 
