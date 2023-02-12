@@ -74,7 +74,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     # 音频切片
     slices_list = await asyncify(slice)(origin, Path('resource/sing/slices'), song_id)
-    if not slices_list:
+    if not slices_list or chunk_index >= len(slices_list):
         await failed()
 
     chunk = slices_list[chunk_index]
@@ -120,8 +120,15 @@ play_cmd = on_message(
     permission=permission.GROUP)
 
 
-SONG_PATH = 'resource/sing/mix/'
 MUSIC_PATH = 'resource/music/'
+SONG_PATH = 'resource/sing/mix/'
+
+
+def get_random_music():
+    all_music = [MUSIC_PATH + s for s in os.listdir(MUSIC_PATH)]
+    all_music += [SONG_PATH +
+                  s for s in os.listdir(SONG_PATH) if '_chunk0' in s]
+    return random.choice(all_music)
 
 
 @play_cmd.handle()
@@ -131,11 +138,14 @@ async def _(bot: Bot, event: Event, state: T_State):
         return
     config.refresh_cooldown('music')
 
-    def get_random_music():
-        all_music = [MUSIC_PATH + s for s in os.listdir(MUSIC_PATH)]
-        all_music += [SONG_PATH + s for s in os.listdir(SONG_PATH)]
-        return random.choice(all_music)
-
     rand_music = get_random_music()
+
+    if '_chunk0' in rand_music:
+        song_id = Path(rand_music).stem.split('_')[0]
+        chunk_progess[event.group_id] = {
+            'song_id': song_id,
+            'chunk_index': 0
+        }
+
     msg: Message = MessageSegment.record(file=Path(rand_music))
     await play_cmd.finish(msg)
