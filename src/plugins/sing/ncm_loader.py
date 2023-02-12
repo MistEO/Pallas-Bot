@@ -7,21 +7,20 @@ from src.common.utils.download_tools import DownloadTools
 
 
 class Config(BaseModel, extra=Extra.ignore):
-    NCM_PHONE: str = ""
-    NCM_EMAIL: str = ""
-    NCM_PASSWORD: str = ""
-    NCM_CTCODE: int = 86
-    NCM_REMERBER_LOGIN: bool = True
+    ncm_phone: str = ""
+    ncm_email: str = ""
+    ncm_password: str = ""
+    ncm_ctcode: int = 86
 
 
 config = Config.parse_obj(get_driver().config)
 
-if config.NCM_PHONE and config.NCM_PASSWORD:
+if config.ncm_phone and config.ncm_password:
     ncm.login.LoginViaCellphone(
-        phone=config.NCM_PHONE, password=config.NCM_PASSWORD, ctcode=config.NCM_CTCODE, rememberLogin=config.NCM_REMERBER_LOGIN)
-elif config.NCM_EMAIL and config.NCM_PASSWORD:
-    ncm.login.LoginViaEmail(email=config.NCM_EMAIL, password=config.NCM_PASSWORD,
-                            rememberLogin=config.NCM_REMERBER_LOGIN)
+        phone=config.ncm_phone, password=config.ncm_password, ctcode=config.NCM_CTCODE)
+elif config.ncm_email and config.ncm_password:
+    ncm.login.LoginViaEmail(email=config.ncm_email,
+                            password=config.ncm_password)
 else:
     ncm.login.LoginViaAnonymousAccount()
 
