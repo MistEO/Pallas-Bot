@@ -2,12 +2,9 @@ from pydub import AudioSegment
 from pathlib import Path
 import os
 
-OUTPUT = Path("resource/sing/mix")
-EXTENSION = 'mp3'
 
-
-def mix(vocals: Path, no_vocals: Path, filename: str):
-    path = OUTPUT / f'{filename}.{EXTENSION}'
+def mix(vocals: Path, no_vocals: Path, output_dir: Path, output_stem: str, extension: str = "mp3"):
+    path = output_dir / f'{output_stem}.{extension}'
     if os.path.exists(path):
         return path
 
@@ -20,8 +17,8 @@ def mix(vocals: Path, no_vocals: Path, filename: str):
     mix_audio = vocals_audio.overlay(no_vocals_audio)
 
     # 保存
-    os.makedirs(OUTPUT, exist_ok=True)
-    mix_audio.export(path, format=EXTENSION)
+    os.makedirs(output_dir, exist_ok=True)
+    mix_audio.export(path, format=extension)
 
     if not os.path.exists(path):
         return None

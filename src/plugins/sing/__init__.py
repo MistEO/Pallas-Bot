@@ -77,19 +77,19 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     chunk = slices_list[chunk_index]
 
     # 人声分离
-    separated = await asyncify(separate)(chunk, Path('resource/sing/'), locker=gpu_locker)
+    separated = await asyncify(separate)(chunk, Path('resource/sing'), locker=gpu_locker)
     if not separated:
         await failed()
 
     vocals, no_vocals = separated
 
     # 音色转换（SVC）
-    svc = await asyncify(inference)(vocals, Path('resource/sing/svc/'), locker=gpu_locker)
+    svc = await asyncify(inference)(vocals, Path('resource/sing/svc'), locker=gpu_locker)
     if not svc:
         await failed()
 
     # 混合人声和伴奏
-    result = await asyncify(mix)(svc, no_vocals, chunk.stem)
+    result = await asyncify(mix)(svc, no_vocals, Path("resource/sing/mix"), chunk.stem)
     if not result:
         await failed()
 
