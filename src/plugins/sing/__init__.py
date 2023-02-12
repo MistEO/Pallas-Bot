@@ -12,7 +12,7 @@ from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, Gro
 
 from src.common.config import BotConfig, GroupConfig
 
-from .ncm_loader import download, get_song_name
+from .ncm_loader import download, get_song_title
 from .separater import separate
 from .slicer import slice
 from .svc_inference import inference
@@ -155,21 +155,26 @@ async def what_song(bot: "Bot", event: "Event", state: T_State) -> bool:
     return '牛牛' in text and ('什么歌' in text or '哪首歌' in text or '啥歌' in text)
 
 
-name_cmd = on_message(
+song_title_cmd = on_message(
     rule=Rule(what_song),
     priority=13,
     block=True,
     permission=permission.GROUP)
 
 
-@name_cmd.handle()
+@song_title_cmd.handle()
 async def _(bot: Bot, event: Event, state: T_State):
     if not event.group_id in chunk_progess:
         return
 
+    config = GroupConfig(event.group_id, cooldown=10)
+    if not config.is_cooldown('song_title'):
+        return
+    config.refresh_cooldown('song_title')
+
     song_id = chunk_progess[event.group_id]['song_id']
-    song_name = await asyncify(get_song_name)(song_id)
-    if not song_name:
+    song_title = await asyncify(get_song_title)(song_id)
+    if not song_title:
         return
 
-    await name_cmd.finish(f'{song_name}')
+    await song_title_cmd.finish(f'{song_title}')

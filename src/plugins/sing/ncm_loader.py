@@ -58,6 +58,6 @@ def request_file(url):
     return DownloadTools.request_file(url)
 
 
-def get_song_name(song_id):
+def get_song_title(song_id):
     response = ncm.track.GetTrackDetail(song_id)
     return response["songs"][0]["name"]
