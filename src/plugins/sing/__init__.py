@@ -24,7 +24,9 @@ SING_COOLDOWN_KEY = 'sing'
 
 
 async def is_to_sing(bot: "Bot", event: "Event", state: T_State) -> bool:
-    return SING_CMD in event.get_plaintext() or event.get_plaintext() in SING_CONTINUE_CMDS
+    text = event.get_plaintext()
+    return (SING_CMD in text and text.replace(SING_CMD, '').strip().isdigit()
+            ) or text in SING_CONTINUE_CMDS
 
 sing_msg = on_message(
     rule=Rule(is_to_sing),
