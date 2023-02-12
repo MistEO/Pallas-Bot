@@ -4,6 +4,8 @@ from asyncer import asyncify
 import random
 import os
 
+from pydantic import BaseModel, Extra
+from nonebot import get_driver
 from nonebot import on_message
 from nonebot.typing import T_State
 from nonebot.rule import Rule
@@ -18,6 +20,12 @@ from .slicer import slice
 from .svc_inference import inference
 from .mixer import mix
 
+
+class Config(BaseModel, extra=Extra.ignore):
+    slice_size: int = 40000
+
+
+config = Config.parse_obj(get_driver().config)
 
 # key 对应命令词，开头必须是人名
 # value 对应 resource/sing/models/ 下的文件夹名，以及生成的音频文件名
@@ -83,30 +91,46 @@ chunk_progess = {}
 
 @sing_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    config = BotConfig(event.self_id, event.group_id, cooldown=60)
+    config = BotConfig(event.self_id, event.group_id, cooldown=120)
     if not config.is_cooldown(SING_COOLDOWN_KEY):
         return
     config.refresh_cooldown(SING_COOLDOWN_KEY)
+
+    speaker = state['speaker']
+    song_id = state['song_id']
+    chunk_index = state['chunk_index']
+    key = 0
 
     async def failed():
         config.refresh_cooldown(SING_COOLDOWN_KEY, reset=True)
         await sing_msg.finish('我习惯了站着不动思考。有时候啊，也会被大家突然戳一戳，看看睡着了没有。')
 
-    await sing_msg.send('欢呼吧！')
+    async def success(song: Path):
+        config.refresh_cooldown(SING_COOLDOWN_KEY, reset=True)
+        chunk_progess[event.group_id] = {
+            'song_id': song_id,
+            'chunk_index': chunk_index + 1
+        }
 
-    speaker = state['speaker']
-    song_id = state['song_id']
-    chunk_index = state['chunk_index']
+        msg: Message = MessageSegment.record(file=song)
+        await sing_msg.finish(msg)
+
     # 下载 -> 切片 -> 人声分离 -> 音色转换（SVC） -> 混音
     # 其中 人声分离和音色转换是吃 GPU 的，所以要加锁，不然显存不够用
 
+    cache_path = Path("resource/sing/mix") / \
+        f'{song_id}_chunk{chunk_index}_{key}key_{speaker}.mp3'
+    if cache_path.exists():
+        await success(cache_path)
+
+    await sing_msg.send('欢呼吧！')
     # 从网易云下载
     origin = await asyncify(download)(song_id)
     if not origin:
         await failed()
 
     # 音频切片
-    slices_list = await asyncify(slice)(origin, Path('resource/sing/slices'), song_id)
+    slices_list = await asyncify(slice)(origin, Path('resource/sing/slices'), song_id, size=config.slice_size)
     if not slices_list or chunk_index >= len(slices_list):
         await failed()
 
@@ -129,15 +153,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     if not result:
         await failed()
 
-    config.refresh_cooldown(SING_COOLDOWN_KEY, reset=True)
-
-    chunk_progess[event.group_id] = {
-        'song_id': song_id,
-        'chunk_index': chunk_index + 1
-    }
-
-    msg: Message = MessageSegment.record(file=result)
-    await sing_msg.finish(msg)
+    await success(result)
 
 
 # 青春版唱歌（bushi

@@ -5,10 +5,10 @@ import os
 
 def mix(vocals: Path, no_vocals: Path, origin_vocals: Path, output_dir: Path, output_stem: str, extension: str = "mp3"):
     path = output_dir / f'{output_stem}.{extension}'
-    if os.path.exists(path):
+    if path.exists():
         return path
 
-    if not os.path.exists(vocals) or not os.path.exists(no_vocals):
+    if not vocals.exists() or not no_vocals.exists():
         return None
 
     # 自动增益
@@ -26,7 +26,7 @@ def mix(vocals: Path, no_vocals: Path, origin_vocals: Path, output_dir: Path, ou
     os.makedirs(output_dir, exist_ok=True)
     mix_audio.export(path, format=extension)
 
-    if not os.path.exists(path):
+    if not path.exists():
         return None
 
     return path

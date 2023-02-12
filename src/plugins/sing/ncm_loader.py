@@ -28,7 +28,7 @@ else:
 def download(song_id):
     folder = Path("resource/sing/ncm")
     path = folder / f"{song_id}.mp3"
-    if os.path.exists(path):
+    if path.exists():
         return path
 
     url = get_audio_url(song_id)

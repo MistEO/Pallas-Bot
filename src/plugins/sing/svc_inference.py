@@ -10,6 +10,7 @@ SVC_OUPUT_FORMAT = 'flac'
 
 speaker_models = {}
 
+
 def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "pallas", locker: Lock = Lock()):
     # 这个库不知道咋集成，似乎可以转成 ONNX，但是我不会
     # 先用 cmd 凑合跑了
@@ -18,7 +19,7 @@ def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "p
     result = output_dir / \
         f'{song_path.parent.stem}_{key}key_{speaker}.{SVC_OUPUT_FORMAT}'
 
-    if not os.path.exists(result):
+    if not result.exists():
         global speaker_models
 
         model = ""
@@ -28,7 +29,7 @@ def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "p
                 if m.startswith('G_') and m.endswith('.pth'):
                     speaker_models[speaker] = models_dir / m
                     break
-        
+
         model = speaker_models[speaker].absolute()
         config = Path(f'resource/sing/models/{speaker}/config.json').absolute()
 
@@ -41,7 +42,7 @@ def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "p
             print(cmd)
             os.system(cmd)
 
-    if not os.path.exists(result):
+    if not result.exists():
         return None
 
     return result

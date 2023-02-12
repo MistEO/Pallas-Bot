@@ -3,14 +3,14 @@ from pathlib import Path
 import os
 
 
-def slice(path: Path, output_dir: Path, output_stem: str, format: str = 'mp3', size: int = 60000):
+def slice(path: Path, output_dir: Path, output_stem: str, format: str = 'mp3', size: int = 40000):
     os.makedirs(output_dir, exist_ok=True)
     audio_segment = AudioSegment.from_file(path, format=format)
     total = int(audio_segment.duration_seconds * 1000 / size)  # 计算音频切片后的个数
 
     results = [output_dir /
                f"{output_stem}_chunk{i}.{format}" for i in range(total + 1)]
-    if all([os.path.exists(f) for f in results]):
+    if all([f.exists() for f in results]):
         return results
 
     print('splitting audio...')
