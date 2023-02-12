@@ -29,7 +29,7 @@ async def is_to_sing(bot: "Bot", event: "Event", state: T_State) -> bool:
 sing_msg = on_message(
     rule=Rule(is_to_sing),
     priority=5,
-    block=False,
+    block=True,
     permission=permission.GROUP
 )
 
