@@ -25,7 +25,7 @@ class Config(BaseModel, extra=Extra.ignore):
     slice_size: int = 40000
 
 
-config = Config.parse_obj(get_driver().config)
+plugin_config = Config.parse_obj(get_driver().config)
 
 # key 对应命令词，开头必须是人名
 # value 对应 resource/sing/models/ 下的文件夹名，以及生成的音频文件名
@@ -130,7 +130,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         await failed()
 
     # 音频切片
-    slices_list = await asyncify(slice)(origin, Path('resource/sing/slices'), song_id, size=config.slice_size)
+    slices_list = await asyncify(slice)(origin, Path('resource/sing/slices'), song_id, size=plugin_config.slice_size)
     if not slices_list or chunk_index >= len(slices_list):
         await failed()
 
