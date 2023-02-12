@@ -17,7 +17,7 @@ config = Config.parse_obj(get_driver().config)
 
 if config.ncm_phone and config.ncm_password:
     ncm.login.LoginViaCellphone(
-        phone=config.ncm_phone, password=config.ncm_password, ctcode=config.NCM_CTCODE)
+        phone=config.ncm_phone, password=config.ncm_password, ctcode=config.ncm_ctcode)
 elif config.ncm_email and config.ncm_password:
     ncm.login.LoginViaEmail(email=config.ncm_email,
                             password=config.ncm_password)
