@@ -49,8 +49,15 @@ def download(song_id):
 
 def get_audio_url(song_id):
     response = ncm.track.GetTrackAudio(song_id)
+    if response["data"][0]["size"] > 20000000:  # 20MB
+        return None
     return response["data"][0]["url"]
 
 
 def request_file(url):
     return DownloadTools.request_file(url)
+
+
+def get_song_name(song_id):
+    response = ncm.track.GetTrackDetail(song_id)
+    return response["songs"][0]["name"]

@@ -12,7 +12,7 @@ from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, Gro
 
 from src.common.config import BotConfig, GroupConfig
 
-from .ncm_loader import download
+from .ncm_loader import download, get_song_name
 from .separater import separate
 from .slicer import slice
 from .svc_inference import inference
@@ -98,10 +98,9 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     config.refresh_cooldown(SING_COOLDOWN_KEY, reset=True)
 
-    is_over = chunk_index + 1 >= len(slices_list)
     chunk_progess[event.group_id] = {
-        'song_id': song_id if not is_over else None,
-        'chunk_index': chunk_index + 1 if not is_over else 0
+        'song_id': song_id,
+        'chunk_index': chunk_index + 1
     }
 
     msg: Message = MessageSegment.record(file=result)
@@ -144,8 +143,33 @@ async def _(bot: Bot, event: Event, state: T_State):
         song_id = Path(rand_music).stem.split('_')[0]
         chunk_progess[event.group_id] = {
             'song_id': song_id,
-            'chunk_index': 1 # 这里判断是否是最后一段有点麻烦，直接扔个生成那边去判断算了
+            'chunk_index': 1
         }
 
     msg: Message = MessageSegment.record(file=Path(rand_music))
     await play_cmd.finish(msg)
+
+
+async def what_song(bot: "Bot", event: "Event", state: T_State) -> bool:
+    text = event.get_plaintext()
+    return '牛牛' in text and ('什么歌' in text or '哪首歌' in text or '啥歌' in text)
+
+
+name_cmd = on_message(
+    rule=Rule(what_song),
+    priority=13,
+    block=True,
+    permission=permission.GROUP)
+
+
+@name_cmd.handle()
+async def _(bot: Bot, event: Event, state: T_State):
+    if not event.group_id in chunk_progess:
+        return
+
+    song_id = chunk_progess[event.group_id]['song_id']
+    song_name = await asyncify(get_song_name)(song_id)
+    if not song_name:
+        return
+
+    await name_cmd.finish(f'{song_name}')
