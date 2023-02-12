@@ -120,6 +120,10 @@ play_cmd = on_message(
     permission=permission.GROUP)
 
 
+SONG_PATH = 'resource/sing/mix/'
+MUSIC_PATH = 'resource/music/'
+
+
 @play_cmd.handle()
 async def _(bot: Bot, event: Event, state: T_State):
     config = GroupConfig(event.group_id, cooldown=10)
@@ -127,11 +131,11 @@ async def _(bot: Bot, event: Event, state: T_State):
         return
     config.refresh_cooldown('music')
 
-    def get_music_name():
-        resource_path = "resource/music/"
-        all_music = os.listdir(resource_path)
-        music = random.choice(all_music)
-        return resource_path + music
+    def get_random_music():
+        all_music = [MUSIC_PATH + s for s in os.listdir(MUSIC_PATH)]
+        all_music += [SONG_PATH + s for s in os.listdir(SONG_PATH)]
+        return random.choice(all_music)
 
-    msg: Message = MessageSegment.record(file=Path(get_music_name()))
+    rand_music = get_random_music()
+    msg: Message = MessageSegment.record(file=Path(rand_music))
     await play_cmd.finish(msg)
