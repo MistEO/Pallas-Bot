@@ -1,0 +1,7 @@
+resource/sing/models
+├── hubert-soft-0d54a1f4.pt
+├── pallas
+│   ├── config.json
+│   ├── D_60000.pth
+│   └── G_60000.pth
+└── path_structure
