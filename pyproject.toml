@@ -22,11 +22,6 @@ nonebot-plugin-gocqhttp = "^0.6.4"
 [tool.poetry.dev-dependencies]
 nb-cli = "^0.6.0"
 
-[[tool.poetry.source]]
-name = "aliyun"
-url = "https://mirrors.aliyun.com/pypi/simple"
-default = true
-
 [tool.nonebot]
 plugins = ["nonebot_plugin_apscheduler", "nonebot_plugin_gocqhttp"]
 plugin_dirs = ["src/plugins"]

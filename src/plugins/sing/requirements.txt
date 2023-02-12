@@ -1,6 +1,7 @@
 pyncm
 pydub
 demucs
+asyncer
 
 ### so-vits-svc ###
 Flask==2.1.2
