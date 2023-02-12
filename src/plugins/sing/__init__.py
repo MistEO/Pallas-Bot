@@ -125,7 +125,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         await failed()
 
     # 混合人声和伴奏
-    result = await asyncify(mix)(svc, no_vocals, Path("resource/sing/mix"), svc.stem)
+    result = await asyncify(mix)(svc, no_vocals, vocals, Path("resource/sing/mix"), svc.stem)
     if not result:
         await failed()
 
