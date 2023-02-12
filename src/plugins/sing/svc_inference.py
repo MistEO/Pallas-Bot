@@ -1,4 +1,5 @@
 import os
+from threading import Lock
 from pathlib import Path
 
 SVC_MODEL = Path('resource/sing/models/G_60000.pth').absolute()
@@ -11,7 +12,7 @@ SVC_SLICE_DB = -40
 SVC_OUPUT_FORMAT = 'flac'
 
 
-def inference(song_path: Path, output_dir: Path, key: int = 0):
+def inference(song_path: Path, output_dir: Path, key: int = 0, locker: Lock = Lock()):
     # 这个库不知道咋集成，似乎可以转成 ONNX，但是我不会
     # 先用 cmd 凑合跑了
     # TODO: 使用 ONNX Runtime 重新集成
@@ -20,8 +21,9 @@ def inference(song_path: Path, output_dir: Path, key: int = 0):
 
     if not os.path.exists(result):
         cmd = f'python {SVC_MAIN} {SVC_MODEL} {SVC_CONFIG} {SVC_HUBERT} {song_path.absolute()} {key} {SVC_SPEAKER} {SVC_SLICE_DB} {output_dir.absolute()} {SVC_OUPUT_FORMAT}'
-        print(cmd)
-        os.system(cmd)
+        with locker:
+            print(cmd)
+            os.system(cmd)
 
     if not os.path.exists(result):
         return None

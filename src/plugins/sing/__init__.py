@@ -6,7 +6,7 @@ import os
 
 from nonebot import on_message
 from nonebot.typing import T_State
-from nonebot.rule import startswith, Rule
+from nonebot.rule import Rule
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 
@@ -32,7 +32,7 @@ sing_msg = on_message(
     permission=permission.GROUP
 )
 
-inference_locker = Lock()
+gpu_locker = Lock()
 chunk_progess = {}
 
 
@@ -65,36 +65,26 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     await sing_msg.send('欢呼吧！')
 
     # 从网易云下载
-    path = await asyncify(get_song_path)(song_id)
-    if not path:
+    origin = await asyncify(get_song_path)(song_id)
+    if not origin:
         await failed()
 
     # 音频切片
-    slices_list = await asyncify(slice)(path, Path('resource/sing/slices'), song_id)
+    slices_list = await asyncify(slice)(origin, Path('resource/sing/slices'), song_id)
     if not slices_list:
         await failed()
 
     chunk = slices_list[chunk_index]
 
     # 人声分离
-    def separate_with_locker():
-        with inference_locker:
-            res = separate(chunk, Path('resource/sing/'))
-        return res
-
-    separated = await asyncify(separate_with_locker)()
+    separated = await asyncify(separate)(chunk, Path('resource/sing/'), locker=gpu_locker)
     if not separated:
         await failed()
 
     vocals, no_vocals = separated
 
     # 音色转换（SVC）
-    def inference_with_locker():
-        with inference_locker:
-            res = inference(vocals, Path('resource/sing/svc/'))
-        return res
-
-    svc = await asyncify(inference_with_locker)()
+    svc = await asyncify(inference)(vocals, Path('resource/sing/svc/'), locker=gpu_locker)
     if not svc:
         await failed()
 
