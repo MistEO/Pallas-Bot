@@ -31,7 +31,7 @@
 3. 更换 pip 源为阿里云*（更换为国内源会比默认的国外源快很多）
 
     ```cmd
-    python -m pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/
+    python -m pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
     ```
 
 4. 通过手脚架安装nonebot
@@ -48,7 +48,7 @@
     python -m pip install -r requirements.txt
     ```
 
-    （如果这些依赖与其他 Python 程序产生了冲突，请自行搜索如何构建python虚拟环境）
+    （如果这些依赖与其他 Python 程序产生了冲突，推荐使用 miniconda 等虚拟环境）
 
 6. 安装 nonebot 的 apscheduler 插件和 websockets 驱动器
 
@@ -56,6 +56,7 @@
     nb plugin install nonebot_plugin_apscheduler
     nb plugin install nonebot_plugin_gocqhttp
     nb driver install websockets
+    nb driver install fastapi
     ```
 
     （如果你的系统提示找不到 `nb`，请自行尝试添加相关环境变量~）
@@ -122,6 +123,7 @@ python -m pip install --upgrade pip # 更新 pip
     nb plugin install nonebot_plugin_apscheduler
     nb plugin install nonebot_plugin_gocqhttp
     nb driver install websockets
+    nb driver install fastapi
     ```
 
 4. 安装并启动 Mongodb （这是启动核心功能所必须的）
@@ -132,6 +134,7 @@ python -m pip install --upgrade pip # 更新 pip
 
     ```bash
     sudo apt install -y ffmpeg
+    sudo ldconfig
     ```
 
 ### 启动 Pallas-Bot 及登陆账号
