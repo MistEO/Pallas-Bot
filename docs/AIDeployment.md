@@ -21,7 +21,7 @@
 
         ```
         python -m pip install -r src/plugins/sing/requirements.txt
-        pip install torch==1.10.0+cpu torchvision==0.11.0+cpu torchaudio==0.10.0 -f https://download.pytorch.org/whl/torch_stable.html
+        python -m pip install torch==1.10.0+cpu torchvision==0.11.0+cpu torchaudio==0.10.0 -f https://download.pytorch.org/whl/torch_stable.html
         ```
 
     - GPU  
@@ -30,7 +30,7 @@
 
         ```
         python -m pip install -r src/plugins/sing/requirements.txt
-        pip install torch==1.10.0+cu113 torchvision==0.11.0+cu113 torchaudio==0.10.0 -f https://download.pytorch.org/whl/torch_stable.html
+        python -m pip install torch==1.10.0+cu113 torchvision==0.11.0+cu113 torchaudio==0.10.0 -f https://download.pytorch.org/whl/torch_stable.html
         ```
 
 ### 牛牛画画
