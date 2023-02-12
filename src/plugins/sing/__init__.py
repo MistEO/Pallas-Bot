@@ -144,7 +144,7 @@ async def _(bot: Bot, event: Event, state: T_State):
         song_id = Path(rand_music).stem.split('_')[0]
         chunk_progess[event.group_id] = {
             'song_id': song_id,
-            'chunk_index': 0
+            'chunk_index': 1 # 这里判断是否是最后一段有点麻烦，直接扔个生成那边去判断算了
         }
 
     msg: Message = MessageSegment.record(file=Path(rand_music))
