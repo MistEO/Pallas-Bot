@@ -13,12 +13,21 @@ request_cmd = on_request(
 
 @request_cmd.handle()
 async def handle_request(bot: Bot, event: GroupRequestEvent, state: T_State):
-
     if event.sub_type == 'invite':
-        bot_config = BotConfig(event.self_id, event.group_id)
+        bot_config = BotConfig(event.self_id)
         if (bot_config.auto_accept() and
                 not GroupConfig(event.group_id).is_banned() and
                 not UserConfig(event.user_id).is_banned()
             ) or \
                 bot_config.is_admin_of_bot(event.user_id):
             await event.approve(bot)
+
+
+@request_cmd.handle()
+async def handle_request(bot: Bot, event: FriendRequestEvent, state: T_State):
+    bot_config = BotConfig(event.self_id)
+    if (bot_config.auto_accept() and
+            not UserConfig(event.user_id).is_banned()
+        ) or \
+            bot_config.is_admin_of_bot(event.user_id):
+        await event.approve(bot)
