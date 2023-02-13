@@ -316,7 +316,7 @@ class Chat:
             
             config = BotConfig(bot_id, group_id)
             pretend_msg = list(filter(lambda msg: msg['user_id'] == config.taken_name(), available_messages))
-            rand_message = random.choice(pretend_msg) if len(pretend_msg) > 0 else random.choice(available_messages)
+            rand_message = pretend_msg[0] if pretend_msg else available_messages[0]
             speak = rand_message["raw_message"]
             
             with Chat._reply_lock:
