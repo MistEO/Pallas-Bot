@@ -158,6 +158,20 @@ class BotConfig(Config):
     @staticmethod
     def completely_sober():
         BotConfig._drunk_data = defaultdict(lambda: defaultdict(int))
+    
+    _take_name_data = defaultdict(lambda: defaultdict(int))    # 牛牛夺舍的账号
+
+    def taken_name(self) -> int:
+        '''
+        返回在该群夺舍的账号
+        '''
+        return BotConfig._take_name_data[self.bot_id][self.group_id]
+
+    def update_name(self, user_id: int) -> None:
+        '''
+        更新夺舍的账号
+        '''
+        BotConfig._take_name_data[self.bot_id][self.group_id] = user_id
 
 
 class GroupConfig(Config):
