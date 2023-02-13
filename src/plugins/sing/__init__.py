@@ -21,27 +21,26 @@ from .svc_inference import inference
 from .mixer import mix
 
 
+# 这些建议直接在 .env 文件里配置
 class Config(BaseModel, extra=Extra.ignore):
-    slice_size: int = 40000
+    # 切片大小，单位：毫秒
+    # 即每次语音发多长的，越长越吃显存。
+    # 6G 显存大概能 40000
+    # 第一次用建议设置个 10000，确定能跑起来，再根据自己显存调节
+    svc_slice_size: int = 40000
+
+    # key 对应命令词，即“牛牛唱歌” or “兔兔唱歌”
+    # value 对应 resource/sing/models/ 下的文件夹名，以及生成的音频文件名
+    # 注意 .env 里 dict 不能换行哦，得在一行写完所有的
+    svc_speakers: dict = {
+        "帕拉斯": "pallas",
+        "牛牛": "pallas",
+    }
 
 
 plugin_config = Config.parse_obj(get_driver().config)
+print(plugin_config.svc_speakers)
 
-# key 对应命令词，开头必须是人名
-# value 对应 resource/sing/models/ 下的文件夹名，以及生成的音频文件名
-SPEAKERS = {
-    "帕拉斯": "pallas",
-    "牛牛": "pallas",
-    "阿米娅": "amiya",
-    "兔兔": "amiya",
-    "安洁莉娜": "aglina",
-    "洁哥": "aglina",
-    "杰哥": "aglina",
-    "能天使": "angel",
-    "阿能": "angel",
-    "澄闪": "gdglow",
-    "粉猫猫": "gdglow",
-}
 SING_CMD = '唱歌'
 SING_CONTINUE_CMDS = ['继续唱', '接着唱']
 SING_COOLDOWN_KEY = 'sing'
@@ -53,7 +52,7 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
         return False
 
     has_spk = False
-    for name, speaker in SPEAKERS.items():
+    for name, speaker in plugin_config.svc_speakers.items():
         if not text.startswith(name):
             continue
         text = text.replace(name, '').strip()
@@ -130,7 +129,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         await failed()
 
     # 音频切片
-    slices_list = await asyncify(slice)(origin, Path('resource/sing/slices'), song_id, size=plugin_config.slice_size)
+    slices_list = await asyncify(slice)(origin, Path('resource/sing/slices'), song_id, size=plugin_config.svc_slice_size)
     if not slices_list or chunk_index >= len(slices_list):
         await failed()
 
@@ -162,7 +161,7 @@ async def play_song(bot: Bot, event: Event, state: T_State) -> bool:
     if not text or not text.endswith(SING_CMD):
         return False
 
-    for name, speaker in SPEAKERS.items():
+    for name, speaker in plugin_config.svc_speakers.items():
         if not text.startswith(name):
             continue
         state['speaker'] = speaker
@@ -220,7 +219,7 @@ async def _(bot: Bot, event: Event, state: T_State):
 
 async def what_song(bot: "Bot", event: "Event", state: T_State) -> bool:
     text = event.get_plaintext()
-    return any([text.startswith(spk) for spk in SPEAKERS.keys()]) \
+    return any([text.startswith(spk) for spk in plugin_config.svc_speakers.keys()]) \
         and any(key in text for key in ['什么歌', '哪首歌', '啥歌'])
 
 
