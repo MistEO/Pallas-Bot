@@ -39,4 +39,20 @@
 
 ### 牛牛 Chat
 
-敬请期待
+1. 下载模型，参考 [原仓库说明](https://github.com/BlinkDL/ChatRWKV#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B)，把文件放到 `resource/chat/models` 文件夹，然后改下 `src/chat/answer.py` 里 `args.MODEL_NAME` 的路径
+2. 安装依赖
+
+    - CPU
+
+    ```bash
+    python -m pip install torch torchvision torchaudio tokenizers
+    ```
+
+    - GPU
+    
+    ```bash
+    python -m pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu117
+    python -m pip install tokenizers
+    ```
+
+3. `src/chat/answer.py` 里的起手咒语 `init_prompt` 有兴趣可以试着改改
