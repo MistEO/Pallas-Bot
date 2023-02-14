@@ -18,7 +18,7 @@ if [ $# -eq 0 ]; then
     usage
 fi
 
-output="backups/"`date "+%Y_%m_%d_%H_%M_%S"`
+output=$working_path"backups/"`date "+%Y_%m_%d_%H_%M_%S"`
 
 backup_full_mongodb() {
     mongodump -o $output/mongodb
