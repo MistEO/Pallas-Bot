@@ -142,4 +142,5 @@ dmypy.json
 
 resource
 accounts
-cache
+mixed_data
+backups
