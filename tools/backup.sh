@@ -8,7 +8,7 @@ usage() {
     echo "Options:"
     echo "  -h           Show this help message and exit"
     echo "  -a           Backup full data"
-    echo "  -i           Backup import data in mongodb"
+    echo "  -i           Backup important data in mongodb"
     echo "  -s           Backup session.token and device.json"
     exit 1
 }
@@ -25,7 +25,7 @@ backup_full_mongodb() {
     echo "Backup full mongodb data to $output/mongodb"
 }
 
-backup_import_data_in_mongodb() {
+backup_important_data_in_mongodb() {
     mongodump -d PallasBot -c blacklist -o $output/mongodb
     mongodump -d PallasBot -c config -o $output/mongodb
     mongodump -d PallasBot -c group_config -o $output/mongodb
@@ -35,7 +35,7 @@ backup_import_data_in_mongodb() {
     mongodump -d gocq-database -c image-cache -o $output/mongodb
     mongodump -d gocq-database -c video-cache -o $output/mongodb
 
-    echo "Backup import data in mongodb to $output/mongodb"
+    echo "Backup important data in mongodb to $output/mongodb"
 }
 
 backup_session() {
@@ -46,6 +46,9 @@ backup_session() {
         cp $path $target
     done
     
+    mkdir -p $output/accounts/binary
+    cp $working_path/accounts/binary/accounts.pkl $output/accounts/binary/accounts.pkl
+
     echo "Backup session.token and device.json to $output/accounts"
 }
 
@@ -56,7 +59,7 @@ while getopts "ahis" arg; do
             backup_session
             ;;
         i)
-            backup_import_data_in_mongodb
+            backup_important_data_in_mongodb
             ;;
         s)
             backup_session
