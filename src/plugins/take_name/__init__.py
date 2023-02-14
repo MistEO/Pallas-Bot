@@ -71,6 +71,8 @@ async def change_name():
                 'message': Message('[CQ:poke,qq={}]'.format(target_user_id)),
                 'group_id': group_id
             })
+            
+            config.update_name(target_user_id)
 
         except ActionFailed:
             # 可能牛牛退群了

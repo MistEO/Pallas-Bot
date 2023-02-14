@@ -303,6 +303,9 @@ class Chat:
                     'reply': '[PallasBot: Speak]',
                     'reply_keywords': '[PallasBot: Speak]',
                 })
+            
+            bot_id = random.choice(
+                [bid for bid in group_replies.keys() if bid])
 
             ban_keywords = Chat._find_ban_keywords(
                 context='', group_id=group_id)
@@ -310,12 +313,12 @@ class Chat:
                                   if msg['keywords'] not in ban_keywords]
             if not available_messages:
                 continue
-
-            rand_message = random.choice(available_messages)
+            
+            config = BotConfig(bot_id, group_id)
+            pretend_msg = list(filter(lambda msg: msg['user_id'] == config.taken_name(), available_messages))
+            rand_message = pretend_msg[0] if pretend_msg else available_messages[0]
             speak = rand_message["raw_message"]
-
-            bot_id = random.choice(
-                [bid for bid in group_replies.keys() if bid])
+            
             with Chat._reply_lock:
                 group_replies[bot_id].append({
                     'time': int(cur_time),
