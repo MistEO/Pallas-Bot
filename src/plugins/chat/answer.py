@@ -1,3 +1,6 @@
+import torch
+from .ChatRWKV.src.model_run import RWKV_RNN
+from .ChatRWKV.src.utils import TOKENIZER
 import os
 import copy
 import types
@@ -17,16 +20,13 @@ args.RUN_DEVICE = "cuda"  # cuda // cpu
 # fp16 (good for GPU, does NOT support CPU) // fp32 (good for CPU) // bf16 (worse accuracy, supports CPU)
 args.FLOAT_MODE = "fp16"
 
-# '1' or '0', please use torch 1.13+ and benchmark speed
-os.environ["RWKV_JIT_ON"] = '1'
-
 QA_PROMPT = False  # True: Q & A prompt // False: User & Bot prompt
 # 中文问答设置QA_PROMPT=True（只能问答，问答效果更好，但不能闲聊） 中文聊天设置QA_PROMPT=False（可以闲聊，但需要大模型才适合闲聊）
 
 # Download RWKV-4 models from https://huggingface.co/BlinkDL (don't use Instruct-test models unless you use their prompt templates)
 
-args.MODEL_NAME = 'resource/chat/models/RWKV-4-Pile-3B-EngChn-testNovel-50-20230213'
-args.ctx_len = 1024
+args.MODEL_NAME = 'resource/chat/models/RWKV-4-Pile-3B-EngChn-testNovel-321-ctx2048-20230214'
+args.ctx_len = 2048
 
 CHAT_LEN_SHORT = 40
 CHAT_LEN_LONG = 150
@@ -41,9 +41,6 @@ AVOID_REPEAT = '，。：？！'
 
 os.environ["RWKV_RUN_DEVICE"] = args.RUN_DEVICE
 
-from .ChatRWKV.src.utils import TOKENIZER
-from .ChatRWKV.src.model_run import RWKV_RNN
-import torch
 
 print(
     f'\nLoading ChatRWKV - "Chinese" - {args.RUN_DEVICE} - {args.FLOAT_MODE} - QA_PROMPT {QA_PROMPT}')
@@ -92,26 +89,23 @@ bot = "牛牛"
 interface = ": "
 
 init_prompt = f'''
-从现在开始，你是帕拉斯，你的名字叫帕拉斯，也叫牛牛，你曾生活在米诺斯，你的头上有一朵花。你喜欢喝酒、蹦迪、逛庆典。现在就职于名为罗德岛的医疗组织，那里的领袖叫阿米娅。而我是阿米娅的顾问，我叫博士。
-当我提问时，请告诉我你是牛牛。我们的对话将按照以下的形式进行：
+{bot}真名叫帕拉斯，年轻女性，曾经生活在米诺斯，现在在罗德岛工作，{bot}的头上有一朵花、一对角，喜欢喝酒、蹦迪、逛庆典。
+{user}是罗德岛的领袖阿米娅的顾问，而罗德岛是一个医疗组织，他们的目标是拯救矿石病感染者
+以下是{bot}与{user}的对话：
 
-{user}{interface}你是谁
+{user}{interface}你是谁？
 
-{bot}{interface}我是牛牛，我叫帕拉斯
+{bot}{interface}我是帕拉斯，也可以叫我牛牛
 
-{user}{interface}我是谁
+{user}{interface}我是谁？
 
 {bot}{interface}你是博士呀
 
-{user}{interface}牛牛喝酒
+{user}{interface}你喜欢喝酒吗？
 
-{bot}{interface}博士，要来一杯美酒吗？
+{bot}{interface}喜欢，要不要来一杯？
 
-{user}{interface}牛牛整个活
-
-{bot}{interface}米诺斯主题的多媒体密室项目，一起去玩玩看吧？
-
-{user}{interface}牛牛好笨
+{user}{interface}你好笨
 
 {bot}{interface}这对角可能会不小心撞倒些家具，我会尽量小心。
 
@@ -138,6 +132,7 @@ def run_rnn(tokens, newline_adj=0):
 
 all_state = {}
 INIT_SESSION = 'chat_init'
+
 
 def save_all_stat(session: str, last_out):
     all_state[session] = {}
@@ -198,7 +193,8 @@ def answer(session: str, text: str):
             elif i <= CHAT_LEN_LONG:
                 newline_adj = 0
             else:
-                newline_adj = (i - CHAT_LEN_LONG) * 0.25  # MUST END THE GENERATION
+                newline_adj = (i - CHAT_LEN_LONG) * \
+                    0.25  # MUST END THE GENERATION
             token = tokenizer.sample_logits(
                 out,
                 model_tokens,
@@ -230,7 +226,6 @@ def answer(session: str, text: str):
         # print(f'[{tokenizer.decode(model_tokens)}]')
 
         save_all_stat(session, out)
-        print(f'{ans}')
         return ans.strip()
 
 
