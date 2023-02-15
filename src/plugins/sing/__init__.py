@@ -15,9 +15,9 @@ from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, Gro
 from src.common.config import BotConfig, GroupConfig
 
 from .ncm_loader import download, get_song_title
-from .separater import separate
 from .slicer import slice
-from .svc_inference import inference
+from .separater import separate, set_separate_cuda_devices
+from .svc_inference import inference, set_svc_cuda_devices
 from .mixer import mix
 
 
@@ -37,9 +37,14 @@ class Config(BaseModel, extra=Extra.ignore):
         "牛牛": "pallas",
     }
 
+    sing_cuda_device: str = ''
+
 
 plugin_config = Config.parse_obj(get_driver().config)
-print(plugin_config.svc_speakers)
+print("plugin_config", plugin_config)
+if plugin_config.sing_cuda_device:
+    set_separate_cuda_devices(plugin_config.sing_cuda_device)
+    set_svc_cuda_devices(plugin_config.sing_cuda_device)
 
 SING_CMD = '唱歌'
 SING_CONTINUE_CMDS = ['继续唱', '接着唱']
