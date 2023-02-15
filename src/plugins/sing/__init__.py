@@ -109,13 +109,19 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         chunk_progess[event.group_id] = {
             'song_id': song_id,
             'chunk_index': chunk_index + 1
-        }
+      }
 
         msg: Message = MessageSegment.record(file=song)
         await sing_msg.finish(msg)
 
     # 下载 -> 切片 -> 人声分离 -> 音色转换（SVC） -> 混音
     # 其中 人声分离和音色转换是吃 GPU 的，所以要加锁，不然显存不够用
+
+    # 优先返回合并后的歌
+    full_cache_path = Path("resource/sing/full") / \
+        f'{song_id}_{speaker}.mp3'
+    if full_cache_path.exists():
+        await success(full_cache_path)
 
     cache_path = Path("resource/sing/mix") / \
         f'{song_id}_chunk{chunk_index}_{key}key_{speaker}.mp3'
