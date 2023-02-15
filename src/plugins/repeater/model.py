@@ -1,7 +1,7 @@
 from typing import Generator, List, Optional, Union, Tuple, Dict, Any
 from functools import cached_property, cmp_to_key
 from dataclasses import dataclass
-from collections import defaultdict
+from collections import defaultdict, deque
 
 import jieba_fast.analyse
 import threading
@@ -112,6 +112,8 @@ class Chat:
 
     blacklist_answer = defaultdict(set)
     blacklist_answer_reserve = defaultdict(set)
+
+    rencently_speak = deque(maxlen=5)    # 主动发言记录，避免重复内容
 
     def __init__(self, data: Union[ChatData, GroupMessageEvent, PrivateMessageEvent]):
 
@@ -303,22 +305,29 @@ class Chat:
                     'reply': '[PallasBot: Speak]',
                     'reply_keywords': '[PallasBot: Speak]',
                 })
-            
+
             bot_id = random.choice(
                 [bid for bid in group_replies.keys() if bid])
 
             ban_keywords = Chat._find_ban_keywords(
                 context='', group_id=group_id)
-            available_messages = [msg for msg in Chat._message_dict[group_id]
-                                  if msg['keywords'] not in ban_keywords]
+
+            def msg_filter(msg: Dict[str, Any]) -> bool:
+                return msg['keywords'] not in ban_keywords \
+                    and msg['raw_message'] not in Chat.rencently_speak
+            available_messages = list(
+                filter(msg_filter, Chat._message_dict[group_id]))
             if not available_messages:
                 continue
-            
+
             config = BotConfig(bot_id, group_id)
-            pretend_msg = list(filter(lambda msg: msg['user_id'] == config.taken_name(), available_messages))
-            rand_message = pretend_msg[0] if pretend_msg else available_messages[0]
-            speak = rand_message["raw_message"]
-            
+            pretend_msg = list(
+                filter(lambda msg: msg['user_id'] == config.taken_name(), available_messages))
+            rand_message = random.choice(
+                pretend_msg if pretend_msg else available_messages)
+            speak = rand_message['raw_message']
+            Chat.rencently_speak.append(speak)
+
             with Chat._reply_lock:
                 group_replies[bot_id].append({
                     'time': int(cur_time),
