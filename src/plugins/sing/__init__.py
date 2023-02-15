@@ -19,7 +19,7 @@ from .separater import separate
 from .slicer import slice
 from .svc_inference import inference
 from .mixer import mix
-
+from .splice import splice
 
 # 这些建议直接在 .env 文件里配置
 class Config(BaseModel, extra=Extra.ignore):
@@ -151,6 +151,12 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     result = await asyncify(mix)(svc, no_vocals, vocals, Path("resource/sing/mix"), svc.stem)
     if not result:
         await failed()
+    
+    # 唱完最后一段后合并音频
+    if chunk_index == len(slices_list) - 1:
+        result = await asyncify(splice)(Path("resource/sing/mix"), Path('resource/sing/full'), len(slices_list), song_id, speaker)
+        if not result:
+            await failed()
 
     await success(result)
 
