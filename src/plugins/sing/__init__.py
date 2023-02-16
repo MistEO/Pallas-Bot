@@ -20,6 +20,8 @@ from .slicer import slice
 from .svc_inference import inference
 from .mixer import mix
 from .splice import splice
+from .get_song_id import get_song_id
+
 
 # 这些建议直接在 .env 文件里配置
 class Config(BaseModel, extra=Extra.ignore):
@@ -64,8 +66,18 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
         return False
 
     if text.startswith(SING_CMD):
-        song_id = text.replace(SING_CMD, '').strip()
-        if not song_id or not song_id.isdigit():
+        temp = text.replace(SING_CMD, '').strip()
+        if not temp:
+                return False
+        # 如果是纯数字，就直接用id
+        if temp.isdigit():
+            song_id = temp
+        else:
+            song_name = temp
+            if not song_name:
+                return False
+            song_id = get_song_id(song_name)
+        if not song_id:
             return False
         state['song_id'] = song_id
         state['chunk_index'] = 0
@@ -109,7 +121,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         chunk_progess[event.group_id] = {
             'song_id': song_id,
             'chunk_index': chunk_index + 1
-      }
+        }
 
         msg: Message = MessageSegment.record(file=song)
         await sing_msg.finish(msg)
