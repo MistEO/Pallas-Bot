@@ -2,6 +2,11 @@ import os
 from threading import Lock
 from pathlib import Path
 
+cuda_devices = ''
+
+def set_separate_cuda_devices(devices: str):
+    global cuda_devices
+    cuda_devices = devices
 
 def separate(song_path: Path, output_dir: Path, locker: Lock = Lock()):
     MODEL = 'hdemucs_mmi'
@@ -12,7 +17,10 @@ def separate(song_path: Path, output_dir: Path, locker: Lock = Lock()):
 
     if not vocals.exists() or not no_vocals.exists():
         # 这个库没提供 APIs，暂时简单粗暴用命令行了
-        cmd = f'python -m demucs --two-stems=vocals --mp3 --mp3-bitrate 128 -n {MODEL} {str(song_path)} -o {output_dir}'
+        cmd = ''
+        if cuda_devices:
+            cmd = f'CUDA_VISIBLE_DEVICES={cuda_devices} '
+        cmd += f'python -m demucs --two-stems=vocals --mp3 --mp3-bitrate 128 -n {MODEL} {str(song_path)} -o {output_dir}'
         with locker:
             print(cmd)
             os.system(cmd)
