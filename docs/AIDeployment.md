@@ -19,18 +19,18 @@
 
         该功能本身约需要 4G 内存，而且比较慢，E3 1230 v2 合成 60 秒音频大概三五分钟（体感，我没具体测）
 
-        ```
+        ```bash
         python -m pip install -r src/plugins/sing/requirements.txt
-        python -m pip install torch==1.10.0+cpu torchvision==0.11.0+cpu torchaudio==0.10.0 -f https://download.pytorch.org/whl/torch_stable.html
+        python -m pip install torch torchvision torchaudio
         ```
 
     - GPU  
 
         需要 5G 或更高**显存**，否则跑不起来，P106-100 (差不多 GTX1060 的性能）合成 60 秒音频大概需要 30 秒
 
-        ```
+        ```bash
         python -m pip install -r src/plugins/sing/requirements.txt
-        python -m pip install torch==1.10.0+cu113 torchvision==0.11.0+cu113 torchaudio==0.10.0 -f https://download.pytorch.org/whl/torch_stable.html
+        python -m pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu117
         ```
 
 ### 牛牛画画
@@ -39,8 +39,9 @@
 
 ### 牛牛 Chat
 
-1. 下载模型，参考 [原仓库说明](https://github.com/BlinkDL/ChatRWKV#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B)，把文件放到 `resource/chat/models` 文件夹，然后改下 `src/chat/answer.py` 里 `args.MODEL_NAME` 的路径（默认 ctx_len 是 1024，2048 是我为了那个模型专门改的，其他模型建议改回 1024）
-2. 安装依赖
+1. 下载模型，参考 [原仓库说明](https://github.com/BlinkDL/ChatRWKV#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B)，把文件放到 `resource/chat/models` 文件夹，然后改下 `src/chat/answer.py` 里 `args.MODEL_NAME` 的路径
+2. 默认 args.ctx_len 是 1024，2048 是我为了那个模型专门改的，其他模型建议改回 1024
+3. 安装依赖
 
     - CPU
 
@@ -55,4 +56,4 @@
     python -m pip install tokenizers
     ```
 
-3. `src/chat/answer.py` 里的起手咒语 `init_prompt` 有兴趣可以试着改改
+4. `src/chat/answer.py` 里的起手咒语 `init_prompt` 有兴趣可以试着改改
