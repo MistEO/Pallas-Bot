@@ -45,6 +45,6 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         text = text[2:].strip()
     ans = await asyncify(answer)(session, text)
 
-    config.refresh_cooldown(cd_key, True)
+    config.reset_cooldown(cd_key)
     if ans:
         await drunk_msg.finish(ans)

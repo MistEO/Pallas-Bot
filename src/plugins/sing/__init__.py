@@ -106,11 +106,11 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     key = 0
 
     async def failed():
-        config.refresh_cooldown(SING_COOLDOWN_KEY, reset=True)
+        config.reset_cooldown(SING_COOLDOWN_KEY)
         await sing_msg.finish('我习惯了站着不动思考。有时候啊，也会被大家突然戳一戳，看看睡着了没有。')
 
     async def success(song: Path):
-        config.refresh_cooldown(SING_COOLDOWN_KEY, reset=True)
+        config.reset_cooldown(SING_COOLDOWN_KEY)
         chunk_progess[event.group_id] = {
             'song_id': song_id,
             'chunk_index': chunk_index + 1

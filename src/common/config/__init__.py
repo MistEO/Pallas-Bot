@@ -1,9 +1,10 @@
 import pymongo
 import time
 from pymongo.collection import Collection
-from collections import defaultdict
 from abc import ABC
 from typing import Any, Optional
+
+KEY_JOINER = '.'
 
 
 class Config(ABC):
@@ -21,30 +22,49 @@ class Config(ABC):
                                            keys=[(cls._key, pymongo.HASHED)])
         return cls._config_mongo
 
-    _mongo_find_key: Optional[dict] = None
-    _key_id: Optional[int] = None
-    _cache: Optional[dict] = None
+    _db_filter: Optional[dict] = None
+    _document_key: Optional[int] = None
+    _document_cache: Optional[dict] = None
 
     @classmethod
-    def _find_key(cls, key: str) -> Any:
-        if cls._key_id not in cls._cache:
-            # print("refresh config from mongodb")
-            info = cls._get_config_mongo().find_one(cls._mongo_find_key)
-            cls._cache[cls._key_id] = info
+    def _find(cls, key: str, db: bool = True) -> Any:
+        if db and cls._document_key not in cls._document_cache:
+            # 获取这个 key_id（bot_id 或 group_id）的所有配置（document）
+            info = cls._get_config_mongo().find_one(cls._db_filter)
+            cls._document_cache[cls._document_key] = info
 
-        if cls._key_id in cls._cache:
-            key_cache = cls._cache[cls._key_id]
-            if key_cache and key in key_cache:
-                return key_cache[key]
+        cache = cls._document_cache[cls._document_key]
+        for k in key.split(KEY_JOINER):
+            if cache and k in cache:
+                cache = cache[k]
+            else:
+                return None
 
-        return None
+        return cache
+
+    @classmethod
+    def _update(cls, key: str, value: Any, db: bool = True) -> None:
+        if db:
+            cls._get_config_mongo().update_one(
+                cls._db_filter, {'$set': {key: value}})
+
+        if cls._document_key not in cls._document_cache:
+            cls._document_cache[cls._document_key] = {}
+        cache = cls._document_cache[cls._document_key]
+        splited_keys = key.split(KEY_JOINER)
+        for k in splited_keys[:-1]:
+            if k not in cache:
+                cache[k] = {}
+            cache = cache[k]
+        cache[splited_keys[-1]] = value
 
     def __init__(self, table: str, key: str, key_id: int) -> None:
         self.__class__._table = table
         self.__class__._key = key
-        self.__class__._key_id = key_id
-        self.__class__._mongo_find_key = {key: key_id}
-        self.__class__._cache = {}
+        self.__class__._document_key = key_id
+        self.__class__._db_filter = {key: key_id}
+        if self.__class__._document_cache is None:
+            self.__class__._document_cache = {}
 
 
 class BotConfig(Config):
@@ -62,116 +82,100 @@ class BotConfig(Config):
         '''
         账号是否安全（不处于风控等异常状态）
         '''
-        security = self._find_key('security')
+        security = self._find('security')
         return True if security else False
 
     def auto_accept(self) -> bool:
         '''
         是否自动接受加群、加好友请求
         '''
-        accept = self._find_key('auto_accept')
+        accept = self._find('auto_accept')
         return True if accept else False
 
     def is_admin_of_bot(self, user_id: int) -> bool:
         '''
         是否是管理员
         '''
-        admins = self._find_key('admins')
+        admins = self._find('admins')
         return user_id in admins if admins else False
-
-    def add_bot_admin(self, user_id: int) -> None:
-        '''
-        添加管理员
-        '''
-        self._get_config_mongo().update_one(
-            self._mongo_find_key,
-            {'$push': {'admins': user_id}},
-            upsert=True
-        )
-
-    _cooldown_data = {}
 
     def is_cooldown(self, action_type: str) -> bool:
         '''
         是否冷却完成
         '''
-        if self.bot_id not in BotConfig._cooldown_data:
-            return True
+        cd = self._find(
+            f'cooldown{KEY_JOINER}{action_type}{KEY_JOINER}{self.group_id}', db=False)
+        return cd + self.cooldown < time.time() if cd else True
 
-        if self.group_id not in BotConfig._cooldown_data[self.bot_id]:
-            return True
-
-        if action_type not in BotConfig._cooldown_data[self.bot_id][self.group_id]:
-            return True
-
-        cd = BotConfig._cooldown_data[self.bot_id][self.group_id][action_type]
-        return cd + self.cooldown < time.time()
-
-    def refresh_cooldown(self, action_type: str, reset: bool = False) -> None:
+    def refresh_cooldown(self, action_type: str) -> None:
         '''
         刷新冷却时间
         '''
-        if self.bot_id not in BotConfig._cooldown_data:
-            BotConfig._cooldown_data[self.bot_id] = {}
+        self._update(
+            f'cooldown{KEY_JOINER}{action_type}{KEY_JOINER}{self.group_id}', time.time(), db=False)
 
-        if self.group_id not in BotConfig._cooldown_data[self.bot_id]:
-            BotConfig._cooldown_data[self.bot_id][self.group_id] = {}
-
-        BotConfig._cooldown_data[self.bot_id][self.group_id][action_type] = time.time(
-        ) if not reset else 0
-
-    _drunk_data = defaultdict(lambda: defaultdict(int))     # 醉酒程度，不同群应用不同的数值
-    _sleep_until = defaultdict(lambda: defaultdict(int))    # 牛牛起床的时间
+    def reset_cooldown(self, action_type: str) -> None:
+        '''
+        重置冷却时间
+        '''
+        self._update(
+            f'cooldown{KEY_JOINER}{action_type}{KEY_JOINER}{self.group_id}', 0, db=False)
 
     def drink(self) -> None:
         '''
         喝酒功能，增加牛牛的混沌程度（bushi
         '''
-        BotConfig._drunk_data[self.bot_id][self.group_id] += 1
+        self._update(f'drunk{KEY_JOINER}{self.group_id}',
+                     self.drunkenness() + 1, db=False)
 
     def sober_up(self) -> bool:
         '''
         醒酒，降低醉酒程度，返回是否完全醒酒
         '''
-        BotConfig._drunk_data[self.bot_id][self.group_id] -= 1
-        return BotConfig._drunk_data[self.bot_id][self.group_id] <= 0
+        value = self.drunkenness() - 1
+        self._update(f'drunk{KEY_JOINER}{self.group_id}', value, db=False)
+        return value <= 0
 
     def drunkenness(self) -> int:
         '''
         获取醉酒程度
         '''
-        return BotConfig._drunk_data[self.bot_id][self.group_id]
+        value = self._find(f'drunk{KEY_JOINER}{self.group_id}', db=False)
+        return value if value else 0
+
+    @classmethod
+    def fully_sober_up(cls) -> None:
+        '''
+        完全醒酒
+        '''
+        cls._update('drunk', {})
 
     def is_sleep(self) -> bool:
         '''
         牛牛睡了么？
         '''
-        return BotConfig._sleep_until[self.bot_id][self.group_id] > time.time()
+        value = self._find(f'sleep{KEY_JOINER}{self.group_id}')
+        return value > time.time() if value else False
 
     def sleep(self, seconds: int) -> None:
         '''
         牛牛睡觉
         '''
-        BotConfig._sleep_until[self.bot_id][self.group_id] = time.time(
-        ) + seconds
-
-    @staticmethod
-    def completely_sober():
-        BotConfig._drunk_data = defaultdict(lambda: defaultdict(int))
-    
-    _take_name_data = defaultdict(lambda: defaultdict(int))    # 牛牛夺舍的账号
+        self._update(f'sleep{KEY_JOINER}{self.group_id}',
+                     time.time() + seconds)
 
     def taken_name(self) -> int:
         '''
         返回在该群夺舍的账号
         '''
-        return BotConfig._take_name_data[self.bot_id][self.group_id]
+        user_id = self._find(f'taken_name{KEY_JOINER}{self.group_id}')
+        return user_id if user_id else 0
 
-    def update_name(self, user_id: int) -> None:
+    def update_taken_name(self, user_id: int) -> None:
         '''
         更新夺舍的账号
         '''
-        BotConfig._take_name_data[self.bot_id][self.group_id] = user_id
+        self._update(f'taken_name{KEY_JOINER}{self.group_id}', user_id)
 
 
 class GroupConfig(Config):
@@ -184,19 +188,14 @@ class GroupConfig(Config):
         self.group_id = group_id
         self.cooldown = cooldown
 
-    _roulette_mode = {}    # 0 踢人 1 禁言
-
     def roulette_mode(self) -> int:
         '''
         获取轮盘模式
 
         :return: 0 踢人 1 禁言
         '''
-        if self.group_id not in GroupConfig._roulette_mode:
-            mode = self._find_key('roulette_mode')
-            GroupConfig._roulette_mode[self.group_id] = mode if mode is not None else 0
-
-        return GroupConfig._roulette_mode[self.group_id]
+        mode = self._find('roulette_mode')
+        return mode if mode else 0
 
     def set_roulette_mode(self, mode: int) -> None:
         '''
@@ -204,60 +203,42 @@ class GroupConfig(Config):
 
         :param mode: 0 踢人 1 禁言
         '''
-        GroupConfig._roulette_mode[self.group_id] = mode
-        self._get_config_mongo().update_one(
-            self._mongo_find_key,
-            {'$set': {'roulette_mode': mode}},
-            upsert=True
-        )
-
-    _ban_cache = {}
+        self._update('roulette_mode', mode)
 
     def ban(self) -> None:
         '''
         拉黑该群
         '''
-        GroupConfig._ban_cache[self.group_id] = True
-
-        self._get_config_mongo().update_one(
-            self._mongo_find_key,
-            {'$set': {'banned': True}},
-            upsert=True
-        )
+        self._update('banned', True)
 
     def is_banned(self) -> bool:
         '''
         群是否被拉黑
         '''
-        if self.group_id not in GroupConfig._ban_cache:
-            banned = self._find_key('banned')
-            GroupConfig._ban_cache[self.group_id] = True if banned else False
-
-        return GroupConfig._ban_cache[self.group_id]
-
-    _cooldown_data = {}
+        banned = self._find('banned')
+        return True if banned else False
 
     def is_cooldown(self, action_type: str) -> bool:
         '''
         是否冷却完成
         '''
-        if self.group_id not in GroupConfig._cooldown_data:
-            return True
-
-        if action_type not in GroupConfig._cooldown_data[self.group_id]:
-            return True
-
-        cd = GroupConfig._cooldown_data[self.group_id][action_type]
-        return cd + self.cooldown < time.time()
+        cd = self._find(
+            f'cooldown{KEY_JOINER}{action_type}{KEY_JOINER}{self.group_id}', db=False)
+        return cd + self.cooldown < time.time() if cd else True
 
     def refresh_cooldown(self, action_type: str) -> None:
         '''
         刷新冷却时间
         '''
-        if self.group_id not in GroupConfig._cooldown_data:
-            GroupConfig._cooldown_data[self.group_id] = {}
+        self._update(
+            f'cooldown{KEY_JOINER}{action_type}{KEY_JOINER}{self.group_id}', time.time(), db=False)
 
-        GroupConfig._cooldown_data[self.group_id][action_type] = time.time()
+    def reset_cooldown(self, action_type: str) -> None:
+        '''
+        重置冷却时间
+        '''
+        self._update(
+            f'cooldown{KEY_JOINER}{action_type}{KEY_JOINER}{self.group_id}', 0, db=False)
 
 
 class UserConfig(Config):
@@ -269,26 +250,15 @@ class UserConfig(Config):
 
         self.user_id = user_id
 
-    _ban_cache = {}
-
     def ban(self) -> None:
         '''
         拉黑这个人
         '''
-        UserConfig._ban_cache[self.user_id] = True
-
-        self._get_config_mongo().update_one(
-            self._mongo_find_key,
-            {'$set': {'banned': True}},
-            upsert=True
-        )
+        self._update('banned', True)
 
     def is_banned(self) -> bool:
         '''
         是否被拉黑
         '''
-        if self.user_id not in UserConfig._ban_cache:
-            banned = self._find_key('banned')
-            UserConfig._ban_cache[self.user_id] = True if banned else False
-
-        return UserConfig._ban_cache[self.user_id]
+        banned = self._find('banned')
+        return True if banned else False
