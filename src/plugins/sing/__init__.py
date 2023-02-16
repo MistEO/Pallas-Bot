@@ -14,13 +14,11 @@ from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, Gro
 
 from src.common.config import BotConfig, GroupConfig
 
-from .ncm_loader import download, get_song_title
+from .ncm_loader import download, get_song_title, get_song_id
 from .separater import separate
 from .slicer import slice
 from .svc_inference import inference
-from .mixer import mix
-from .splice import splice
-from .get_song_id import get_song_id
+from .mixer import mix, splice, is_file_completed
 
 
 # 这些建议直接在 .env 文件里配置
@@ -131,8 +129,8 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     # 优先返回合并后的歌
     full_cache_path = Path("resource/sing/full") / \
-        f'{song_id}_{speaker}.mp3'
-    if full_cache_path.exists():
+        f'{song_id}_{key}key_{speaker}.mp3'
+    if await asyncify(is_file_completed)(full_cache_path):
         await success(full_cache_path)
 
     cache_path = Path("resource/sing/mix") / \
@@ -170,11 +168,9 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     if not result:
         await failed()
     
-    # 唱完最后一段后合并音频
-    if chunk_index == len(slices_list) - 1:
-        result = await asyncify(splice)(Path("resource/sing/mix"), Path('resource/sing/full'), len(slices_list), song_id, speaker)
-        if not result:
-            await failed()
+    # 混音后合并混音结果，如果到最后一段就在文件后加标记
+    finished = (chunk_index == len(slices_list) - 1)
+    await asyncify(splice)(result, Path('resource/sing/full'), finished, song_id, chunk_index, speaker, key=key)
 
     await success(result)
 

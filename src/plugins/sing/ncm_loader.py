@@ -1,4 +1,5 @@
 import os
+import requests
 from pathlib import Path
 from pydantic import BaseModel, Extra
 from nonebot import get_driver
@@ -60,3 +61,11 @@ def request_file(url):
 def get_song_title(song_id):
     response = ncm.track.GetTrackDetail(song_id)
     return response["songs"][0]["name"]
+
+def get_song_id(song_name: str):
+    url = 'http://music.163.com/api/search/get/'
+    params = {'s': song_name, 'type': 1, 'limit': 1}
+    r = requests.get(url, params=params)
+    r_json = r.json()
+    song_id = r_json['result']['songs'][0]['id']
+    return song_id
