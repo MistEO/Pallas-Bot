@@ -34,11 +34,10 @@ class WikiVoice(DownloadTools):
     def download_voice_from_wiki(self, operator, url, filename):
         folder = f'{voices_source}/{operator}'
         f = f'{folder}/{filename}'
-        print('Downloading', url, "as", filename, "to", folder)
         if os.path.exists(f):
-            print("Already exists")
             return
 
+        print('Downloading', url, "as", filename, "to", folder)
         content = self.request_file(url)
         if content:
             os.makedirs(folder, exist_ok=True)

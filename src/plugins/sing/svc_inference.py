@@ -8,6 +8,14 @@ SVC_MAIN = (Path(__file__).parent / 'so_vits_svc' /
 SVC_SLICE_DB = -40
 SVC_OUPUT_FORMAT = 'flac'
 
+cuda_devices = ''
+
+
+def set_svc_cuda_devices(devices: str):
+    global cuda_devices
+    cuda_devices = devices
+
+
 speaker_models = {}
 
 
@@ -37,7 +45,10 @@ def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "p
             print("!!! Model or config not found !!!")
             return None
 
-        cmd = f'python {SVC_MAIN} {model} {config} {SVC_HUBERT} {song_path.absolute()} {key} {speaker} {SVC_SLICE_DB} {output_dir.absolute()} {SVC_OUPUT_FORMAT}'
+        cmd = ''
+        if cuda_devices:
+            cmd = f'CUDA_VISIBLE_DEVICES={cuda_devices} '
+        cmd += f'python {SVC_MAIN} {model} {config} {SVC_HUBERT} {song_path.absolute()} {key} {speaker} {SVC_SLICE_DB} {output_dir.absolute()} {SVC_OUPUT_FORMAT}'
         with locker:
             print(cmd)
             os.system(cmd)
