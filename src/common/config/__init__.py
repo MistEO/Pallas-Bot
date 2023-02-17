@@ -27,8 +27,8 @@ class Config(ABC):
     _document_cache: Optional[dict] = None
 
     @classmethod
-    def _find(cls, key: str, db: bool = True) -> Any:
-        if db and cls._document_key not in cls._document_cache:
+    def _find(cls, key: str) -> Any:
+        if cls._document_key not in cls._document_cache:
             # 获取这个 key_id（bot_id 或 group_id）的所有配置（document）
             info = cls._get_config_mongo().find_one(cls._db_filter)
             cls._document_cache[cls._document_key] = info
@@ -104,7 +104,7 @@ class BotConfig(Config):
         是否冷却完成
         '''
         cd = self._find(
-            f'cooldown{KEY_JOINER}{action_type}{KEY_JOINER}{self.group_id}', db=False)
+            f'cooldown{KEY_JOINER}{action_type}{KEY_JOINER}{self.group_id}')
         return cd + self.cooldown < time.time() if cd else True
 
     def refresh_cooldown(self, action_type: str) -> None:
@@ -140,7 +140,7 @@ class BotConfig(Config):
         '''
         获取醉酒程度
         '''
-        value = self._find(f'drunk{KEY_JOINER}{self.group_id}', db=False)
+        value = self._find(f'drunk{KEY_JOINER}{self.group_id}')
         return value if value else 0
 
     @classmethod
@@ -223,7 +223,7 @@ class GroupConfig(Config):
         是否冷却完成
         '''
         cd = self._find(
-            f'cooldown{KEY_JOINER}{action_type}{KEY_JOINER}{self.group_id}', db=False)
+            f'cooldown{KEY_JOINER}{action_type}{KEY_JOINER}{self.group_id}')
         return cd + self.cooldown < time.time() if cd else True
 
     def refresh_cooldown(self, action_type: str) -> None:
