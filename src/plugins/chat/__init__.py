@@ -6,7 +6,7 @@ from nonebot.rule import Rule
 from nonebot.typing import T_State
 from nonebot import on_message, get_driver
 
-from .answer import answer, del_all_stat
+from .model import answer, del_all_stat
 from src.common.config import BotConfig, GroupConfig
 
 
