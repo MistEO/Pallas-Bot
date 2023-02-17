@@ -26,9 +26,11 @@ QA_PROMPT = False  # True: Q & A prompt // False: User & Bot prompt
 # Download RWKV-4 models from https://huggingface.co/BlinkDL (don't use Instruct-test models unless you use their prompt templates)
 
 MODELS = 'resource/chat/models'
+MODEL_FORMAT = '.pth'
 for f in os.listdir(MODELS):
-    if not f.endswith('.pth'):
+    if not f.endswith(MODEL_FORMAT):
         continue
+    f = f[:-len(MODEL_FORMAT)]
     args.MODEL_NAME = f'{MODELS}/{f}'
     if 'ctx2048' in f:
         args.ctx_len = 2048

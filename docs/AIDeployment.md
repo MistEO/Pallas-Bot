@@ -39,8 +39,7 @@
 
 ### 牛牛 Chat
 
-1. 下载模型，参考 [原仓库说明](https://github.com/BlinkDL/ChatRWKV#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B)，把文件放到 `resource/chat/models` 文件夹，然后改下 `src/chat/answer.py` 里 `args.MODEL_NAME` 的路径
-2. 默认 args.ctx_len 是 1024，2048 是我为了那个模型专门改的，其他模型建议改回 1024
+1. 下载模型，参考 [原仓库说明](https://github.com/BlinkDL/ChatRWKV#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B)，把文件放到 `resource/chat/models` 文件夹（.pth 都行，根据你的显存和需求选择）
 3. 安装依赖
 
     - CPU
