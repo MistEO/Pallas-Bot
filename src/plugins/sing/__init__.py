@@ -207,8 +207,9 @@ MUSIC_PATH = 'resource/music/'
 def get_random_song(speaker: str = ""):
     all_song = []
     if os.path.exists(SONG_PATH):
-        all_song = [SONG_PATH +
-                    s for s in os.listdir(SONG_PATH) if speaker in s]
+        all_song = [SONG_PATH + s for s in os.listdir(SONG_PATH) \
+                    # 只唱过一段的大概率不是什么好听的，排除下
+                    if speaker in s and '_spliced0' not in s]
     if not all_song:
         all_song = [MUSIC_PATH + s for s in os.listdir(MUSIC_PATH)]
 
