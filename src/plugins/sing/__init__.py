@@ -18,7 +18,7 @@ from .ncm_loader import download, get_song_title, get_song_id
 from .separater import separate
 from .slicer import slice
 from .svc_inference import inference
-from .mixer import mix, splice, is_file_completed
+from .mixer import mix, splice
 
 
 # 这些建议直接在 .env 文件里配置
@@ -130,7 +130,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     # 优先返回合并后的歌
     full_cache_path = Path("resource/sing/full") / \
         f'{song_id}_{key}key_{speaker}.mp3'
-    if await asyncify(is_file_completed)(full_cache_path):
+    if full_cache_path.exists():
         await success(full_cache_path)
 
     cache_path = Path("resource/sing/mix") / \
@@ -168,11 +168,13 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     if not result:
         await failed()
     
-    # 混音后合并混音结果，如果到最后一段就在文件后加标记
+    # 混音后合并混音结果
     finished = (chunk_index == len(slices_list) - 1)
-    await asyncify(splice)(result, Path('resource/sing/full'), finished, song_id, chunk_index, speaker, key=key)
-
-    await success(result)
+    full_file = await asyncify(splice)(result, Path('resource/sing/full'), finished, song_id, chunk_index, speaker, key=key)
+    if not full_file:
+        await success(result)
+    else:
+        await success(full_file)
 
 
 # 青春版唱歌（bushi
