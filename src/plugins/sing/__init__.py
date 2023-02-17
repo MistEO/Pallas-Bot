@@ -14,11 +14,11 @@ from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, Gro
 
 from src.common.config import BotConfig, GroupConfig
 
-from .ncm_loader import download, get_song_title
+from .ncm_loader import download, get_song_title, get_song_id
 from .slicer import slice
+from .mixer import mix, splice
 from .separater import separate, set_separate_cuda_devices
 from .svc_inference import inference, set_svc_cuda_devices
-from .mixer import mix
 
 
 # 这些建议直接在 .env 文件里配置
@@ -69,8 +69,18 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
         return False
 
     if text.startswith(SING_CMD):
-        song_id = text.replace(SING_CMD, '').strip()
-        if not song_id or not song_id.isdigit():
+        temp = text.replace(SING_CMD, '').strip()
+        if not temp:
+                return False
+        # 如果是纯数字，就直接用id
+        if temp.isdigit():
+            song_id = temp
+        else:
+            song_name = temp
+            if not song_name:
+                return False
+            song_id = get_song_id(song_name)
+        if not song_id:
             return False
         state['song_id'] = song_id
         state['chunk_index'] = 0
@@ -122,10 +132,11 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     # 下载 -> 切片 -> 人声分离 -> 音色转换（SVC） -> 混音
     # 其中 人声分离和音色转换是吃 GPU 的，所以要加锁，不然显存不够用
 
-    cache_path = Path("resource/sing/mix") / \
-        f'{song_id}_chunk{chunk_index}_{key}key_{speaker}.mp3'
-    if cache_path.exists():
-        await success(cache_path)
+    # 优先返回合并后的歌
+    full_cache_path = Path("resource/sing/full") / \
+        f'{song_id}_{key}key_{speaker}.mp3'
+    if full_cache_path.exists():
+        await success(full_cache_path)
 
     await sing_msg.send('欢呼吧！')
     # 从网易云下载
@@ -139,6 +150,16 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         await failed()
 
     chunk = slices_list[chunk_index]
+
+    cache_path = Path("resource/sing/mix") / \
+        f'{song_id}_chunk{chunk_index}_{key}key_{speaker}.mp3'
+    if cache_path.exists():
+        finished = (chunk_index == len(slices_list) - 1)
+        full_file = await asyncify(splice)(cache_path, Path('resource/sing/full'), finished, song_id, chunk_index, speaker, key=key)
+        if not full_file:
+            await success(cache_path)
+        else:
+            await success(full_file)
 
     # 人声分离
     separated = await asyncify(separate)(chunk, Path('resource/sing'), locker=gpu_locker)
@@ -156,8 +177,14 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     result = await asyncify(mix)(svc, no_vocals, vocals, Path("resource/sing/mix"), svc.stem)
     if not result:
         await failed()
-
-    await success(result)
+    
+    # 混音后合并混音结果
+    finished = (chunk_index == len(slices_list) - 1)
+    full_file = await asyncify(splice)(result, Path('resource/sing/full'), finished, song_id, chunk_index, speaker, key=key)
+    if not full_file:
+        await success(result)
+    else:
+        await success(full_file)
 
 
 # 青春版唱歌（bushi

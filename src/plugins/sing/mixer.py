@@ -30,3 +30,29 @@ def mix(vocals: Path, no_vocals: Path, origin_vocals: Path, output_dir: Path, ou
         return None
 
     return path
+
+def splice(input_song: Path, output_dir: Path, finished: bool, song_id: str,chunk_index: int, speaker: str, input_format: str = 'mp3', format: str = 'mp3', key: int = 0):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    last_file_path = f'{output_dir}\{chunk_index - 1}_{song_id}_{key}key_{speaker}.{input_format}'
+    now_file_path = f'{output_dir}\{chunk_index}_{song_id}_{key}key_{speaker}.{input_format}'
+    print('splicing audio...')
+
+    # 不是第一段且没有能接的文件，过
+    if chunk_index > 0 and (not os.path.exists(last_file_path)):
+        return
+
+    # 合并
+    if chunk_index == 0:
+        output_audio = AudioSegment.empty()
+    else:
+        output_audio = AudioSegment.from_file(last_file_path)
+    output_audio += AudioSegment.from_file(input_song)
+    output_audio.export(now_file_path)
+
+    # 保存
+    if chunk_index > 0:
+        os.remove(last_file_path)
+    if finished:
+        os.rename(now_file_path, f'{output_dir}\{song_id}_{key}key_{speaker}.{input_format}')
+        return Path(f'{output_dir}\{song_id}_{key}key_{speaker}.{input_format}')
