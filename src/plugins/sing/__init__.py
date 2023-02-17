@@ -133,11 +133,6 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     if full_cache_path.exists():
         await success(full_cache_path)
 
-    cache_path = Path("resource/sing/mix") / \
-        f'{song_id}_chunk{chunk_index}_{key}key_{speaker}.mp3'
-    if cache_path.exists():
-        await success(cache_path)
-
     await sing_msg.send('欢呼吧！')
     # 从网易云下载
     origin = await asyncify(download)(song_id)
@@ -150,6 +145,16 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         await failed()
 
     chunk = slices_list[chunk_index]
+
+    cache_path = Path("resource/sing/mix") / \
+        f'{song_id}_chunk{chunk_index}_{key}key_{speaker}.mp3'
+    if cache_path.exists():
+        finished = (chunk_index == len(slices_list) - 1)
+        full_file = await asyncify(splice)(cache_path, Path('resource/sing/full'), finished, song_id, chunk_index, speaker, key=key)
+        if not full_file:
+            await success(cache_path)
+        else:
+            await success(full_file)
 
     # 人声分离
     separated = await asyncify(separate)(chunk, Path('resource/sing'), locker=gpu_locker)
