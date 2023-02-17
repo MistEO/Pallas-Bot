@@ -53,6 +53,8 @@ class Config(ABC):
         cache = cls._document_cache[cls._document_key]
         splited_keys = key.split(KEY_JOINER)
         for k in splited_keys[:-1]:
+            if not cache:
+                cache = {}
             if k not in cache:
                 cache[k] = {}
             cache = cache[k]
