@@ -25,8 +25,16 @@ QA_PROMPT = False  # True: Q & A prompt // False: User & Bot prompt
 
 # Download RWKV-4 models from https://huggingface.co/BlinkDL (don't use Instruct-test models unless you use their prompt templates)
 
-args.MODEL_NAME = 'resource/chat/models/RWKV-4-Pile-3B-EngChn-testNovel-321-ctx2048-20230214'
-args.ctx_len = 2048
+MODELS = 'resource/chat/models'
+for f in os.listdir(MODELS):
+    if not f.endswith('.pth'):
+        continue
+    args.MODEL_NAME = f'{MODELS}/{f}'
+    if 'ctx2048' in f:
+        args.ctx_len = 2048
+    else:
+        args.ctx_len = 1024
+    break
 
 CHAT_LEN_SHORT = 40
 CHAT_LEN_LONG = 150
