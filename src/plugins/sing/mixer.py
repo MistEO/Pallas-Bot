@@ -1,6 +1,7 @@
 from pydub import AudioSegment
 from pathlib import Path
 import os
+import shutil
 
 
 def mix(vocals: Path, no_vocals: Path, origin_vocals: Path, output_dir: Path, output_stem: str, extension: str = "mp3"):
@@ -31,28 +32,37 @@ def mix(vocals: Path, no_vocals: Path, origin_vocals: Path, output_dir: Path, ou
 
     return path
 
-def splice(input_song: Path, output_dir: Path, finished: bool, song_id: str,chunk_index: int, speaker: str, input_format: str = 'mp3', format: str = 'mp3', key: int = 0):
+
+def splice(input_song: Path, output_dir: Path, finished: bool, song_id: str, chunk_index: int, speaker: str, key: int = 0, format: str = 'mp3'):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    last_file_path = f'{output_dir}\{chunk_index - 1}_{song_id}_{key}key_{speaker}.{input_format}'
-    now_file_path = f'{output_dir}\{chunk_index}_{song_id}_{key}key_{speaker}.{input_format}'
-    print('splicing audio...')
+    # 随机播放的时候要根据文件名判断进度，这个文件名之后改的话要注意下
+    last_file_path = output_dir / \
+        f'{song_id}_spliced{chunk_index - 1}_{key}key_{speaker}.{format}'
+    now_file_path = output_dir / \
+        f'{song_id}_spliced{chunk_index}_{key}key_{speaker}.{format}'
+
+    if finished:
+        now_file_path = output_dir / \
+            f'{song_id}_full_{key}key_{speaker}.{format}'
+
+    if chunk_index == 0:
+        if input_song.exists() and not now_file_path.exists():
+            shutil.copy(input_song, now_file_path)
+        return now_file_path
 
     # 不是第一段且没有能接的文件，过
-    if chunk_index > 0 and (not os.path.exists(last_file_path)):
-        return
+    if not os.path.exists(last_file_path):
+        return now_file_path
 
     # 合并
-    if chunk_index == 0:
-        output_audio = AudioSegment.empty()
-    else:
-        output_audio = AudioSegment.from_file(last_file_path)
-    output_audio += AudioSegment.from_file(input_song)
-    output_audio.export(now_file_path)
-
+    print('splicing audio...')
+    output_audio = AudioSegment.from_file(last_file_path)
+    if input_song.exists():
+        output_audio += AudioSegment.from_file(input_song)
     # 保存
-    if chunk_index > 0:
-        os.remove(last_file_path)
-    if finished:
-        os.rename(now_file_path, f'{output_dir}\{song_id}_{key}key_{speaker}.{input_format}')
-        return Path(f'{output_dir}\{song_id}_{key}key_{speaker}.{input_format}')
+    output_audio.export(now_file_path, format=format)
+
+    os.remove(last_file_path)
+
+    return now_file_path

@@ -69,25 +69,20 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
         return False
 
     if text.startswith(SING_CMD):
-        temp = text.replace(SING_CMD, '').strip()
-        if not temp:
-                return False
-        # 如果是纯数字，就直接用id
-        if temp.isdigit():
-            song_id = temp
-        else:
-            song_name = temp
-            if not song_name:
-                return False
-            song_id = get_song_id(song_name)
+        song_key = text.replace(SING_CMD, '').strip()
+        song_id = song_key if song_key.isdigit() else await asyncify(get_song_id)(song_key)
         if not song_id:
             return False
         state['song_id'] = song_id
         state['chunk_index'] = 0
         return True
     elif text in SING_CONTINUE_CMDS and event.group_id in chunk_progess:
-        state['song_id'] = chunk_progess[event.group_id]['song_id']
-        state['chunk_index'] = chunk_progess[event.group_id]['chunk_index']
+        song_id = chunk_progess[event.group_id]['song_id']
+        chunk_index = chunk_progess[event.group_id]['chunk_index']
+        if not song_id or chunk_index > 100:
+            return False
+        state['song_id'] = song_id
+        state['chunk_index'] = chunk_index
         return True
 
     return False
@@ -119,11 +114,11 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         config.reset_cooldown(SING_COOLDOWN_KEY)
         await sing_msg.finish('我习惯了站着不动思考。有时候啊，也会被大家突然戳一戳，看看睡着了没有。')
 
-    async def success(song: Path):
+    async def success(song: Path, spec_index: int = None):
         config.reset_cooldown(SING_COOLDOWN_KEY)
         chunk_progess[event.group_id] = {
             'song_id': song_id,
-            'chunk_index': chunk_index + 1
+            'chunk_index': (spec_index if spec_index else chunk_index) + 1,
         }
 
         msg: Message = MessageSegment.record(file=song)
@@ -131,14 +126,21 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     # 下载 -> 切片 -> 人声分离 -> 音色转换（SVC） -> 混音
     # 其中 人声分离和音色转换是吃 GPU 的，所以要加锁，不然显存不够用
-
-    # 优先返回合并后的歌
-    full_cache_path = Path("resource/sing/full") / \
-        f'{song_id}_{key}key_{speaker}.mp3'
-    if full_cache_path.exists():
-        await success(full_cache_path)
-
     await sing_msg.send('欢呼吧！')
+
+    if chunk_index == 0:
+        for cache_path in Path('resource/sing/splices').glob(f'{song_id}_*_{key}key_{speaker}.mp3'):
+            if cache_path.name.startswith(f'{song_id}_full_', 114514):
+                await success(cache_path)
+            elif cache_path.name.startswith(f'{song_id}_spliced'):
+                await success(cache_path, int(cache_path.name.split('_')[1].replace('spliced', '')))
+    else:
+        cache_path = Path("resource/sing/mix") / \
+            f'{song_id}_chunk{chunk_index}_{key}key_{speaker}.mp3'
+        if cache_path.exists():
+            await asyncify(splice)(cache_path, Path('resource/sing/splices'), False, song_id, chunk_index, speaker, key=key)
+            await success(cache_path)
+
     # 从网易云下载
     origin = await asyncify(download)(song_id)
     if not origin:
@@ -147,19 +149,11 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     # 音频切片
     slices_list = await asyncify(slice)(origin, Path('resource/sing/slices'), song_id, size=plugin_config.svc_slice_size)
     if not slices_list or chunk_index >= len(slices_list):
+        if chunk_index == len(slices_list):
+            await asyncify(splice)(Path("NotExists"), Path('resource/sing/splices'), True, song_id, chunk_index, speaker, key=key)
         await failed()
 
     chunk = slices_list[chunk_index]
-
-    cache_path = Path("resource/sing/mix") / \
-        f'{song_id}_chunk{chunk_index}_{key}key_{speaker}.mp3'
-    if cache_path.exists():
-        finished = (chunk_index == len(slices_list) - 1)
-        full_file = await asyncify(splice)(cache_path, Path('resource/sing/full'), finished, song_id, chunk_index, speaker, key=key)
-        if not full_file:
-            await success(cache_path)
-        else:
-            await success(full_file)
 
     # 人声分离
     separated = await asyncify(separate)(chunk, Path('resource/sing'), locker=gpu_locker)
@@ -177,17 +171,14 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     result = await asyncify(mix)(svc, no_vocals, vocals, Path("resource/sing/mix"), svc.stem)
     if not result:
         await failed()
-    
+
     # 混音后合并混音结果
-    finished = (chunk_index == len(slices_list) - 1)
-    full_file = await asyncify(splice)(result, Path('resource/sing/full'), finished, song_id, chunk_index, speaker, key=key)
-    if not full_file:
-        await success(result)
-    else:
-        await success(full_file)
+    finished = chunk_index == len(slices_list) - 1
+    await asyncify(splice)(result, Path('resource/sing/splices'), finished, song_id, chunk_index, speaker, key=key)
+    await success(result)
 
 
-# 青春版唱歌（bushi
+# 随机放歌（bushi
 async def play_song(bot: Bot, event: Event, state: T_State) -> bool:
     text = event.get_plaintext()
     if not text or not text.endswith(SING_CMD):
@@ -209,7 +200,7 @@ play_cmd = on_message(
     permission=permission.GROUP)
 
 
-SONG_PATH = 'resource/sing/mix/'
+SONG_PATH = 'resource/sing/splices/'
 MUSIC_PATH = 'resource/music/'
 
 
@@ -217,7 +208,7 @@ def get_random_song(speaker: str = ""):
     all_song = []
     if os.path.exists(SONG_PATH):
         all_song = [SONG_PATH +
-                    s for s in os.listdir(SONG_PATH) if '_chunk0' in s and speaker in s]
+                    s for s in os.listdir(SONG_PATH) if speaker in s]
     if not all_song:
         all_song = [MUSIC_PATH + s for s in os.listdir(MUSIC_PATH)]
 
@@ -238,11 +229,16 @@ async def _(bot: Bot, event: Event, state: T_State):
     if not rand_music:
         return
 
-    if '_chunk0' in rand_music:
-        song_id = Path(rand_music).stem.split('_')[0]
+    if '_spliced' in rand_music:
+        splited = Path(rand_music).stem.split('_')
         chunk_progess[event.group_id] = {
-            'song_id': song_id,
-            'chunk_index': 1
+            'song_id': splited[0],
+            'chunk_index': int(splited[1].replace('spliced', '')) + 1,
+        }
+    else:
+        chunk_progess[event.group_id] = {
+            'song_id': '',
+            'chunk_index': 114514,
         }
 
     msg: Message = MessageSegment.record(file=Path(rand_music))
