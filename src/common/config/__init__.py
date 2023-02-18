@@ -145,8 +145,7 @@ class BotConfig(Config):
         喝酒功能，增加牛牛的混沌程度（bushi
         '''
         value = self.drunkenness() + 1
-        self._update(f'drunk{KEY_JOINER}{self.group_id}',
-                     value, db=False)
+        self._update(f'drunk{KEY_JOINER}{self.group_id}', value, db=False)
         for on_drink in self.on_drink_funcs:
             on_drink(self.bot_id, self.group_id, value)
 
@@ -156,11 +155,11 @@ class BotConfig(Config):
         '''
         value = self.drunkenness() - 1
         self._update(f'drunk{KEY_JOINER}{self.group_id}', value, db=False)
-        if value <= 0:
-            for on_sober_up in self.on_sober_up_funcs:
-                on_sober_up(self.bot_id, self.group_id, value)
-            return True
-        return False
+        if value > 0:
+            return False
+        for on_sober_up in self.on_sober_up_funcs:
+            on_sober_up(self.bot_id, self.group_id, value)
+        return True
 
     def drunkenness(self) -> int:
         '''
