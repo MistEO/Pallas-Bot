@@ -93,6 +93,7 @@
 [jieba_fast](https://github.com/deepcs233/jieba_fast): 高效的中文分词库  
 [demucs](https://github.com/facebookresearch/demucs): Code for the paper Hybrid Spectrogram and Waveform Source Separation  
 [so-vits-svc](https://github.com/innnky/so-vits-svc): 基于vits与softvc的歌声音色转换模型  
+[ChatRWKV](https://github.com/BlinkDL/ChatRWKV): ChatRWKV is like ChatGPT but powered by RWKV (100% RNN) language model, and open source.  
 
 ## QQ群
 
