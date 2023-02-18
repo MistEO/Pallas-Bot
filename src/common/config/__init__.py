@@ -44,13 +44,12 @@ class Config(ABC):
             self._get_config_mongo().update_one(
                 self._db_filter, {'$set': {key: value}})
 
-        if self._document_key not in self._document_cache:
+        if self._document_key not in self._document_cache or \
+                not self._document_cache[self._document_key]:
             self._document_cache[self._document_key] = {}
         cache = self._document_cache[self._document_key]
         splited_keys = key.split(KEY_JOINER)
         for k in splited_keys[:-1]:
-            if not cache:
-                cache = {}
             if k not in cache:
                 cache[k] = {}
             cache = cache[k]
