@@ -8,7 +8,6 @@ from nonebot.rule import keyword, to_me, Rule
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.onebot.v11 import permission
-from nonebot.permission import Permission
 from src.common.config import BotConfig, GroupConfig
 
 
