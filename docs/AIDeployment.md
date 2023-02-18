@@ -39,7 +39,13 @@
 
 ### 牛牛 Chat
 
-1. 下载模型，参考 [原仓库说明](https://github.com/BlinkDL/ChatRWKV#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B)，把文件放到 `resource/chat/models` 文件夹（.pth 都行，根据你的显存和需求选择）
+1. 下载模型，参考 [原仓库说明](https://github.com/BlinkDL/ChatRWKV#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B)，把文件放到 `resource/chat/models` 文件夹（只要是 `.pth` 都行，根据你的显存和需求选择）
+2. 更新 git 子模块
+
+    ```
+    git submodule update --init --recursive
+    ```
+
 3. 安装依赖
 
     - CPU
@@ -55,4 +61,4 @@
     python -m pip install tokenizers
     ```
 
-4. `src/chat/answer.py` 里的起手咒语 `init_prompt` 有兴趣可以试着改改
+4. `src/chat/model.py` 里的起手咒语 `init_prompt` 有兴趣可以试着改改
