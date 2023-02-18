@@ -8,13 +8,16 @@ from nonebot import on_message, get_driver, logger
 from .model import answer, del_all_stat
 from src.common.config import BotConfig, GroupConfig
 
+
 def on_sober_up(bot_id, group_id, drunkenness) -> bool:
     session = f'{bot_id}_{group_id}'
-    logger.info(f'bot [{bot_id}] sober up in group [{group_id}], clear session [{session}]')
+    logger.info(
+        f'bot [{bot_id}] sober up in group [{group_id}], clear session [{session}]')
     del_all_stat(session)
 
 
-BotConfig.register_on_sober_up(on_sober_up)
+BotConfig.register_sober_up(on_sober_up)
+
 
 def is_drunk(bot: Bot, event: Event, state: T_State) -> bool:
     config = BotConfig(event.self_id, event.group_id)
