@@ -22,18 +22,15 @@ class Config(ABC):
                                            keys=[(cls._key, pymongo.HASHED)])
         return cls._config_mongo
 
-    _db_filter: Optional[dict] = None
-    _document_key: Optional[int] = None
     _document_cache: Optional[dict] = None
 
-    @classmethod
-    def _find(cls, key: str) -> Any:
-        if cls._document_key not in cls._document_cache:
+    def _find(self, key: str) -> Any:
+        if self._document_key not in self._document_cache:
             # 获取这个 key_id（bot_id 或 group_id）的所有配置（document）
-            info = cls._get_config_mongo().find_one(cls._db_filter)
-            cls._document_cache[cls._document_key] = info
+            info = self._get_config_mongo().find_one(self._db_filter)
+            self._document_cache[self._document_key] = info
 
-        cache = cls._document_cache[cls._document_key]
+        cache = self._document_cache[self._document_key]
         for k in key.split(KEY_JOINER):
             if cache and k in cache:
                 cache = cache[k]
@@ -42,15 +39,14 @@ class Config(ABC):
 
         return cache
 
-    @classmethod
-    def _update(cls, key: str, value: Any, db: bool = True) -> None:
+    def _update(self, key: str, value: Any, db: bool = True) -> None:
         if db:
-            cls._get_config_mongo().update_one(
-                cls._db_filter, {'$set': {key: value}})
+            self._get_config_mongo().update_one(
+                self._db_filter, {'$set': {key: value}})
 
-        if cls._document_key not in cls._document_cache:
-            cls._document_cache[cls._document_key] = {}
-        cache = cls._document_cache[cls._document_key]
+        if self._document_key not in self._document_cache:
+            self._document_cache[self._document_key] = {}
+        cache = self._document_cache[self._document_key]
         splited_keys = key.split(KEY_JOINER)
         for k in splited_keys[:-1]:
             if not cache:
@@ -61,12 +57,12 @@ class Config(ABC):
         cache[splited_keys[-1]] = value
 
     def __init__(self, table: str, key: str, key_id: int) -> None:
-        self.__class__._table = table
-        self.__class__._key = key
-        self.__class__._document_key = key_id
-        self.__class__._db_filter = {key: key_id}
+        self._document_key = key_id
+        self._db_filter = {key: key_id}
         if self.__class__._document_cache is None:
             self.__class__._document_cache = {}
+            self.__class__._table = table
+            self.__class__._key = key
 
 
 class BotConfig(Config):
