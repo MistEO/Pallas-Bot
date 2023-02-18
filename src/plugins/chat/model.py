@@ -38,6 +38,10 @@ for f in os.listdir(MODELS):
         args.ctx_len = 1024
     break
 
+if not args.MODEL_NAME:
+    print('!!!Chat model not found!!!')
+    raise Exception('Chat model not found')
+
 CHAT_LEN_SHORT = 40
 CHAT_LEN_LONG = 150
 FREE_GEN_LEN = 200
