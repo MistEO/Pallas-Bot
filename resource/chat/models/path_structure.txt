@@ -1,3 +1,3 @@
 resource/chat/models
-├── path_structure
+├── path_structure.txt
 └── RWKV-4-Pile-XXXXXX.pth
