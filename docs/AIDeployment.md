@@ -9,7 +9,7 @@
 1. 下载模型相关文件（文件太大了，请加开发 QQ 群：716692626），解压放到 `resource/sing/models/XXX` 文件夹里  
 
     - 这里的 `XXX` 换成资源文件夹的名字，例如 `pallas`, `amiya` 等
-    - 在 `src/plugins/sing` 修改 `svc_speakers` （对应上面的资源文件夹名）
+    - 在 `src/plugins/sing/__init__.py` 修改 `svc_speakers` （对应上面的资源文件夹名）
 
 2. 更新 git 子模块
 
@@ -67,4 +67,4 @@
     python -m pip install tokenizers
     ```
 
-4. `src/chat/model.py` 里的起手咒语 `init_prompt` 有兴趣可以试着改改
+4. `src/plugins/chat/model.py` 里的起手咒语 `init_prompt` 有兴趣可以试着改改
