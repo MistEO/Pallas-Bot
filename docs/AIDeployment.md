@@ -9,7 +9,7 @@
 1. 下载模型相关文件（文件太大了，请加开发 QQ 群：716692626），解压放到 `resource/sing/models/XXX` 文件夹里  
 
     - 这里的 `XXX` 换成资源文件夹的名字，例如 `pallas`, `amiya` 等
-    - 在 `src/plugins/sing/__init__.py` 修改 `svc_speakers` （对应上面的资源文件夹名）
+    - 在 `src/plugins/sing/__init__.py` 修改 `svc_speakers` 对应上面的资源文件夹名。（也可以在 `.env` 里改）
 
 2. 更新 git 子模块
 
