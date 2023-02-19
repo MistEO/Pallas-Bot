@@ -15,26 +15,25 @@
 
 参考 [安装教程](https://zhuanlan.zhihu.com/p/43155342)（推荐 3.8.x 版本）， 或者你也可以自行搜索其他的安装教程
 
-### 下载源码
+### 配置 Windows 运行环境
 
 1. 下载安装 [git](https://git-scm.com/downloads)
-2. 在你想放数据的文件夹里，Shift + 鼠标右键，打开 powershell 窗口，clone 牛牛代码
+2. 下载源码  
+    在你想放数据的文件夹里，Shift + 鼠标右键，打开 Powershell 窗口，clone 牛牛代码
 
     ```cmd
     git clone https://github.com/MistEO/Pallas-Bot.git --depth=1
     ```
 
-受限于国内网络环境，请留意命令是否执行成功，若一直失败推荐挂上代理
+    受限于国内网络环境，请留意命令是否执行成功，若一直失败可以挂上代理
 
-### 配置 Windows 运行环境
-
-1. 更换 pip 源为阿里云*（更换为国内源会比默认的国外源快很多）
+3. 更换 pip 源为阿里云*（更换为国内源会比默认的国外源快很多）
 
     ```cmd
     python -m pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
     ```
 
-2. 通过手脚架安装nonebot
+4. 通过手脚架安装nonebot
 
     ```cmd
     python -m pip install nb-cli
@@ -42,7 +41,7 @@
 
     详情参见 [安装 NoneBot2](https://v2.nonebot.dev/docs/start/installation)
 
-3. 安装依赖
+5. 安装依赖
 
     ```cmd
     cd Pallas-Bot # 进入项目目录
@@ -51,7 +50,7 @@
 
     （如果这些依赖与其他 Python 程序产生了冲突，推荐使用 miniconda 等虚拟环境）
 
-4. 安装 nonebot 的 apscheduler 插件和 websockets 驱动器
+6. 安装 nonebot 的 apscheduler 插件和 websockets 驱动器
 
     ```cmd
     nb plugin install nonebot_plugin_apscheduler
@@ -62,13 +61,13 @@
 
     （如果你的系统提示找不到 `nb`，请自行尝试添加相关环境变量~）
 
-5. 安装并启动 Mongodb （这是启动核心功能所必须的）
+7. 安装并启动 Mongodb （这是启动核心功能所必须的）
 
     👉 [Windows 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-window-install.html)
 
     只需要确认 Mongodb 启动即可，后面的部分会由 Pallas-Bot 自动完成
 
-6. 配置 ffmpeg （如果不希望牛牛发送语音，可以跳过这一步）
+8. 配置 ffmpeg （如果不希望牛牛发送语音，可以跳过这一步）
 
     👉 [安装 ffmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)
 
