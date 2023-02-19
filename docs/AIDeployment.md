@@ -6,7 +6,11 @@
 
 ## 牛牛唱歌 (Sing)
 
-1. 下载模型相关文件（文件太大了，请加开发 QQ 群：716692626），解压放到 `resource/sing/models/{speaker}` 文件夹里
+1. 下载模型相关文件（文件太大了，请加开发 QQ 群：716692626），解压放到 `resource/sing/models/{xxx}` 文件夹里  
+
+    - 这里的 `{xxx}` 换成资源文件夹的名字，例如 `pallas`, `amiya` 等
+    - 在 `src/plugins/sing` 修改 `svc_speakers` （对应上面的资源文件夹名）
+
 2. 更新 git 子模块
 
     ```
@@ -32,6 +36,8 @@
         python -m pip install -r src/plugins/sing/requirements.txt
         python -m pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu117
         ```
+
+4. 另外 `so-vits-svc` 似乎对 python 版本有要求，高于 3.8 可能跑不起来（不太确定，也可以试试
 
 ### 牛牛画画
 
