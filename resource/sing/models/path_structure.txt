@@ -4,4 +4,4 @@ resource/sing/models
 │   ├── config.json
 │   ├── D_60000.pth
 │   └── G_60000.pth
-└── path_structure
+└── path_structure.txt
