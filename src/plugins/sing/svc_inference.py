@@ -68,5 +68,5 @@ def mp3_to_wav(mp3_file_path):
 
     sound = AudioSegment.from_mp3(mp3_file_path)
     sound.export(wav_file_path, format="wav")
-    os.remove(mp3_file_path)
+    # os.remove(mp3_file_path)
     return Path(wav_file_path)
