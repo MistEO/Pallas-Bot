@@ -1,6 +1,8 @@
 import os
+import platform
 from threading import Lock
 from pathlib import Path
+from pydub import AudioSegment
 
 SVC_HUBERT = Path('resource/sing/models/hubert-soft-0d54a1f4.pt').absolute()
 SVC_MAIN = (Path(__file__).parent / 'so_vits_svc' /
@@ -23,7 +25,9 @@ def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "p
     # 这个库不知道咋集成，似乎可以转成 ONNX，但是我不会
     # 先用 cmd 凑合跑了
     # TODO: 使用 ONNX Runtime 重新集成
-
+    
+    if platform.system() == "Windows":
+        song_path = mp3_to_wav(song_path)
     result = output_dir / \
         f'{song_path.parent.stem}_{key}key_{speaker}.{SVC_OUPUT_FORMAT}'
 
@@ -57,3 +61,16 @@ def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "p
         return None
 
     return result
+
+def mp3_to_wav(mp3_file_path):
+    mp3_dirname, mp3_filename = os.path.split(mp3_file_path)
+    wav_filename = os.path.splitext(mp3_filename)[0] + '.wav'
+    wav_file_path = os.path.join(mp3_dirname, wav_filename)
+    
+    if os.path.exists(wav_file_path):
+        return Path(wav_file_path)
+
+    sound = AudioSegment.from_mp3(mp3_file_path)
+    sound.export(wav_file_path, format="wav")
+    # os.remove(mp3_file_path)
+    return Path(wav_file_path)
