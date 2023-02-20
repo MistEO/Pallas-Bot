@@ -130,8 +130,8 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     if chunk_index == 0:
         for cache_path in Path('resource/sing/splices').glob(f'{song_id}_*_{key}key_{speaker}.mp3'):
-            if cache_path.name.startswith(f'{song_id}_full_', 114514):
-                await success(cache_path)
+            if cache_path.name.startswith(f'{song_id}_full_'):
+                await success(cache_path, 114514)
             elif cache_path.name.startswith(f'{song_id}_spliced'):
                 await success(cache_path, int(cache_path.name.split('_')[1].replace('spliced', '')))
     else:
