@@ -8,11 +8,12 @@ def slice(path: Path, output_dir: Path, output_stem: str, format: str = 'mp3', s
     audio_segment = AudioSegment.from_file(path, format=format)
     total = int(audio_segment.duration_seconds * 1000 / size)  # 计算音频切片后的个数
 
-    results = [output_dir /
+    exists = [output_dir /
                f"{output_stem}_chunk{i}.{format}" for i in range(total + 1)]
-    if all([f.exists() for f in results]):
-        return results
+    if all([f.exists() for f in exists]):
+        return exists
 
+    results = []
     print('splitting audio...')
     for i in range(total):
         # 将音频切片，并以顺序进行命名
