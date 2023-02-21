@@ -4,9 +4,11 @@ from pathlib import Path
 
 cuda_devices = ''
 
+
 def set_separate_cuda_devices(devices: str):
     global cuda_devices
     cuda_devices = devices
+
 
 def separate(song_path: Path, output_dir: Path, locker: Lock = Lock()):
     MODEL = 'hdemucs_mmi'

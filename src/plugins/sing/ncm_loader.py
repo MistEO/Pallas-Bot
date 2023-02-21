@@ -62,6 +62,7 @@ def get_song_title(song_id):
     response = ncm.track.GetTrackDetail(song_id)
     return response["songs"][0]["name"]
 
+
 def get_song_id(song_name: str):
     if not song_name:
         return None

@@ -25,7 +25,7 @@ def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "p
     # 这个库不知道咋集成，似乎可以转成 ONNX，但是我不会
     # 先用 cmd 凑合跑了
     # TODO: 使用 ONNX Runtime 重新集成
-    
+
     if platform.system() == "Windows":
         song_path = mp3_to_wav(song_path)
     result = output_dir / \
@@ -62,11 +62,12 @@ def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "p
 
     return result
 
+
 def mp3_to_wav(mp3_file_path):
     mp3_dirname, mp3_filename = os.path.split(mp3_file_path)
     wav_filename = os.path.splitext(mp3_filename)[0] + '.wav'
     wav_file_path = os.path.join(mp3_dirname, wav_filename)
-    
+
     if os.path.exists(wav_file_path):
         return Path(wav_file_path)
 
