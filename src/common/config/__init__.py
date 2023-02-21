@@ -243,7 +243,7 @@ class GroupConfig(Config):
         是否冷却完成
         '''
         cd = self._find(
-            f'cooldown{KEY_JOINER}{action_type}{KEY_JOINER}{self.group_id}')
+            f'cooldown{KEY_JOINER}{action_type}')
         return cd + self.cooldown < time.time() if cd else True
 
     def refresh_cooldown(self, action_type: str) -> None:
@@ -251,14 +251,26 @@ class GroupConfig(Config):
         刷新冷却时间
         '''
         self._update(
-            f'cooldown{KEY_JOINER}{action_type}{KEY_JOINER}{self.group_id}', time.time(), db=False)
+            f'cooldown{KEY_JOINER}{action_type}', time.time(), db=False)
 
     def reset_cooldown(self, action_type: str) -> None:
         '''
         重置冷却时间
         '''
         self._update(
-            f'cooldown{KEY_JOINER}{action_type}{KEY_JOINER}{self.group_id}', 0, db=False)
+            f'cooldown{KEY_JOINER}{action_type}', 0, db=False)
+
+    def sing_progress(self) -> Optional[dict]:
+        '''
+        获取歌曲进度
+        '''
+        return self._find('sing_progress')
+
+    def update_sing_progress(self, progress: dict) -> None:
+        '''
+        更新歌曲进度
+        '''
+        self._update('sing_progress', progress)
 
 
 class UserConfig(Config):

@@ -12,7 +12,7 @@ from nonebot.rule import Rule
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
 
-from src.common.config import BotConfig, GroupConfig
+from src.common.config import GroupConfig
 
 from .ncm_loader import download, get_song_title, get_song_id
 from .slicer import slice
@@ -76,9 +76,11 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
         state['song_id'] = song_id
         state['chunk_index'] = 0
         return True
-    elif text in SING_CONTINUE_CMDS and event.group_id in chunk_progess:
-        song_id = chunk_progess[event.group_id]['song_id']
-        chunk_index = chunk_progess[event.group_id]['chunk_index']
+
+    progress = GroupConfig(group_id=event.group_id).sing_progress()
+    if text in SING_CONTINUE_CMDS and progress:
+        song_id = progress['song_id']
+        chunk_index = progress['chunk_index']
         if not song_id or chunk_index > 100:
             return False
         state['song_id'] = song_id
@@ -95,12 +97,11 @@ sing_msg = on_message(
 )
 
 gpu_locker = Lock()
-chunk_progess = {}
 
 
 @sing_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    config = BotConfig(event.self_id, event.group_id, cooldown=120)
+    config = GroupConfig(event.group_id, cooldown=120)
     if not config.is_cooldown(SING_COOLDOWN_KEY):
         return
     config.refresh_cooldown(SING_COOLDOWN_KEY)
@@ -116,10 +117,10 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     async def success(song: Path, spec_index: int = None):
         config.reset_cooldown(SING_COOLDOWN_KEY)
-        chunk_progess[event.group_id] = {
+        config.update_sing_progress({
             'song_id': song_id,
             'chunk_index': (spec_index if spec_index else chunk_index) + 1,
-        }
+        })
 
         msg: Message = MessageSegment.record(file=song)
         await sing_msg.finish(msg)
@@ -232,15 +233,15 @@ async def _(bot: Bot, event: Event, state: T_State):
 
     if '_spliced' in rand_music:
         splited = Path(rand_music).stem.split('_')
-        chunk_progess[event.group_id] = {
+        config.update_sing_progress({
             'song_id': splited[0],
             'chunk_index': int(splited[1].replace('spliced', '')) + 1,
-        }
+        })
     else:
-        chunk_progess[event.group_id] = {
+        config.update_sing_progress({
             'song_id': '',
             'chunk_index': 114514,
-        }
+        })
 
     msg: Message = MessageSegment.record(file=Path(rand_music))
     await play_cmd.finish(msg)
@@ -261,15 +262,16 @@ song_title_cmd = on_message(
 
 @song_title_cmd.handle()
 async def _(bot: Bot, event: Event, state: T_State):
-    if not event.group_id in chunk_progess:
+    config = GroupConfig(event.group_id, cooldown=10)
+    progress = config.sing_progress()
+    if not progress:
         return
 
-    config = GroupConfig(event.group_id, cooldown=10)
     if not config.is_cooldown('song_title'):
         return
     config.refresh_cooldown('song_title')
 
-    song_id = chunk_progess[event.group_id]['song_id']
+    song_id = progress['song_id']
     song_title = await asyncify(get_song_title)(song_id)
     if not song_title:
         return
