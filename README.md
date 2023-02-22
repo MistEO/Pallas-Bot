@@ -95,6 +95,12 @@
 [so-vits-svc](https://github.com/innnky/so-vits-svc): 基于vits与softvc的歌声音色转换模型  
 [ChatRWKV](https://github.com/BlinkDL/ChatRWKV): ChatRWKV is like ChatGPT but powered by RWKV (100% RNN) language model, and open source.  
 
+### 贡献者
+
+感谢
+
+[![Contributors](https://contributors-img.web.app/image?repo=MistEO/Pallas-Bot)](https://github.com/MistEO/Pallas-Bot/graphs/contributors)
+
 ## QQ群
 
 ~~牛牛调教一群: 831322617 被腾讯封了 orz~~  
