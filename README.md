@@ -97,7 +97,7 @@
 
 ### 贡献者
 
-感谢
+感谢各位大佬！
 
 [![Contributors](https://contributors-img.web.app/image?repo=MistEO/Pallas-Bot)](https://github.com/MistEO/Pallas-Bot/graphs/contributors)
 
