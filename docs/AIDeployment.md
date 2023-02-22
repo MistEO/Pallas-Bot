@@ -39,11 +39,11 @@
 
 4. 另外 `so-vits-svc` 似乎对 python 版本有要求，高于 3.8 可能跑不起来（不太确定，也可以试试
 
-### 牛牛画画
+## 牛牛画画
 
 敬请期待
 
-### 牛牛 Chat
+## 牛牛 Chat
 
 1. 下载模型，参考 [原仓库说明](https://github.com/BlinkDL/ChatRWKV#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B)，把文件放到 `resource/chat/models` 文件夹（只要是 `.pth` 都行，根据你的显存和需求选择）
 2. 更新 git 子模块
