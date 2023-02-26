@@ -1,7 +1,9 @@
 resource/sing/models
-├── hubert-soft-0d54a1f4.pt
+├── amiya
+│   ├── config.json
+│   └── G_24210.pth
 ├── pallas
 │   ├── config.json
-│   ├── D_60000.pth
-│   └── G_60000.pth
+│   └── G_20000.pth
+├── checkpoint_best_legacy_500.pt
 └── path_structure.txt
