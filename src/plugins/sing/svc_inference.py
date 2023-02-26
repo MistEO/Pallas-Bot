@@ -8,7 +8,7 @@ SVC_MAIN = (Path(__file__).parent / 'so_vits_svc' /
             'inference_main.py').absolute()
 SVC_HUBERT = Path(
     'resource/sing/models/checkpoint_best_legacy_500.pt').absolute()
-SVC_SLICE_DB = -40
+SVC_SLICE_DB = -30
 SVC_OUPUT_FORMAT = 'flac'
 
 cuda_devices = ''
@@ -48,11 +48,14 @@ def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "p
         model = speaker_models[speaker].absolute()
         config = Path(f'resource/sing/models/{speaker}/config.json').absolute()
 
-        if not os.path.exists(model) or not os.path.exists(config):
-            print("!!! Model or config not found !!!")
+        if not os.path.exists(model):
+            print("!!! Model or config not found !!!", model)
+            return None
+        if not os.path.exists(config):
+            print("!!! Model or config not found !!!", config)
             return None
         if not os.path.exists(SVC_HUBERT):
-            print("!!! Hubert model not found !!!")
+            print("!!! Hubert model not found !!!", SVC_HUBERT)
             return None
 
         cmd = ''
