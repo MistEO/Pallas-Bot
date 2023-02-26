@@ -179,7 +179,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         await ban_msg_latest.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
 
 
-@speak_sched.scheduled_job('interval', seconds=5)
+@speak_sched.scheduled_job('interval', seconds=60)
 async def speak_up():
 
     ret = Chat.speak()
