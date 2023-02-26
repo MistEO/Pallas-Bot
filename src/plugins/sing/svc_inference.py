@@ -49,10 +49,10 @@ def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "p
         config = Path(f'resource/sing/models/{speaker}/config.json').absolute()
 
         if not os.path.exists(model):
-            print("!!! Model or config not found !!!", model)
+            print("!!! G Model not found !!!", model)
             return None
         if not os.path.exists(config):
-            print("!!! Model or config not found !!!", config)
+            print("!!! Config not found !!!", config)
             return None
         if not os.path.exists(SVC_HUBERT):
             print("!!! Hubert model not found !!!", SVC_HUBERT)
