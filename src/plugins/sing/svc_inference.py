@@ -55,8 +55,6 @@ def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "p
             print("!!! Hubert model not found !!!")
             return None
 
-        output_dir.mkdir(parents=True, exist_ok=True)
-
         cmd = ''
         if cuda_devices:
             cmd = f'CUDA_VISIBLE_DEVICES={cuda_devices} '
