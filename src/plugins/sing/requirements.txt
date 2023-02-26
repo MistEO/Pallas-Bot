@@ -26,5 +26,6 @@ onnxoptimizer
 librosa
 soundfile
 matplotlib
+fairseq>=0.12.2
 ### so-vits-svc ###
 

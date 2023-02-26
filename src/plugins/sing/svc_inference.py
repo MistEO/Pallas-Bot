@@ -4,9 +4,10 @@ from threading import Lock
 from pathlib import Path
 from pydub import AudioSegment
 
-SVC_HUBERT = Path('resource/sing/models/hubert-soft-0d54a1f4.pt').absolute()
 SVC_MAIN = (Path(__file__).parent / 'so_vits_svc' /
-            'inference_caller.py').absolute()
+            'inference_main.py').absolute()
+SVC_HUBERT = Path(
+    'resource/sing/models/checkpoint_best_legacy_500.pt').absolute()
 SVC_SLICE_DB = -40
 SVC_OUPUT_FORMAT = 'flac'
 
@@ -28,8 +29,10 @@ def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "p
 
     if platform.system() == "Windows":
         song_path = mp3_to_wav(song_path)
+
+    stem = song_path.stem
     result = output_dir / \
-        f'{song_path.parent.stem}_{key}key_{speaker}.{SVC_OUPUT_FORMAT}'
+        f'{stem}_{key}key_{speaker}.{SVC_OUPUT_FORMAT}'
 
     if not result.exists():
         global speaker_models
@@ -45,14 +48,19 @@ def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "p
         model = speaker_models[speaker].absolute()
         config = Path(f'resource/sing/models/{speaker}/config.json').absolute()
 
-        if not os.path.exists(model) or not os.path.exists(config) or not os.path.exists(SVC_HUBERT):
+        if not os.path.exists(model) or not os.path.exists(config):
             print("!!! Model or config not found !!!")
+            return None
+        if not os.path.exists(SVC_HUBERT):
+            print("!!! Hubert model not found !!!")
             return None
 
         cmd = ''
         if cuda_devices:
             cmd = f'CUDA_VISIBLE_DEVICES={cuda_devices} '
-        cmd += f'python {SVC_MAIN} {model} {config} {SVC_HUBERT} {song_path.absolute()} {key} {speaker} {SVC_SLICE_DB} {output_dir.absolute()} {SVC_OUPUT_FORMAT}'
+        cmd += f'python {SVC_MAIN} -m {model} -c {config} -hb {SVC_HUBERT.absolute()} \
+            -f {song_path.absolute()} -t {key} -s {speaker} -sd {SVC_SLICE_DB} \
+            -o {output_dir.absolute()} -wf {SVC_OUPUT_FORMAT}'
         with locker:
             print(cmd)
             os.system(cmd)

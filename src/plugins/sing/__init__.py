@@ -25,9 +25,9 @@ from .svc_inference import inference, set_svc_cuda_devices
 class Config(BaseModel, extra=Extra.ignore):
     # 切片大小，单位：毫秒
     # 即每次语音发多长的，越长越吃显存。
-    # 6G 显存大概能 40000
+    # 6G 显存大概能 120000（两分钟）
     # 第一次用建议设置个 10000，确定能跑起来，再根据自己显存调节
-    svc_slice_size: int = 40000
+    svc_slice_size: int = 120000
 
     # key 对应命令词，即“牛牛唱歌” or “兔兔唱歌”
     # value 对应 resource/sing/models/ 下的文件夹名，以及生成的音频文件名
