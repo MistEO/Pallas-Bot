@@ -237,6 +237,11 @@ async def _(bot: Bot, event: Event, state: T_State):
             'song_id': splited[0],
             'chunk_index': int(splited[1].replace('spliced', '')) + 1,
         })
+    elif '_full_' in rand_music:
+        config.update_sing_progress({
+            'song_id': Path(rand_music).stem.split('_')[0],
+            'chunk_index': 114514,
+        })
     else:
         config.update_sing_progress({
             'song_id': '',
