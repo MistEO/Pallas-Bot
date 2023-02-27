@@ -674,6 +674,8 @@ class Chat:
                     continue
             if sample_msg.startswith("[CQ:xml"):
                 continue
+            if '\n' in sample_msg:
+                continue
 
             if answer['group_id'] == group_id:
                 candidate_append(candidate_answers, answer)
