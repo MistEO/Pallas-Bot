@@ -9,6 +9,9 @@ SVC_MAIN = (Path(__file__).parent / 'so_vits_svc' /
 SVC_HUBERT = Path(
     'resource/sing/models/checkpoint_best_legacy_500.pt').absolute()
 SVC_SLICE_DB = -30
+SVC_FORCE_SLICE = 40    # 实际推理时的最大切片长度，单位：秒。
+                        # 越大越吃显存，速度会稍微快一点点。
+                        # 但如果切得太小，连接处有可能有瑕疵（其实影响也不大
 SVC_OUPUT_FORMAT = 'flac'
 
 cuda_devices = ''
@@ -18,6 +21,9 @@ def set_svc_cuda_devices(devices: str):
     global cuda_devices
     cuda_devices = devices
 
+def set_svc_force_slice(secs: int):
+    global SVC_FORCE_SLICE
+    SVC_FORCE_SLICE = secs
 
 speaker_models = {}
 
@@ -62,7 +68,7 @@ def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "p
         if cuda_devices:
             cmd = f'CUDA_VISIBLE_DEVICES={cuda_devices} '
         cmd += f'python {SVC_MAIN} -m {model} -c {config} -hb {SVC_HUBERT.absolute()} \
-            -f {song_path.absolute()} -t {key} -s {speaker} -sd {SVC_SLICE_DB} \
+            -f {song_path.absolute()} -t {key} -s {speaker} -sd {SVC_SLICE_DB} -sf {SVC_FORCE_SLICE}\
             -o {output_dir.absolute()} -wf {SVC_OUPUT_FORMAT}'
         with locker:
             print(cmd)

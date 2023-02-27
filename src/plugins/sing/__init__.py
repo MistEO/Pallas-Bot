@@ -23,16 +23,17 @@ from .svc_inference import inference, set_svc_cuda_devices
 
 # 这些建议直接在 .env 文件里配置
 class Config(BaseModel, extra=Extra.ignore):
-    # 切片大小，单位：毫秒
-    # 即每次语音发多长的，越长越吃显存。
-    # 6G 显存大概能 120000（两分钟）
-    # 第一次用建议设置个 10000，确定能跑起来，再根据自己显存调节
-    svc_slice_size: int = 120000
+    # 每次发送的语音长度，单位：秒
+    # 太长的话合成会比较慢
+    # 现在已经做了多段切片了，这个长度仅取决于你能接受多久的合成耗时，跟显存等大小没太大关系
+    # 如果想一次唱完一整首歌，可以设个 600 之类的（十分钟）
+    # 不建议设 99999，有的歌好几个小时，你等吧.jpg
+    sing_length: int = 120
 
     # key 对应命令词，即“牛牛唱歌” or “兔兔唱歌”
-    # value 对应 resource/sing/models/ 下的文件夹名，以及生成的音频文件名
+    # value 对应 resource/sing/models/ 下的文件夹名，以及生成的音频文件名，也要对应模型 config 文件里的 spk 字段
     # 注意 .env 里 dict 不能换行哦，得在一行写完所有的
-    svc_speakers: dict = {
+    sing_speakers: dict = {
         "帕拉斯": "pallas",
         "牛牛": "pallas",
     }
@@ -42,9 +43,11 @@ class Config(BaseModel, extra=Extra.ignore):
 
 plugin_config = Config.parse_obj(get_driver().config)
 print("plugin_config", plugin_config)
+
 if plugin_config.sing_cuda_device:
     set_separate_cuda_devices(plugin_config.sing_cuda_device)
     set_svc_cuda_devices(plugin_config.sing_cuda_device)
+
 
 SING_CMD = '唱歌'
 SING_CONTINUE_CMDS = ['继续唱', '接着唱']
@@ -57,7 +60,7 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
         return False
 
     has_spk = False
-    for name, speaker in plugin_config.svc_speakers.items():
+    for name, speaker in plugin_config.sing_speakers.items():
         if not text.startswith(name):
             continue
         text = text.replace(name, '').strip()
@@ -148,7 +151,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         await failed()
 
     # 音频切片
-    slices_list = await asyncify(slice)(origin, Path('resource/sing/slices'), song_id, size=plugin_config.svc_slice_size)
+    slices_list = await asyncify(slice)(origin, Path('resource/sing/slices'), song_id, size_ms=plugin_config.sing_length * 1000)
     if not slices_list or chunk_index >= len(slices_list):
         if chunk_index == len(slices_list):
             await asyncify(splice)(Path("NotExists"), Path('resource/sing/splices'), True, song_id, chunk_index, speaker, key=key)
@@ -185,7 +188,7 @@ async def play_song(bot: Bot, event: Event, state: T_State) -> bool:
     if not text or not text.endswith(SING_CMD):
         return False
 
-    for name, speaker in plugin_config.svc_speakers.items():
+    for name, speaker in plugin_config.sing_speakers.items():
         if not text.startswith(name):
             continue
         state['speaker'] = speaker
@@ -254,7 +257,7 @@ async def _(bot: Bot, event: Event, state: T_State):
 
 async def what_song(bot: "Bot", event: "Event", state: T_State) -> bool:
     text = event.get_plaintext()
-    return any([text.startswith(spk) for spk in plugin_config.svc_speakers.keys()]) \
+    return any([text.startswith(spk) for spk in plugin_config.sing_speakers.keys()]) \
         and any(key in text for key in ['什么歌', '哪首歌', '啥歌'])
 
 
