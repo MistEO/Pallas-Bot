@@ -30,5 +30,5 @@ async def handle_request(bot: Bot, event: FriendRequestEvent, state: T_State):
         return
 
     bot_config = BotConfig(event.self_id)
-    if bot_config.auto_accept() or bot_config.is_admin_of_bot(event.user_id):
+    if bot_config.is_admin_of_bot(event.user_id): # or bot_config.auto_accept():  # 自动加好友太容易被封号了，先关了
         await event.approve(bot)
