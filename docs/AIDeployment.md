@@ -72,7 +72,7 @@
 
 **仍在开发中，有能力的可以自己试着先接入玩玩**
 
-1. 下载模型，放入 `resource/tts/models` 文件夹中
+1. 下载 [模型资源](https://huggingface.co/MistEO/Pallas-Bot/tree/main/paddlespeech/tts)，放入 `resource/tts/models` 文件夹中
 2. 安装依赖
 
     - GPU 版本（显存占用约 1.5G，合成耗时 1s 左右）  
