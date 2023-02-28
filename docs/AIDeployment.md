@@ -6,7 +6,7 @@
 
 ## Sing
 
-1. 下载 [模型及配置文件](https://huggingface.co/MistEO/Pallas-Bot/tree/main/so-vits-svc/4.0) 和 [contentvec](https://ibm.box.com/s/z1wgl1stco8ffooyatzdwsqn2psd9lrr) 放到 `resource/sing/models/XXX/` 文件夹里  
+1. 下载 [模型及配置文件](https://huggingface.co/MistEO/Pallas-Bot/tree/main/so-vits-svc/4.0) 放到 `resource/sing/models/XXX/` 文件夹里  
 
     - 这里的 `XXX` 换成资源文件夹的名字，例如 `pallas`, `amiya` 等，需要对应 `config.json` 里的 `spk` 字段
     - 具体路径结构请参考 [path_structure.txt](https://github.com/MistEO/Pallas-Bot/blob/master/resource/sing/models/path_structure.txt)
