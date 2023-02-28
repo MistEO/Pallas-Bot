@@ -94,6 +94,7 @@
 [demucs](https://github.com/facebookresearch/demucs): Code for the paper Hybrid Spectrogram and Waveform Source Separation  
 [so-vits-svc](https://github.com/innnky/so-vits-svc): 基于vits与softvc的歌声音色转换模型  
 [ChatRWKV](https://github.com/BlinkDL/ChatRWKV): ChatRWKV is like ChatGPT but powered by RWKV (100% RNN) language model, and open source.  
+[PaddleSpeech](https://github.com/PaddlePaddle/PaddleSpeech): Easy-to-use Speech Toolkit including Self-Supervised Learning model, SOTA/Streaming ASR with punctuation, Streaming TTS with text frontend, Speaker Verification System, End-to-End Speech Translation and Keyword Spotting. Won NAACL2022 Best Demo Award.  
 
 ### 贡献者
 

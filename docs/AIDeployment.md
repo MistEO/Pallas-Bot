@@ -4,7 +4,7 @@
 
 我会尽可能保证这篇教程以及最终运行的代码在 CPU 下也能够推理，但为了获得更好的体验和运行速度，还是非常推荐你拥有一块支持 CUDA 的显卡来运行
 
-## 牛牛唱歌 (Sing)
+## Sing
 
 1. 下载 [模型及配置文件](https://huggingface.co/MistEO/Pallas-Bot/tree/main/so-vits-svc/4.0) 和 [contentvec](https://ibm.box.com/s/z1wgl1stco8ffooyatzdwsqn2psd9lrr) 放到 `resource/sing/models/XXX/` 文件夹里  
 
@@ -70,4 +70,21 @@
 
 ## TTS
 
-WIP
+**仍在开发中，有能力的可以自己试着先接入玩玩**
+
+1. 下载模型，放入 `resource/tts/models` 文件夹中
+2. 安装依赖
+
+    - GPU 版本（显存占用约 1.5G，合成耗时 1s 左右）  
+
+        因为需要装 cudnn，推荐用 conda 安装。没有 conda 的可以自己去搜教程 cudnn 的安装方法，或者参考 [飞桨官方安装教程](https://www.paddlepaddle.org.cn/documentation/docs/zh/install/pip/linux-pip.html)
+
+        ```bash
+        conda install paddlepaddle-gpu==2.4.2 cudatoolkit=11.7 cudnn -c https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/Paddle/ -c conda-forge
+        ```
+
+    - CPU 版本（合成耗时 20s 左右）
+
+        ```
+        python3 -m pip install paddlepaddle-gpu==2.4.2.post117 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
+        ```

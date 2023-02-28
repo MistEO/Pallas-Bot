@@ -20,9 +20,6 @@ starlette>=0.19.1
 tqdm>=4.63.0
 scikit-maad
 praat-parselmouth
-onnx
-onnxsim
-onnxoptimizer
 librosa
 soundfile
 matplotlib
