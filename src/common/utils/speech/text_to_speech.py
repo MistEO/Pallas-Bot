@@ -5,7 +5,7 @@ from pathlib import Path
 from paddlespeech.t2s.exps.syn_utils import get_am_output, get_frontend, get_predictor, get_voc_output
 
 AM_INFERENCE_DIR = Path("resource/tts/models/")
-VOC_INFERENCE_DIR = Path("resource/tts/models/pwgan/")
+VOC_INFERENCE_DIR = Path("resource/tts/models/vocoder")
 
 
 # frontend
@@ -21,8 +21,8 @@ device = "gpu" if paddle.device.is_compiled_with_cuda(
 # am_predictor
 am_predictor = get_predictor(
     model_dir=AM_INFERENCE_DIR,
-    model_file="fastspeech2_mix" + ".pdmodel",
-    params_file="fastspeech2_mix" + ".pdiparams",
+    model_file="pallas" + ".pdmodel",
+    params_file="pallas" + ".pdiparams",
     device=device)
 
 # voc_predictor

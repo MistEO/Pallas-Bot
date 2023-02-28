@@ -1,0 +1,8 @@
+resource/tts/models
+├── vocoder
+│   ├── pwgan_aishell3.pdiparams
+│   └── pwgan_aishell3.pdmodel
+├── pallas.pdiparams
+├── pallas.pdmodel
+├── path_structure.txt
+└── phone_id_map.txt
