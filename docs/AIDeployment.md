@@ -4,11 +4,12 @@
 
 我会尽可能保证这篇教程以及最终运行的代码在 CPU 下也能够推理，但为了获得更好的体验和运行速度，还是非常推荐你拥有一块支持 CUDA 的显卡来运行
 
-## 牛牛唱歌 (Sing)
+## 唱歌 (Sing)
 
-1. 下载模型相关文件（文件太大了，请加开发 QQ 群：716692626），解压放到 `resource/sing/models/XXX` 文件夹里  
+1. 下载 [模型及配置文件](https://huggingface.co/MistEO/Pallas-Bot/tree/main/so-vits-svc/4.0) 和 [contentvec](https://ibm.box.com/s/z1wgl1stco8ffooyatzdwsqn2psd9lrr) 放到 `resource/sing/models/XXX/` 文件夹里  
 
-    - 这里的 `XXX` 换成资源文件夹的名字，例如 `pallas`, `amiya` 等
+    - 这里的 `XXX` 换成资源文件夹的名字，例如 `pallas`, `amiya` 等，需要对应 `config.json` 里的 `spk` 字段
+    - 具体路径结构请参考 [path_structure.txt](https://github.com/MistEO/Pallas-Bot/blob/master/resource/sing/models/path_structure.txt)
     - 在 `src/plugins/sing/__init__.py` 修改 `svc_speakers` 对应上面的资源文件夹名。（也可以在 `.env` 里改）
 
 2. 更新 git 子模块
@@ -39,11 +40,11 @@
 
 4. 另外 `so-vits-svc` 似乎对 python 版本有要求，高于 3.8 可能跑不起来（不太确定，也可以试试
 
-## 牛牛画画
+## 画画
 
 敬请期待
 
-## 牛牛 Chat
+## Chat
 
 1. 下载模型，参考 [原仓库说明](https://github.com/BlinkDL/ChatRWKV#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B)，把文件放到 `resource/chat/models` 文件夹（只要是 `.pth` 都行，根据你的显存和需求选择）
 2. 更新 git 子模块
@@ -68,3 +69,7 @@
     ```
 
 4. `src/plugins/chat/model.py` 里的起手咒语 `init_prompt` 有兴趣可以试着改改
+
+## TTS
+
+WIP
