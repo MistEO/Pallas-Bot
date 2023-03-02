@@ -313,8 +313,13 @@ class Chat:
                 context='', group_id=group_id)
 
             def msg_filter(msg: Dict[str, Any]) -> bool:
+                raw_message = msg['raw_message']
                 return msg['keywords'] not in ban_keywords \
-                    and msg['raw_message'] not in Chat.rencently_speak[group_id][bot_id]
+                    and raw_message not in Chat.rencently_speak[group_id][bot_id] \
+                    and not raw_message.startswith('牛牛') \
+                    and not raw_message.startswith("[CQ:xml") \
+                    and '\n' not in raw_message
+
             available_messages = list(
                 filter(msg_filter, Chat._message_dict[group_id]))
             if not available_messages:
