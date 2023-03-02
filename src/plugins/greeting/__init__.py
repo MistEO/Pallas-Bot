@@ -32,7 +32,14 @@ greeting_voices = [
     '信赖触摸',
     '问候',
 ]
-wiki.download_voices(operator, 'char_485_pallas')
+
+# prts wiki 现在不让下载了
+# 虽然可以通过加上 referer: https://prts.wiki/ 来绕过限制
+# 但是人家既然加了 referer，就是不希望被爬，所以还是不爬了
+# 请下载 https://huggingface.co/MistEO/Pallas-Bot/resolve/main/voices/voices.zip
+# 解压放到 resource/voices/ 文件夹下（参考 resource/voices/path_structure.txt）
+
+# wiki.download_voices(operator, 'char_485_pallas')
 
 target_msgs = ['牛牛', '帕拉斯']
 

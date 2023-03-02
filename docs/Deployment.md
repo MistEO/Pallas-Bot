@@ -69,7 +69,8 @@
 
 8. 配置 ffmpeg （如果不希望牛牛发送语音，可以跳过这一步）
 
-    👉 [安装 ffmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)
+    👉 [安装 ffmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)  
+    👉 下载 [牛牛语音文件](https://huggingface.co/MistEO/Pallas-Bot/resolve/main/voices/voices.zip)，解压放到 `resource/voices/` 文件夹下（参考 `resource/voices/path_structure.txt`）
 
 ### 启动 Pallas-Bot
 
@@ -143,6 +144,8 @@ python -m pip install --upgrade pip # 更新 pip
     sudo apt install -y ffmpeg
     sudo ldconfig
     ```
+    
+    👉 下载 [牛牛语音文件](https://huggingface.co/MistEO/Pallas-Bot/resolve/main/voices/voices.zip)，解压放到 `resource/voices/` 文件夹下（参考 `resource/voices/path_structure.txt`）
 
 ### 启动 Pallas-Bot 及登陆账号
 
