@@ -113,7 +113,7 @@ class Chat:
     blacklist_answer = defaultdict(set)
     blacklist_answer_reserve = defaultdict(set)
 
-    rencently_speak = defaultdict(lambda: defaultdict(lambda: deque(maxlen=5)))    # 主动发言记录，避免重复内容
+    recent_speak = defaultdict(lambda: defaultdict(lambda: deque(maxlen=5)))    # 主动发言记录，避免重复内容
 
     def __init__(self, data: Union[ChatData, GroupMessageEvent, PrivateMessageEvent]):
 
@@ -315,7 +315,7 @@ class Chat:
             def msg_filter(msg: Dict[str, Any]) -> bool:
                 raw_message = msg['raw_message']
                 return msg['keywords'] not in ban_keywords \
-                    and raw_message not in Chat.rencently_speak[group_id][bot_id] \
+                    and raw_message not in Chat.recent_speak[group_id][bot_id] \
                     and not raw_message.startswith('牛牛') \
                     and not raw_message.startswith("[CQ:xml") \
                     and '\n' not in raw_message
@@ -325,13 +325,12 @@ class Chat:
             if not available_messages:
                 continue
 
-            config = BotConfig(bot_id, group_id)
+            taken_name = BotConfig(bot_id, group_id).taken_name()
             pretend_msg = list(
-                filter(lambda msg: msg['user_id'] == config.taken_name(), available_messages))
-            rand_message = random.choice(
-                pretend_msg if pretend_msg else available_messages)
-            speak = rand_message['raw_message']
-            Chat.rencently_speak[group_id][bot_id].append(speak)
+                filter(lambda msg: msg['user_id'] == taken_name, available_messages))
+            first_message = pretend_msg[0] if pretend_msg else available_messages[0]
+            speak = first_message['raw_message']
+            Chat.recent_speak[group_id][bot_id].append(speak)
 
             with Chat._reply_lock:
                 group_replies[bot_id].append({
