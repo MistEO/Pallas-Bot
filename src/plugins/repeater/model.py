@@ -95,25 +95,43 @@ class ChatData:
 
 
 class Chat:
-    answer_threshold = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
-    answer_threshold_weights = [7, 23, 70]  # answer 阈值权重，不知道怎么解释，自己看源码吧（
-    cross_group_threshold = 2       # N 个群有相同的回复，就跨群作为全局回复
-    repeat_threshold = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
-    speak_threshold = 5             # 主动发言的阈值，越小废话越多
+    ANSWER_THRESHOLD = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
+    ANSWER_THRESHOLD_WEIGHTS = [7, 23, 70]  # answer 阈值权重，不知道怎么解释，自己看源码吧（
+    CROSS_GROUP_THRESHOLD = 2       # N 个群有相同的回复，就跨群作为全局回复
+    REPEAT_THRESHOLD = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
+    SPEAK_THRESHOLD = 5             # 主动发言的阈值，越小废话越多
 
-    split_probability = 0.5         # 按逗号分割回复语的概率
-    voice_probability = 0           # 回复语音的概率（仅纯文字）
-    speak_continuously_probability = 0.5  # 连续主动说话的概率
-    speak_poke_probability = 0.6    # 主动说话加上随机戳一戳群友的概率
-    speak_continuously_max_len = 2  # 连续主动说话最多几句话
+    SPLIT_PROBABILITY = 0.5         # 按逗号分割回复语的概率
+    VOICE_PROBABILITY = 0           # 回复语音的概率（仅纯文字）
+    SPEAK_CONTINUOUSLY_PROBABILITY = 0.5  # 连续主动说话的概率
+    SPEAK_POKE_PROBABILITY = 0.6    # 主动说话加上随机戳一戳群友的概率
+    SPEAK_CONTINUOUSLY_MAX_LEN = 2  # 连续主动说话最多几句话
 
-    save_time_threshold = 3600      # 每隔多久进行一次持久化 ( 秒 )
-    save_count_threshold = 1000     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
+    SAVE_TIME_THRESHOLD = 3600      # 每隔多久进行一次持久化 ( 秒 )
+    SAVE_COUNT_THRESHOLD = 1000     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
+    SAVE_RESERVED_SIZE = 100        # 保存时，给内存中保留的大小
 
-    blacklist_answer = defaultdict(set)
-    blacklist_answer_reserve = defaultdict(set)
+# private:
 
-    recent_speak = defaultdict(lambda: defaultdict(lambda: deque(maxlen=5)))    # 主动发言记录，避免重复内容
+    _reply_dict = defaultdict(lambda: defaultdict(list))  # 牛牛回复的消息缓存，暂未做持久化
+    _message_dict = {}              # 群消息缓存
+
+    _answer_threshold_choice_list = list(
+        range(ANSWER_THRESHOLD - len(ANSWER_THRESHOLD_WEIGHTS) + 1, ANSWER_THRESHOLD + 1))
+
+    _late_save_time = 0             # 上次保存（消息数据持久化）的时刻 ( time.time(), 秒 )
+
+    _reply_lock = threading.Lock()
+    _message_lock = threading.Lock()
+
+    _blacklist_answer = defaultdict(set)
+    _blacklist_answer_reserve = defaultdict(set)
+    _blacklist_flag = 114514
+
+    _recent_speak = defaultdict(lambda: defaultdict(
+        lambda: deque(maxlen=5)))    # 主动发言记录，避免重复内容
+
+###
 
     def __init__(self, data: Union[ChatData, GroupMessageEvent, PrivateMessageEvent]):
 
@@ -227,13 +245,13 @@ class Chat:
                         'reply_keywords': answer_keywords,
                     })
                 if '[CQ:' not in item and len(item) > 1 \
-                        and random.random() < Chat.voice_probability:
+                        and random.random() < Chat.VOICE_PROBABILITY:
                     yield Chat._text_to_speech(item)
                 else:
                     yield Message(item)
 
             with Chat._reply_lock:
-                group_bot_replies = group_bot_replies[-Chat._save_reserve_size:]
+                group_bot_replies = group_bot_replies[-Chat.SAVE_RESERVED_SIZE:]
 
         return yield_results(results)
 
@@ -293,7 +311,7 @@ class Chat:
             # 已经超过平均发言间隔 N 倍的时间没有人说话了，才主动发言
             # print(cur_time - latest_time, '/', avg_interval *
             #       Chat.speak_threshold + basic_delay)
-            if cur_time - latest_time < avg_interval * Chat.speak_threshold + basic_delay:
+            if cur_time - latest_time < avg_interval * Chat.SPEAK_THRESHOLD + basic_delay:
                 continue
 
             # append 一个 flag, 防止这个群热度特别高，但压根就没有可用的 context 时，每次 speak 都查这个群，浪费时间
@@ -315,7 +333,7 @@ class Chat:
             def msg_filter(msg: Dict[str, Any]) -> bool:
                 raw_message = msg['raw_message']
                 return msg['keywords'] not in ban_keywords \
-                    and raw_message not in Chat.recent_speak[group_id][bot_id] \
+                    and raw_message not in Chat._recent_speak[group_id][bot_id] \
                     and not raw_message.startswith('牛牛') \
                     and not raw_message.startswith("[CQ:xml") \
                     and '\n' not in raw_message
@@ -330,7 +348,7 @@ class Chat:
                 filter(lambda msg: msg['user_id'] == taken_name, available_messages))
             first_message = pretend_msg[0] if pretend_msg else available_messages[0]
             speak = first_message['raw_message']
-            Chat.recent_speak[group_id][bot_id].append(speak)
+            Chat._recent_speak[group_id][bot_id].append(speak)
 
             with Chat._reply_lock:
                 group_replies[bot_id].append({
@@ -342,8 +360,8 @@ class Chat:
                 })
 
             speak_list = [Message(speak), ]
-            while random.random() < Chat.speak_continuously_probability \
-                    and len(speak_list) < Chat.speak_continuously_max_len:
+            while random.random() < Chat.SPEAK_CONTINUOUSLY_PROBABILITY \
+                    and len(speak_list) < Chat.SPEAK_CONTINUOUSLY_MAX_LEN:
                 pre_msg = str(speak_list[-1])
                 answer = Chat(ChatData(group_id, 0, pre_msg,
                                        pre_msg, cur_time, 0)).answer()
@@ -351,7 +369,7 @@ class Chat:
                     break
                 speak_list.extend(answer)
 
-            if random.random() < Chat.speak_poke_probability:
+            if random.random() < Chat.SPEAK_POKE_PROBABILITY:
                 target_id = random.choice(
                     Chat._message_dict[group_id])['user_id']
                 speak_list.append(Message('[CQ:poke,qq={}]'.format(target_id)))
@@ -419,13 +437,13 @@ class Chat:
                 }
             }
         })
-        if keywords in Chat.blacklist_answer_reserve[group_id]:
-            Chat.blacklist_answer[group_id].add(keywords)
-            if keywords in Chat.blacklist_answer_reserve[Chat._blacklist_flag]:
-                Chat.blacklist_answer[Chat._blacklist_flag].add(
+        if keywords in Chat._blacklist_answer_reserve[group_id]:
+            Chat._blacklist_answer[group_id].add(keywords)
+            if keywords in Chat._blacklist_answer_reserve[Chat._blacklist_flag]:
+                Chat._blacklist_answer[Chat._blacklist_flag].add(
                     keywords)
         else:
-            Chat.blacklist_answer_reserve[group_id].add(keywords)
+            Chat._blacklist_answer_reserve[group_id].add(keywords)
 
         return True
 
@@ -440,20 +458,6 @@ class Chat:
         return {group_id: random.choice(group_msgs)
                 for group_id, group_msgs in Chat._message_dict.items()
                 if group_msgs}
-
-# private:
-    _reply_dict = defaultdict(lambda: defaultdict(list))  # 牛牛回复的消息缓存，暂未做持久化
-    _message_dict = {}              # 群消息缓存
-
-    _answer_threshold_choice_list = list(
-        range(answer_threshold - len(answer_threshold_weights) + 1, answer_threshold + 1))
-
-    _save_reserve_size = 100        # 保存时，给内存中保留的大小
-    _late_save_time = 0             # 上次保存（消息数据持久化）的时刻 ( time.time(), 秒 )
-
-    _reply_lock = threading.Lock()
-    _message_lock = threading.Lock()
-    _blacklist_flag = 114514
 
     def _message_insert(self):
         group_id = self.chat_data.group_id
@@ -478,10 +482,10 @@ class Chat:
             Chat._late_save_time = cur_time - 1
             return
 
-        if len(Chat._message_dict[group_id]) > Chat.save_count_threshold:
+        if len(Chat._message_dict[group_id]) > Chat.SAVE_COUNT_THRESHOLD:
             Chat._sync(cur_time)
 
-        elif cur_time - Chat._late_save_time > Chat.save_time_threshold:
+        elif cur_time - Chat._late_save_time > Chat.SAVE_TIME_THRESHOLD:
             Chat._sync(cur_time)
 
     @staticmethod
@@ -498,7 +502,7 @@ class Chat:
             if not save_list:
                 return
 
-            Chat._message_dict = {group_id: group_msgs[-Chat._save_reserve_size:]
+            Chat._message_dict = {group_id: group_msgs[-Chat.SAVE_RESERVED_SIZE:]
                                   for group_id, group_msgs in Chat._message_dict.items()}
 
             Chat._late_save_time = cur_time
@@ -608,9 +612,9 @@ class Chat:
         # 复读！
         if group_id in Chat._message_dict:
             group_msgs = Chat._message_dict[group_id]
-            if len(group_msgs) >= Chat.repeat_threshold and \
+            if len(group_msgs) >= Chat.REPEAT_THRESHOLD and \
                 all(item['raw_message'] == raw_message
-                    for item in group_msgs[-Chat.repeat_threshold + 1:]):
+                    for item in group_msgs[-Chat.REPEAT_THRESHOLD + 1:]):
                 # 到这里说明当前群里是在复读
                 group_bot_replies = Chat._reply_dict[group_id][bot_id]
                 if len(group_bot_replies) and group_bot_replies[-1]['reply'] != raw_message:
@@ -632,14 +636,14 @@ class Chat:
             answer_count_threshold = 1
         else:
             answer_count_threshold = random.choices(
-                Chat._answer_threshold_choice_list, weights=Chat.answer_threshold_weights)[0]
+                Chat._answer_threshold_choice_list, weights=Chat.ANSWER_THRESHOLD_WEIGHTS)[0]
             if self.chat_data.keywords_len == ChatData._keywords_size:
                 answer_count_threshold -= 1
 
         if self.chat_data.to_me:
             cross_group_threshold = 1
         else:
-            cross_group_threshold = Chat.cross_group_threshold
+            cross_group_threshold = Chat.CROSS_GROUP_THRESHOLD
 
         ban_keywords = Chat._find_ban_keywords(
             context=context, group_id=group_id)
@@ -711,7 +715,7 @@ class Chat:
         answer_keywords = final_answer['keywords']
 
         if 0 < answer_str.count('，') <= 3 and '[CQ:' not in answer_str \
-                and random.random() < Chat.split_probability:
+                and random.random() < Chat.SPLIT_PROBABILITY:
             return (answer_str.split('，'), answer_keywords)
         return ([answer_str, ], answer_keywords)
 
@@ -730,13 +734,13 @@ class Chat:
 
         keywords_dict = defaultdict(int)
         global_blacklist = set()
-        for _, keywords_list in Chat.blacklist_answer.items():
+        for _, keywords_list in Chat._blacklist_answer.items():
             for keywords in keywords_list:
                 keywords_dict[keywords] += 1
-                if keywords_dict[keywords] == Chat.cross_group_threshold:
+                if keywords_dict[keywords] == Chat.CROSS_GROUP_THRESHOLD:
                     global_blacklist.add(keywords)
 
-        Chat.blacklist_answer[Chat._blacklist_flag] |= global_blacklist
+        Chat._blacklist_answer[Chat._blacklist_flag] |= global_blacklist
 
     @staticmethod
     def _select_blacklist() -> None:
@@ -745,16 +749,16 @@ class Chat:
         for item in all_blacklist:
             group_id = item['group_id']
             if 'answers' in item:
-                Chat.blacklist_answer[group_id] |= set(item['answers'])
+                Chat._blacklist_answer[group_id] |= set(item['answers'])
             if 'answers_reserve' in item:
-                Chat.blacklist_answer_reserve[group_id] |= set(
+                Chat._blacklist_answer_reserve[group_id] |= set(
                     item['answers_reserve'])
 
     @staticmethod
     def _sync_blacklist() -> None:
         Chat._select_blacklist()
 
-        for group_id, answers in Chat.blacklist_answer.items():
+        for group_id, answers in Chat._blacklist_answer.items():
             if not len(answers):
                 continue
             blacklist_mongo.update_one(
@@ -762,11 +766,11 @@ class Chat:
                 {'$set': {'answers': list(answers)}},
                 upsert=True)
 
-        for group_id, answers in Chat.blacklist_answer_reserve.items():
+        for group_id, answers in Chat._blacklist_answer_reserve.items():
             if not len(answers):
                 continue
-            if group_id in Chat.blacklist_answer:
-                answers = answers - Chat.blacklist_answer[group_id]
+            if group_id in Chat._blacklist_answer:
+                answers = answers - Chat._blacklist_answer[group_id]
 
             blacklist_mongo.update_one(
                 {'group_id': group_id},
@@ -784,7 +788,7 @@ class Chat:
 
         context_mongo.delete_many({
             'time': {'$lt': expiration},
-            'count': {'$lt': Chat.answer_threshold}    # lt 是小于，不包括等于
+            'count': {'$lt': Chat.ANSWER_THRESHOLD}    # lt 是小于，不包括等于
         })
 
         all_context = context_mongo.find({
@@ -816,7 +820,7 @@ class Chat:
         '''
 
         # 全局的黑名单
-        ban_keywords = Chat.blacklist_answer[Chat._blacklist_flag] | Chat.blacklist_answer[group_id]
+        ban_keywords = Chat._blacklist_answer[Chat._blacklist_flag] | Chat._blacklist_answer[group_id]
         # 针对单条回复的黑名单
         if 'ban' in context:
             ban_count = defaultdict(int)
@@ -827,7 +831,7 @@ class Chat:
                 else:
                     # 超过 N 个群都把这句话 ban 了，那就全局 ban 掉
                     ban_count[ban_key] += 1
-                    if ban_count[ban_key] == Chat.cross_group_threshold:
+                    if ban_count[ban_key] == Chat.CROSS_GROUP_THRESHOLD:
                         ban_keywords.add(ban_key)
         return ban_keywords
 
