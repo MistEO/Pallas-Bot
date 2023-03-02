@@ -95,6 +95,9 @@ class ChatData:
 
 
 class Chat:
+
+### 可以试着改改的参数
+
     ANSWER_THRESHOLD = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
     ANSWER_THRESHOLD_WEIGHTS = [7, 23, 70]  # answer 阈值权重，不知道怎么解释，自己看源码吧（
     CROSS_GROUP_THRESHOLD = 2       # N 个群有相同的回复，就跨群作为全局回复
@@ -111,27 +114,29 @@ class Chat:
     SAVE_COUNT_THRESHOLD = 1000     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
     SAVE_RESERVED_SIZE = 100        # 保存时，给内存中保留的大小
 
-# private:
+### 最好别动的参数
+
+    ANSWER_THRESHOLD_CHOICE_LIST = list(
+        range(ANSWER_THRESHOLD - len(ANSWER_THRESHOLD_WEIGHTS) + 1, ANSWER_THRESHOLD + 1))
+    BLACKLIST_FLAG = 114514
+
+### 运行期变量
 
     _reply_dict = defaultdict(lambda: defaultdict(list))  # 牛牛回复的消息缓存，暂未做持久化
     _message_dict = {}              # 群消息缓存
 
-    _answer_threshold_choice_list = list(
-        range(ANSWER_THRESHOLD - len(ANSWER_THRESHOLD_WEIGHTS) + 1, ANSWER_THRESHOLD + 1))
-
-    _late_save_time = 0             # 上次保存（消息数据持久化）的时刻 ( time.time(), 秒 )
-
     _reply_lock = threading.Lock()
     _message_lock = threading.Lock()
 
+    _late_save_time = 0             # 上次保存（消息数据持久化）的时刻 ( time.time(), 秒 )
+
     _blacklist_answer = defaultdict(set)
     _blacklist_answer_reserve = defaultdict(set)
-    _blacklist_flag = 114514
 
     _recent_speak = defaultdict(lambda: defaultdict(
         lambda: deque(maxlen=5)))    # 主动发言记录，避免重复内容
 
-###
+### 
 
     def __init__(self, data: Union[ChatData, GroupMessageEvent, PrivateMessageEvent]):
 
@@ -439,8 +444,8 @@ class Chat:
         })
         if keywords in Chat._blacklist_answer_reserve[group_id]:
             Chat._blacklist_answer[group_id].add(keywords)
-            if keywords in Chat._blacklist_answer_reserve[Chat._blacklist_flag]:
-                Chat._blacklist_answer[Chat._blacklist_flag].add(
+            if keywords in Chat._blacklist_answer_reserve[Chat.BLACKLIST_FLAG]:
+                Chat._blacklist_answer[Chat.BLACKLIST_FLAG].add(
                     keywords)
         else:
             Chat._blacklist_answer_reserve[group_id].add(keywords)
@@ -636,7 +641,7 @@ class Chat:
             answer_count_threshold = 1
         else:
             answer_count_threshold = random.choices(
-                Chat._answer_threshold_choice_list, weights=Chat.ANSWER_THRESHOLD_WEIGHTS)[0]
+                Chat.ANSWER_THRESHOLD_CHOICE_LIST, weights=Chat.ANSWER_THRESHOLD_WEIGHTS)[0]
             if self.chat_data.keywords_len == ChatData._keywords_size:
                 answer_count_threshold -= 1
 
@@ -740,7 +745,7 @@ class Chat:
                 if keywords_dict[keywords] == Chat.CROSS_GROUP_THRESHOLD:
                     global_blacklist.add(keywords)
 
-        Chat._blacklist_answer[Chat._blacklist_flag] |= global_blacklist
+        Chat._blacklist_answer[Chat.BLACKLIST_FLAG] |= global_blacklist
 
     @staticmethod
     def _select_blacklist() -> None:
@@ -820,13 +825,13 @@ class Chat:
         '''
 
         # 全局的黑名单
-        ban_keywords = Chat._blacklist_answer[Chat._blacklist_flag] | Chat._blacklist_answer[group_id]
+        ban_keywords = Chat._blacklist_answer[Chat.BLACKLIST_FLAG] | Chat._blacklist_answer[group_id]
         # 针对单条回复的黑名单
         if 'ban' in context:
             ban_count = defaultdict(int)
             for ban in context['ban']:
                 ban_key = ban['keywords']
-                if ban['group_id'] == group_id or ban['group_id'] == Chat._blacklist_flag:
+                if ban['group_id'] == group_id or ban['group_id'] == Chat.BLACKLIST_FLAG:
                     ban_keywords.add(ban_key)
                 else:
                     # 超过 N 个群都把这句话 ban 了，那就全局 ban 掉
