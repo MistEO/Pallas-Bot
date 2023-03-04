@@ -105,7 +105,7 @@ class Chat:
     CROSS_GROUP_THRESHOLD = 2       # N 个群有相同的回复，就跨群作为全局回复
     REPEAT_THRESHOLD = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
     SPEAK_THRESHOLD = 5             # 主动发言的阈值，越小废话越多
-    DUPLICATE_REPLY = 5             # 说过的话，接下来多少次不再说
+    DUPLICATE_REPLY = 10            # 说过的话，接下来多少次不再说
 
     SPLIT_PROBABILITY = 0.5         # 按逗号分割回复语的概率
     VOICE_PROBABILITY = 0           # 回复语音的概率（仅纯文字）
@@ -681,7 +681,9 @@ class Chat:
         other_group_cache = {}
         answers_count = defaultdict(int)
         recent_replies = [r['reply_keywords']
-                          for r in Chat._reply_dict[group_id][bot_id][:-Chat.DUPLICATE_REPLY]]
+                          for r in Chat._reply_dict[group_id][bot_id][-Chat.DUPLICATE_REPLY:]]
+        recent_message = [m['raw_message']
+                          for m in Chat._message_dict[group_id][-Chat.DUPLICATE_REPLY:]]
 
         def candidate_append(dst, answer):
             answer_key = answer['keywords']
@@ -707,7 +709,7 @@ class Chat:
                 continue
 
             answer_key = answer['keywords']
-            if answer_key in ban_keywords or answer_key in recent_replies or answer_key == keywords:
+            if answer_key in ban_keywords or answer_key in recent_replies:
                 continue
 
             sample_msg = answer['messages'][0]
@@ -722,6 +724,8 @@ class Chat:
             if sample_msg.startswith("[CQ:xml"):
                 continue
             if '\n' in sample_msg:
+                continue
+            if sample_msg in recent_message:  # 别人刚发的就重复，显得很笨
                 continue
 
             if answer['group_id'] == group_id:
