@@ -105,6 +105,7 @@ class Chat:
     CROSS_GROUP_THRESHOLD = 2       # N 个群有相同的回复，就跨群作为全局回复
     REPEAT_THRESHOLD = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
     SPEAK_THRESHOLD = 5             # 主动发言的阈值，越小废话越多
+    DUPLICATE_REPLY = 5             # 说过的话，接下来多少次不再说
 
     SPLIT_PROBABILITY = 0.5         # 按逗号分割回复语的概率
     VOICE_PROBABILITY = 0           # 回复语音的概率（仅纯文字）
@@ -136,10 +137,10 @@ class Chat:
     _blacklist_answer = defaultdict(set)
     _blacklist_answer_reserve = defaultdict(set)
 
-    _recent_speak = defaultdict(lambda: defaultdict(
-        lambda: deque(maxlen=10)))    # 主动发言记录，避免重复内容
     _recent_topics = defaultdict(
         lambda: deque(maxlen=Chat.TOPICS_SIZE))
+    _recent_speak = defaultdict(
+        lambda: deque(maxlen=Chat.DUPLICATE_REPLY))    # 主动发言记录，避免重复内容
 
 ###
 
@@ -260,9 +261,9 @@ class Chat:
                             k for k in answer_keywords.split(' ') if not k.startswith('牛牛')
                         ]
                 with Chat._topics_lock:
-                                    Chat._recent_topics[group_id] += [
-                    k for k in self.chat_data._keywords_list if not k.startswith('牛牛')
-                ]
+                    Chat._recent_topics[group_id] += [
+                        k for k in self.chat_data._keywords_list if not k.startswith('牛牛')
+                    ]
                 if '[CQ:' not in item and len(item) > 1 \
                         and random.random() < Chat.VOICE_PROBABILITY:
                     yield Chat._text_to_speech(item)
@@ -349,13 +350,16 @@ class Chat:
             ban_keywords = Chat._find_ban_keywords(
                 context='', group_id=group_id)
 
+            recently = Chat._recent_speak[group_id]
+
             def msg_filter(msg: Dict[str, Any]) -> bool:
-                raw_message = msg['raw_message']
-                return msg['keywords'] not in ban_keywords \
-                    and raw_message not in Chat._recent_speak[group_id][bot_id] \
-                    and not raw_message.startswith('牛牛') \
-                    and not raw_message.startswith("[CQ:xml") \
-                    and '\n' not in raw_message
+                cur_raw_message = msg['raw_message']
+                cur_keywords = msg['keywords']
+                return cur_keywords not in ban_keywords \
+                    and cur_raw_message not in recently \
+                    and not cur_raw_message.startswith('牛牛') \
+                    and not cur_raw_message.startswith("[CQ:xml") \
+                    and '\n' not in cur_raw_message
 
             available_messages = list(
                 filter(msg_filter, Chat._message_dict[group_id]))
@@ -367,7 +371,7 @@ class Chat:
                 filter(lambda msg: msg['user_id'] == taken_name, available_messages))
             first_message = pretend_msg[0] if pretend_msg else available_messages[0]
             speak = first_message['raw_message']
-            Chat._recent_speak[group_id][bot_id].append(speak)
+            Chat._recent_speak[group_id].append(speak)
 
             with Chat._reply_lock:
                 group_replies[bot_id].append({
@@ -676,6 +680,8 @@ class Chat:
         candidate_answers = {}
         other_group_cache = {}
         answers_count = defaultdict(int)
+        recent_replies = [r['reply_keywords']
+                          for r in Chat._reply_dict[group_id][bot_id][:-Chat.DUPLICATE_REPLY]]
 
         def candidate_append(dst, answer):
             answer_key = answer['keywords']
@@ -701,7 +707,7 @@ class Chat:
                 continue
 
             answer_key = answer['keywords']
-            if answer_key in ban_keywords or answer_key == keywords:
+            if answer_key in ban_keywords or answer_key == recent_replies:
                 continue
 
             sample_msg = answer['messages'][0]
