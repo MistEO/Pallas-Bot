@@ -707,7 +707,7 @@ class Chat:
                 continue
 
             answer_key = answer['keywords']
-            if answer_key in ban_keywords or answer_key == recent_replies:
+            if answer_key in ban_keywords or answer_key in recent_replies or answer_key == keywords:
                 continue
 
             sample_msg = answer['messages'][0]
