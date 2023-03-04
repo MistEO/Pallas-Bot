@@ -96,10 +96,12 @@ class ChatData:
 
 class Chat:
 
-### 可以试着改改的参数
+    # 可以试着改改的参数
 
     ANSWER_THRESHOLD = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
     ANSWER_THRESHOLD_WEIGHTS = [7, 23, 70]  # answer 阈值权重，不知道怎么解释，自己看源码吧（
+    TOPICS_SIZE = 128               # 上下文联想，记录多少个关键词（每个群）
+    TOPICS_IMPORTANCE = 10000       # 上下文命中后，额外的权重系数
     CROSS_GROUP_THRESHOLD = 2       # N 个群有相同的回复，就跨群作为全局回复
     REPEAT_THRESHOLD = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
     SPEAK_THRESHOLD = 5             # 主动发言的阈值，越小废话越多
@@ -114,19 +116,20 @@ class Chat:
     SAVE_COUNT_THRESHOLD = 1000     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
     SAVE_RESERVED_SIZE = 100        # 保存时，给内存中保留的大小
 
-### 最好别动的参数
+    # 最好别动的参数
 
     ANSWER_THRESHOLD_CHOICE_LIST = list(
         range(ANSWER_THRESHOLD - len(ANSWER_THRESHOLD_WEIGHTS) + 1, ANSWER_THRESHOLD + 1))
     BLACKLIST_FLAG = 114514
 
-### 运行期变量
+    # 运行期变量
 
     _reply_dict = defaultdict(lambda: defaultdict(list))  # 牛牛回复的消息缓存，暂未做持久化
     _message_dict = {}              # 群消息缓存
 
     _reply_lock = threading.Lock()
     _message_lock = threading.Lock()
+    _topics_lock = threading.Lock()
 
     _late_save_time = 0             # 上次保存（消息数据持久化）的时刻 ( time.time(), 秒 )
 
@@ -134,9 +137,11 @@ class Chat:
     _blacklist_answer_reserve = defaultdict(set)
 
     _recent_speak = defaultdict(lambda: defaultdict(
-        lambda: deque(maxlen=5)))    # 主动发言记录，避免重复内容
+        lambda: deque(maxlen=10)))    # 主动发言记录，避免重复内容
+    _recent_topics = defaultdict(
+        lambda: deque(maxlen=Chat.TOPICS_SIZE))
 
-### 
+###
 
     def __init__(self, data: Union[ChatData, GroupMessageEvent, PrivateMessageEvent]):
 
@@ -249,6 +254,15 @@ class Chat:
                         'reply': item,
                         'reply_keywords': answer_keywords,
                     })
+                if '[CQ:' not in item:
+                    with Chat._topics_lock:
+                        Chat._recent_topics[group_id] += [
+                            k for k in answer_keywords.split(' ') if not k.startswith('牛牛')
+                        ]
+                with Chat._topics_lock:
+                                    Chat._recent_topics[group_id] += [
+                    k for k in self.chat_data._keywords_list if not k.startswith('牛牛')
+                ]
                 if '[CQ:' not in item and len(item) > 1 \
                         and random.random() < Chat.VOICE_PROBABILITY:
                     yield Chat._text_to_speech(item)
@@ -482,6 +496,12 @@ class Chat:
                 'time': self.chat_data.time,
             })
 
+        if self.chat_data.is_plain_text:
+            with Chat._topics_lock:
+                Chat._recent_topics[group_id] += [
+                    k for k in self.chat_data._keywords_list if not k.startswith('牛牛')
+                ]
+
         cur_time = self.chat_data.time
         if Chat._late_save_time == 0:
             Chat._late_save_time = cur_time - 1
@@ -659,6 +679,14 @@ class Chat:
 
         def candidate_append(dst, answer):
             answer_key = answer['keywords']
+            if '[CQ:' not in answer_key:
+                topics = Chat._recent_topics[group_id]
+                for key in answer_key.split(' '):
+                    if key in topics:
+                        if 'topical' not in answer:
+                            answer['topical'] = 0
+                        answer['topical'] += topics.count(key)
+
             if answer_key not in dst:
                 dst[answer_key] = answer
             else:
@@ -713,9 +741,12 @@ class Chat:
         if not candidate_answers:
             return None
 
-        final_answer = random.choices(list(candidate_answers.values()), weights=[
-            # 防止某个回复权重太大，别的都 Roll 不到了
-            min(answer['count'], 10) for answer in candidate_answers.values()])[0]
+        weights = [min(answer['count'], 10) +
+                   (answer['topical'] if 'topical' in answer else 0) *
+                   Chat.TOPICS_IMPORTANCE
+                   for answer in candidate_answers.values()]
+        final_answer = random.choices(
+            list(candidate_answers.values()), weights=weights)[0]
         answer_str = random.choice(final_answer['messages'])
         answer_keywords = final_answer['keywords']
 
