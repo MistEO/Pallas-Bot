@@ -100,7 +100,7 @@ class Chat:
 
     ANSWER_THRESHOLD = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
     ANSWER_THRESHOLD_WEIGHTS = [7, 23, 70]  # answer 阈值权重，不知道怎么解释，自己看源码吧（
-    TOPICS_SIZE = 128               # 上下文联想，记录多少个关键词（每个群）
+    TOPICS_SIZE = 16                # 上下文联想，记录多少个关键词（每个群）
     TOPICS_IMPORTANCE = 10000       # 上下文命中后，额外的权重系数
     CROSS_GROUP_THRESHOLD = 2       # N 个群有相同的回复，就跨群作为全局回复
     REPEAT_THRESHOLD = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
