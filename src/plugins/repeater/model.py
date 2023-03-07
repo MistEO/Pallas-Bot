@@ -122,6 +122,8 @@ class Chat:
     ANSWER_THRESHOLD_CHOICE_LIST = list(
         range(ANSWER_THRESHOLD - len(ANSWER_THRESHOLD_WEIGHTS) + 1, ANSWER_THRESHOLD + 1))
     BLACKLIST_FLAG = 114514
+    SPEAK_FLAG = '[PallasBot: Speak]'
+    REPLY_FLAG = '[PallasBot: Reply]'
 
     # 运行期变量
 
@@ -239,8 +241,8 @@ class Chat:
                 'time': int(time.time()),
                 'pre_raw_message': raw_message,
                 'pre_keywords': keywords,
-                'reply': '[PallasBot: Reply]',  # flag
-                'reply_keywords': '[PallasBot: Reply]',  # flag
+                'reply': Chat.REPLY_FLAG,
+                'reply_keywords': Chat.REPLY_FLAG,
             })
 
         def yield_results(results: Tuple[List[str], str]) -> Generator[Message, None, None]:
@@ -338,10 +340,10 @@ class Chat:
             with Chat._reply_lock:
                 group_replies_front.append({
                     'time': int(cur_time),
-                    'pre_raw_message': '[PallasBot: Speak]',
-                    'pre_keywords': '[PallasBot: Speak]',
-                    'reply': '[PallasBot: Speak]',
-                    'reply_keywords': '[PallasBot: Speak]',
+                    'pre_raw_message': Chat.SPEAK_FLAG,
+                    'pre_keywords': Chat.SPEAK_FLAG,
+                    'reply': Chat.SPEAK_FLAG,
+                    'reply_keywords': Chat.SPEAK_FLAG,
                 })
 
             bot_id = random.choice(
@@ -376,10 +378,10 @@ class Chat:
             with Chat._reply_lock:
                 group_replies[bot_id].append({
                     'time': int(cur_time),
-                    'pre_raw_message': '[PallasBot: Speak]',
-                    'pre_keywords': '[PallasBot: Speak]',
+                    'pre_raw_message': Chat.SPEAK_FLAG,
+                    'pre_keywords': Chat.SPEAK_FLAG,
                     'reply': speak,
-                    'reply_keywords': '[PallasBot: Speak]',
+                    'reply_keywords': Chat.SPEAK_FLAG,
                 })
 
             speak_list = [Message(speak), ]
@@ -709,7 +711,7 @@ class Chat:
                 continue
 
             answer_key = answer['keywords']
-            if answer_key in ban_keywords or answer_key in recent_replies:
+            if answer_key in ban_keywords or answer_key in recent_replies or answer_key == keywords:
                 continue
 
             sample_msg = answer['messages'][0]
