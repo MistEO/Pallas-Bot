@@ -3,7 +3,11 @@ from functools import cached_property, cmp_to_key
 from dataclasses import dataclass
 from collections import defaultdict, deque
 
-import jieba_fast.analyse
+try:
+    import jieba_fast.analyse
+except ImportError:
+    import jieba.analyse
+    jieba_fast = jieba.analyse
 import threading
 import pypinyin
 import pymongo
