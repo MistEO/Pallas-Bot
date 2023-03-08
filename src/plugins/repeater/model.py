@@ -132,7 +132,7 @@ class Chat:
     # 运行期变量
 
     _reply_dict = defaultdict(lambda: defaultdict(list))  # 牛牛回复的消息缓存，暂未做持久化
-    _message_dict = {}              # 群消息缓存
+    _message_dict = defaultdict(list)                     # 群消息缓存
 
     _reply_lock = threading.Lock()
     _message_lock = threading.Lock()
@@ -492,9 +492,6 @@ class Chat:
         group_id = self.chat_data.group_id
 
         with Chat._message_lock:
-            if group_id not in Chat._message_dict:
-                Chat._message_dict[group_id] = []
-
             Chat._message_dict[group_id].append({
                 'group_id': group_id,
                 'user_id': self.chat_data.user_id,
