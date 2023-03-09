@@ -31,7 +31,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     drunk_duration = random.randint(60, 600)
     logger.info(
-        'drink | bot [{}] ready to drink in group [{}], sober up after {} sec'.format(
+        'bot [{}] ready to drink in group [{}], sober up after {} sec'.format(
             event.self_id, event.group_id, drunk_duration))
 
     config.drink()
@@ -43,7 +43,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         # 35 是期望概率
         sleep_duration = (min(drunkenness, 35) + random.random()) * 800
         logger.info(
-            'drink | bot [{}] go to sleep in group [{}], wake up after {} sec'.format(
+            'bot [{}] go to sleep in group [{}], wake up after {} sec'.format(
                 event.self_id, event.group_id, sleep_duration))
         config.sleep(sleep_duration)
 
@@ -59,7 +59,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     await asyncio.sleep(drunk_duration)
     if config.sober_up() and not config.is_sleep():
-        logger.info('drink | bot [{}] sober up in group [{}]'.format(
+        logger.info('bot [{}] sober up in group [{}]'.format(
             event.self_id, event.group_id))
         await drink_msg.finish('呃......咳嗯，下次不能喝、喝这么多了......')
 

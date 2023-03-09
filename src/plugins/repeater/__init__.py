@@ -32,7 +32,7 @@ async def is_shutup(self_id: int, group_id: int) -> bool:
     })
     flag: bool = info['shut_up_timestamp'] > time.time()
 
-    logger.info('repeater | bot [{}] in group [{}] is shutup: {}'.format(
+    logger.info('bot [{}] in group [{}] is shutup: {}'.format(
         self_id, group_id, flag))
 
     return flag
@@ -96,7 +96,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     for item in answers:
         msg = await replace_at(item, event.self_id, event.group_id)
         logger.info(
-            'repeater | bot [{}] ready to send [{}] to group [{}]'.format(event.self_id, msg, event.group_id))
+            'bot [{}] ready to send [{}] to group [{}]'.format(event.self_id, msg, event.group_id))
 
         await asyncio.sleep(delay)
         config.refresh_cooldown('repeat')
@@ -109,7 +109,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
             # 自动删除失效消息。若 bot 处于风控期，请勿开启该功能
             shutup = await is_shutup(event.self_id, event.group_id)
             if not shutup:  # 说明这条消息失效了
-                logger.info('repeater | bot [{}] ready to ban [{}] in group [{}]'.format(
+                logger.info('bot [{}] ready to ban [{}] in group [{}]'.format(
                     event.self_id, str(item), event.group_id))
                 Chat.ban(event.group_id, event.self_id,
                          str(item), 'ActionFailed')
@@ -148,7 +148,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         raw_message += re.sub(r'(\[CQ\:.+)(?:,url=*)(\])',
                               r'\1\2', raw_reply)
 
-    logger.info('repeater | bot [{}] ready to ban [{}] in group [{}]'.format(
+    logger.info('bot [{}] ready to ban [{}] in group [{}]'.format(
         event.self_id, raw_message, event.group_id))
 
     if Chat.ban(event.group_id, event.self_id, raw_message, str(event.user_id)):
@@ -172,7 +172,7 @@ ban_msg_latest = on_message(
 @ban_msg_latest.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     logger.info(
-        'repeater | bot [{}] ready to ban latest reply in group [{}]'.format(
+        'bot [{}] ready to ban latest reply in group [{}]'.format(
             event.self_id, event.group_id))
 
     if Chat.ban(event.group_id, event.self_id, '', str(event.user_id)):
@@ -190,7 +190,7 @@ async def speak_up():
 
     for msg in messages:
         logger.info(
-            'repeater | bot [{}] ready to speak [{}] to group [{}]'.format(
+            'bot [{}] ready to speak [{}] to group [{}]'.format(
                 bot_id, msg, group_id))
         await get_bot(str(bot_id)).call_api('send_group_msg', **{
             'message': msg,
