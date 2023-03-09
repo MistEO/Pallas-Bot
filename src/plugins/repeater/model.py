@@ -534,7 +534,7 @@ class Chat:
             if not save_list:
                 return
 
-            Chat._message_dict = {group_id: group_msgs[-Chat.SAVE_RESERVED_SIZE:]
+            Chat._message_dict = defaultdict(list) | {group_id: group_msgs[-Chat.SAVE_RESERVED_SIZE:]
                                   for group_id, group_msgs in Chat._message_dict.items()}
 
             Chat._late_save_time = cur_time
