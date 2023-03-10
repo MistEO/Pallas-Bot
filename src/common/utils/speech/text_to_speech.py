@@ -1,6 +1,8 @@
 
 import paddle
 import nltk
+import io
+import soundfile
 import numpy as np
 from pathlib import Path
 from paddlespeech.t2s.exps.syn_utils import get_am_output, get_frontend, get_predictor, get_voc_output
@@ -39,7 +41,7 @@ voc_predictor = get_predictor(
 SAMPLE_RATE = 24000
 
 
-def text_2_speech(text: str, speed: int = 1.0):
+def text_2_speech(text: str, speed: int = 1.0, pre_silent: float = 0.5, post_silent: float = 1.0) -> io.BytesIO():
     am_output_data = get_am_output(
         input=text,
         am_predictor=am_predictor,
@@ -52,7 +54,29 @@ def text_2_speech(text: str, speed: int = 1.0):
     raw = get_voc_output(
         voc_predictor=voc_predictor, input=am_output_data)
     wav = change_speed(raw, speed, SAMPLE_RATE)
-    return wav, SAMPLE_RATE
+    wav = add_silent(wav, SAMPLE_RATE, pre_silent, post_silent)
+    bs = io.BytesIO()
+    soundfile.write(bs, wav, SAMPLE_RATE, format='wav')
+    return bs
+
+
+def add_silent(sample_raw, sample_rate, pre_silent, post_silent):
+    """Add silent to the audio.
+    Note that this is an in-place transformation.
+    :param pre_silent: Duration of silent to add before the audio.
+    :type pre_silent: float
+    :param post_silent: Duration of silent to add after the audio.
+    :type post_silent: float
+    """
+    if pre_silent > 0:
+        pre_silent = np.zeros(
+            [int(sample_rate * pre_silent), 1], dtype=np.float32)
+        sample_raw = np.concatenate((pre_silent, sample_raw))
+    if post_silent > 0:
+        post_silent = np.zeros(
+            [int(sample_rate * post_silent), 1], dtype=np.float32)
+        sample_raw = np.concatenate((sample_raw, post_silent))
+    return sample_raw
 
 
 def change_speed(sample_raw, speed_rate, sample_rate):
@@ -107,8 +131,9 @@ if __name__ == '__main__':
     import time
     for i in range(5):
         start_time = time.time()
-        wav, sr = text_2_speech("我是来自米诺斯的祭司帕拉斯，会在罗德岛休息一段时间。虽然这么说，我渴望以美酒和戏剧被招待，更渴望走向战场。",
+        bs = text_2_speech("我是来自米诺斯的祭司帕拉斯，会在罗德岛休息一段时间。虽然这么说，我渴望以美酒和戏剧被招待，更渴望走向战场。",
                                 speed=1.0)
         duration = time.time() - start_time
         print(f'cost {duration} s')
-    soundfile.write(("hello_pallas.wav"), wav, samplerate=sr)
+    with open("hello.wav", "wb") as f:
+        f.write(bs.getvalue())

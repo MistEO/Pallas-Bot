@@ -22,8 +22,6 @@ from nonebot.adapters.onebot.v11 import Message, MessageSegment
 from src.common.config import BotConfig
 try:
     from src.common.utils.speech.text_to_speech import text_2_speech
-    import io
-    import soundfile
     TTS_AVAIABLE = True
 except (ImportError, LookupError) as error:
     TTS_AVAIABLE = False
@@ -785,9 +783,7 @@ class Chat:
         #     result = tts_client.synthesis(text, options={'per': 111})  # 度小萌
         #     if not isinstance(result, dict):  # error message
         #         return MessageSegment.record(result)
-        bs = io.BytesIO()
-        wav, sr = text_2_speech(text, 1.0)
-        soundfile.write(bs, wav, sr, format='wav')
+        bs = text_2_speech(text, 1.0)
         return MessageSegment.record(bs)
 
     @staticmethod
