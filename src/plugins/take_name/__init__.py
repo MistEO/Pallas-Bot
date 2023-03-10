@@ -27,12 +27,12 @@ async def change_name():
 
         target_user_id = target_msg['user_id']
         logger.info(
-            'take_name | bot [{}] ready to change name by using [{}] in group [{}]'.format(
+            'bot [{}] ready to change name by using [{}] in group [{}]'.format(
                 bot_id, target_user_id, group_id))
 
         bot = get_bot(str(bot_id))
         if not bot:
-            logger.error("take_name | no bot: " + str(bot_id))
+            logger.error("no bot: " + str(bot_id))
             continue
 
         try:
@@ -48,7 +48,7 @@ async def change_name():
 
         card = info['card'] if info['card'] else info['nickname']
         logger.info(
-            'take_name | bot [{}] ready to change name to[{}] in group [{}]'.format(
+            'bot [{}] ready to change name to[{}] in group [{}]'.format(
                 bot_id, card, group_id))
         try:
             # 改牛牛自己的群名片
