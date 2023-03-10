@@ -9,7 +9,7 @@
 1. 下载 [模型及配置文件](https://huggingface.co/MistEO/Pallas-Bot/tree/main/so-vits-svc/4.0) 放到 `resource/sing/models/XXX/` 文件夹里  
 
     - 这里的 `XXX` 换成资源文件夹的名字，例如 `pallas`, `amiya` 等，需要对应 `config.json` 里的 `spk` 字段
-    - 具体路径结构请参考 [path_structure.txt](https://github.com/MistEO/Pallas-Bot/blob/master/resource/sing/models/path_structure.txt)
+    - 具体路径结构请参考 [path_structure.txt](../resource/sing/models/path_structure.txt)
     - 在 `src/plugins/sing/__init__.py` 修改 `svc_speakers` 对应上面的资源文件夹名。（也可以在 `.env` 里改）
 
 2. 更新 git 子模块
@@ -37,10 +37,6 @@
         python -m pip install -r src/plugins/sing/requirements.txt
         python -m pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu117
         ```
-
-## 画画
-
-敬请期待
 
 ## Chat
 
@@ -70,10 +66,16 @@
 
 ## TTS
 
-**仍在开发中，有能力的可以自己试着先接入玩玩**
-
-1. 下载 [模型资源](https://huggingface.co/MistEO/Pallas-Bot/tree/main/paddlespeech/tts)，放入 `resource/tts/models` 文件夹中
+1. 下载 [模型资源](https://huggingface.co/MistEO/Pallas-Bot/tree/main/paddlespeech/tts) common.zip 和 pallas_cn.zip。解压放入 `resource/tts/models` 文件夹中
+    - 具体路径结构请参考 [path_structure.txt](../resource/sing/models/path_structure.txt)
+    - `vocoder` 下有两个声码器，`pwgan_aishell3` 快，`wavernn_csmsc` 慢很多效果好一点，可以自行选择
 2. 安装依赖
+
+    - CPU 版本（合成耗时 20s 左右）
+
+        ```
+        python3 -m pip install paddlepaddle-gpu==2.4.2.post117 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
+        ```
 
     - GPU 版本（显存占用约 1.5G，合成耗时 1s 左右）  
 
@@ -83,8 +85,6 @@
         conda install paddlepaddle-gpu==2.4.2 cudatoolkit=11.7 cudnn -c https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/Paddle/ -c conda-forge
         ```
 
-    - CPU 版本（合成耗时 20s 左右）
+## 画画
 
-        ```
-        python3 -m pip install paddlepaddle-gpu==2.4.2.post117 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
-        ```
+敬请期待

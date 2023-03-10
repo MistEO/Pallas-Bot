@@ -1,8 +1,15 @@
 resource/tts/models
-├── vocoder
-│   ├── pwgan_aishell3.pdiparams
-│   └── pwgan_aishell3.pdmodel
-├── pallas.pdiparams
-├── pallas.pdmodel
+├── nltk_data
+│   └── corpora
+│       └── cmudict
+│           ├── cmudict
+│           └── README
+├── pallas_cn.pdiparams
+├── pallas_cn.pdmodel
 ├── path_structure.txt
-└── phone_id_map.txt
+├── phone_id_map.txt
+└── vocoder
+    ├── pwgan_aishell3.pdiparams
+    ├── pwgan_aishell3.pdmodel
+    ├── wavernn_csmsc.pdiparams
+    └── wavernn_csmsc.pdmodel
