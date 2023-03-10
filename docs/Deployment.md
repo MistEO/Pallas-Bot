@@ -60,8 +60,9 @@
 
 4. 安装并启动 Mongodb （这是启动核心功能所必须的）
 
-    👉 [Windows 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-window-install.html)  
-    👉 [Linux 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-linux-install.html)  
+    - [Windows 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-window-install.html)
+
+    - [Linux 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-linux-install.html)
 
     只需要确认 Mongodb 启动即可，后面的部分会由 Pallas-Bot 自动完成
 
@@ -79,14 +80,14 @@
 
 6. 使用 `jieba-fast` 分词库
 
-    项目默认安装 jieba， 加群较多、需要处理消息量大的用户可以自行安装 jieba-fast，以提升分词速度（若群较少也可跳过这一步）  
-    在 Windows 上可能需要额外安装 `Visual Studio`，Linux 上需要 `build-essential`
+    项目默认安装 `jieba`， 加群较多、需要处理消息量大的用户可以自行安装 `jieba-fast`，以提升分词速度（若群较少也可跳过这一步）  
 
     ```bash
     python -m pip install jieba-fast
     ```
 
-    注：项目将优先尝试导入 jieba-fast 库，如果导入失败则使用 jieba 库, 无需手动修改代码
+    若安装失败，在 Windows 上可能需要额外安装 `Visual Studio`，Linux 上需要 `build-essential`  
+    注：项目将优先尝试导入 `jieba-fast` 库，如果导入失败则使用 `jieba` 库，无需手动修改代码
 
 ## 启动 Pallas-Bot
 
@@ -117,7 +118,7 @@ git pull origin master --autostash
 
 ### 牛牛只发语音不发文字怎么办？
 
-多半是被腾讯风控了（ WebUI 上点开账号可以看到输出提示），自己拿手机登下随便找个群发句话，应该会有提示让你验证。如果没有就多挂几天吧，可能过几天就好了 ( ´_ゝ` )
+多半是被风控了（ WebUI 上点开账号可以看到输出提示），自己拿手机登下随便找个群发句话，应该会有提示让你验证。如果没有就多挂几天吧，可能过几天就好了 ( ´_ゝ` )
 
 ### 唱歌，酒后聊天功能
 
