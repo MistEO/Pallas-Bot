@@ -61,22 +61,14 @@
 4. 安装并启动 Mongodb （这是启动核心功能所必须的）
 
     - [Windows 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-window-install.html)
-
     - [Linux 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-linux-install.html)
 
     只需要确认 Mongodb 启动即可，后面的部分会由 Pallas-Bot 自动完成
 
 5. 配置 FFmpeg （如果不希望牛牛发送语音，可以跳过这一步）
 
-    - [Windows 安装 FFmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)
-    - Linux 安装 FFmpeg
-
-            ```bash
-            sudo apt install -y ffmpeg
-            sudo ldconfig
-            ```
-
-    并下载 [牛牛语音文件](https://huggingface.co/MistEO/Pallas-Bot/resolve/main/voices/voices.zip)，解压放到 `resource/voices/` 文件夹下，参考 [path_structure.txt](../resource/voices/path_structure.txt)
+    - [安装 FFmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)
+    - 下载 [牛牛语音文件](https://huggingface.co/MistEO/Pallas-Bot/resolve/main/voices/voices.zip)，解压放到 `resource/voices/` 文件夹下，参考 [path_structure.txt](../resource/voices/path_structure.txt)
 
 6. 使用 `jieba-fast` 分词库
 
@@ -100,7 +92,10 @@ nb run        # 运行
 
 ## 访问后台并登陆账号
 
-一切顺利的话，在加载完后你大概会看到一个显眼链接。把提示的链接复制到浏览器打开（本地部署的话就直接在浏览器访问 `http://127.0.0.1:8080/go-cqhttp/` ）；然后就是比较直观的操作了，直接添加你的账号并登陆即可
+一切顺利的话，在加载完后你大概会看到一个显眼链接，把它复制到浏览器打开  
+（本地部署的话可以直接访问 <http://127.0.0.1:8080/go-cqhttp/>）  
+
+然后就是比较直观的操作了，直接添加你的账号并登陆即可  
 
 ## 后续更新
 
@@ -118,7 +113,10 @@ git pull origin master --autostash
 
 ### 牛牛只发语音不发文字怎么办？
 
-多半是被风控了（ WebUI 上点开账号可以看到输出提示），自己拿手机登下随便找个群发句话，应该会有提示让你验证。如果没有就多挂几天吧，可能过几天就好了 ( ´_ゝ` )
+多半是被风控了（ WebUI 上点开账号可以看到输出提示）  
+自己拿手机登下随便找个群发句话，应该会有提示让你验证  
+
+如果没有就多挂几天吧，可能过几天就好了 ( ´_ゝ` )
 
 ### 唱歌，酒后聊天功能
 
