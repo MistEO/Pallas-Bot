@@ -5,8 +5,7 @@ import random
 import os
 
 from pydantic import BaseModel, Extra
-from nonebot import get_driver
-from nonebot import on_message
+from nonebot import get_driver, on_message, logger
 from nonebot.typing import T_State
 from nonebot.rule import Rule
 from nonebot.adapters import Bot, Event
@@ -148,6 +147,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     # 从网易云下载
     origin = await asyncify(download)(song_id)
     if not origin:
+        logger.error('download failed', song_id)
         await failed()
 
     # 音频切片
@@ -155,6 +155,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     if not slices_list or chunk_index >= len(slices_list):
         if chunk_index == len(slices_list):
             await asyncify(splice)(Path("NotExists"), Path('resource/sing/splices'), True, song_id, chunk_index, speaker, key=key)
+        logger.error('slice failed', song_id)
         await failed()
 
     chunk = slices_list[chunk_index]
@@ -162,6 +163,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     # 人声分离
     separated = await asyncify(separate)(chunk, Path('resource/sing'), locker=gpu_locker)
     if not separated:
+        logger.error('separate failed', song_id)
         await failed()
 
     vocals, no_vocals = separated
@@ -169,11 +171,13 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     # 音色转换（SVC）
     svc = await asyncify(inference)(vocals, Path('resource/sing/svc'), speaker=speaker, locker=gpu_locker)
     if not svc:
+        logger.error('svc failed', song_id)
         await failed()
 
     # 混合人声和伴奏
     result = await asyncify(mix)(svc, no_vocals, vocals, Path("resource/sing/mix"), svc.stem)
     if not result:
+        logger.error('mix failed', song_id)
         await failed()
 
     # 混音后合并混音结果
