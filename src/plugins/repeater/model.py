@@ -23,10 +23,9 @@ from src.common.config import BotConfig
 try:
     from src.common.utils.speech.text_to_speech import text_2_speech
     TTS_AVAIABLE = True
-except (ImportError, LookupError) as error:
-    TTS_AVAIABLE = False
+except Exception as error:
     print('TTS not available', error)
-    pass
+    TTS_AVAIABLE = False
 
 mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
 
