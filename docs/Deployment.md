@@ -93,6 +93,16 @@ nb run        # 运行
 git pull origin master
 ```
 
+### 使用 jieba-fast 分词库
+
+项目默认安装 jieba， 加群较多、需要处理消息量大的用户可以自行安装 jieba-fast，以提升分词速度
+
+```cmd
+pip install jieba-fast
+```
+
+注：项目将优先尝试导入 jieba-fast 库，如果导入失败则使用 jieba 库, 无需手动修改代码
+
 ## Linux系统
 
 （以 `Ubuntu 20.04` 为例，其它系统请自行变通）
