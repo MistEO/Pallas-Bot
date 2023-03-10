@@ -69,7 +69,7 @@
 **TTS 所依赖的 [paddlespeech](https://github.com/PaddlePaddle/PaddleSpeech) 目前最新的 1.3.0 版本仅支持到 python 3.9，更高版本的 python 无法支持**
 
 1. 下载 [模型资源](https://huggingface.co/MistEO/Pallas-Bot/tree/main/paddlespeech/tts) common.zip 和 pallas_cn.zip。解压放入 `resource/tts/models` 文件夹中
-    - 具体路径结构请参考 [path_structure.txt](../resource/sing/models/path_structure.txt)
+    - 具体路径结构请参考 [path_structure.txt](../resource/tts/models/path_structure.txt)
     - `vocoder` 下有两个声码器，`pwgan_aishell3` 快，`wavernn_csmsc` 慢很多效果好一点，可以自行选择
 2. 安装依赖
 
