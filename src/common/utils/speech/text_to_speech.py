@@ -6,6 +6,7 @@ import soundfile
 import numpy as np
 from pathlib import Path
 from paddlespeech.t2s.exps.syn_utils import get_am_output, get_frontend, get_predictor, get_voc_output
+from threading import Lock
 
 AM_INFERENCE_DIR = Path("resource/tts/models/")
 VOC_INFERENCE_DIR = Path("resource/tts/models/vocoder")
@@ -26,8 +27,8 @@ frontend = get_frontend(
 # am_predictor
 am_predictor = get_predictor(
     model_dir=AM_INFERENCE_DIR,
-    model_file="pallas_cn" + ".pdmodel",
-    params_file="pallas_cn" + ".pdiparams",
+    model_file="pallas_jp" + ".pdmodel",
+    params_file="pallas_jp" + ".pdiparams",
     device=device)
 
 # voc_predictor
@@ -39,20 +40,22 @@ voc_predictor = get_predictor(
 
 
 SAMPLE_RATE = 24000
+predictor_lock = Lock()
 
 
 def text_2_speech(text: str, speed: int = 1.0, pre_silent: float = 0.5, post_silent: float = 1.0) -> io.BytesIO():
-    am_output_data = get_am_output(
-        input=text,
-        am_predictor=am_predictor,
-        am="fastspeech2_mix",
-        frontend=frontend,
-        lang="mix",
-        merge_sentences=True,
-        speaker_dict=AM_INFERENCE_DIR / "phone_id_map.txt",
-        spk_id=0, )
-    raw = get_voc_output(
-        voc_predictor=voc_predictor, input=am_output_data)
+    with predictor_lock:
+        am_output_data = get_am_output(
+            input=text,
+            am_predictor=am_predictor,
+            am="fastspeech2_mix",
+            frontend=frontend,
+            lang="mix",
+            merge_sentences=True,
+            speaker_dict=AM_INFERENCE_DIR / "phone_id_map.txt",
+            spk_id=0, )
+        raw = get_voc_output(
+            voc_predictor=voc_predictor, input=am_output_data)
     wav = change_speed(raw, speed, SAMPLE_RATE)
     wav = add_silent(wav, SAMPLE_RATE, pre_silent, post_silent)
     bs = io.BytesIO()
