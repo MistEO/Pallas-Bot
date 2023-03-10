@@ -74,7 +74,7 @@
     - CPU 版本（合成耗时 20s 左右）
 
         ```
-        python3 -m pip install paddlepaddle-gpu==2.4.2.post117 paddlespeech -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
+        python3 -m pip install paddlepaddle-gpu==2.4.2.post117 paddlespeech==1.3.0 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
         ```
 
     - GPU 版本（显存占用约 1.5G，合成耗时 1s 左右）  
@@ -82,7 +82,7 @@
         因为需要装 cudnn，推荐用 conda 安装。没有 conda 的可以自己去搜教程 cudnn 的安装方法，或者参考 [飞桨官方安装教程](https://www.paddlepaddle.org.cn/documentation/docs/zh/install/pip/linux-pip.html)
 
         ```bash
-        conda install paddlepaddle-gpu==2.4.2 paddlespeech cudatoolkit=11.7 cudnn -c https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/Paddle/ -c conda-forge
+        conda install paddlepaddle-gpu==2.4.2 paddlespeech==1.3.0 cudatoolkit=11.7 cudnn -c https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/Paddle/ -c conda-forge
         ```
 
 ## 画画
