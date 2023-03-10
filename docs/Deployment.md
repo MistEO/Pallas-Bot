@@ -4,122 +4,33 @@
 
 ## 看前提示
 
-- 你需要一个额外的 QQ 小号，一台自己的 `电脑` 或 `服务器`，请不要用大号进行部署
+- 你需要一个额外的 QQ 小号，一台自己的 `电脑` 或 `服务器`，不推荐用大号进行部署
 - 你自己部署的牛牛与其他牛牛数据并不互通，是一张白纸，需要从头调教
 
-## Windows系统
+## 基本环境配置
 
-### 安装 Python
+1. 下载安装 [git](https://git-scm.com/downloads)，这是一个版本控制工具，可以用来方便的下载、更新牛牛的源码
+2. 下载牛牛源码
 
-（如果已经安装过的话可以跳过）
+    在你想放数据的文件夹里，Shift + 鼠标右键，打开 Powershell 窗口，输入命令
 
-参考 [安装教程](https://zhuanlan.zhihu.com/p/43155342)（推荐 3.8.x 版本）， 或者你也可以自行搜索其他的安装教程
-
-### 配置 Windows 运行环境
-
-1. 下载安装 [git](https://git-scm.com/downloads)
-2. 下载源码  
-    在你想放数据的文件夹里，Shift + 鼠标右键，打开 Powershell 窗口，clone 牛牛代码
-
-    ```cmd
+    ```bash
     git clone https://github.com/MistEO/Pallas-Bot.git --depth=1
     ```
 
     受限于国内网络环境，请留意命令是否执行成功，若一直失败可以挂上代理
 
-3. 更换 pip 源为阿里云*（更换为国内源会比默认的国外源快很多）
+3. 下载安装 [Python](https://www.python.org/downloads/)，推荐 3.8.x 版本，避免版本不一致带来的不必要麻烦
+4. 更换 pip 源为阿里云，并更新 pip
 
-    ```cmd
+    ```bash
     python -m pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
+    python -m pip install --upgrade pip
     ```
 
-4. 通过手脚架安装nonebot
+## 项目环境配置
 
-    ```cmd
-    python -m pip install nb-cli
-    ```
-
-    详情参见 [安装 NoneBot2](https://v2.nonebot.dev/docs/start/installation)
-
-5. 安装依赖
-
-    ```cmd
-    cd Pallas-Bot # 进入项目目录
-    python -m pip install -r requirements.txt
-    ```
-
-    （如果这些依赖与其他 Python 程序产生了冲突，推荐使用 miniconda 等虚拟环境）
-
-6. 安装 nonebot 的 apscheduler 插件和 websockets 驱动器
-
-    ```cmd
-    nb plugin install nonebot_plugin_apscheduler
-    nb plugin install nonebot_plugin_gocqhttp
-    nb driver install websockets
-    nb driver install fastapi
-    ```
-
-    （如果你的系统提示找不到 `nb`，请自行尝试添加相关环境变量~）
-
-7. 安装并启动 Mongodb （这是启动核心功能所必须的）
-
-    👉 [Windows 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-window-install.html)
-
-    只需要确认 Mongodb 启动即可，后面的部分会由 Pallas-Bot 自动完成
-
-8. 配置 ffmpeg （如果不希望牛牛发送语音，可以跳过这一步）
-
-    👉 [安装 ffmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)  
-    👉 下载 [牛牛语音文件](https://huggingface.co/MistEO/Pallas-Bot/resolve/main/voices/voices.zip)，解压放到 `resource/voices/` 文件夹下（参考 `resource/voices/path_structure.txt`）
-
-### 启动 Pallas-Bot
-
-```cmd
-cd Pallas-Bot # 进入项目目录
-nb run        # 运行
-```
-
-**注意！请不要关闭这个命令行窗口！这会导致 Pallas-Bot 停止运行！**
-
-### 访问后台并登陆账号
-
-一切顺利的话，在加载完后你大概会看到一个显眼链接。把提示的链接复制到浏览器打开（本地部署的话就直接在浏览器访问 `http://127.0.0.1:8080/go-cqhttp/` ）；然后就是比较直观的操作了，直接添加你的账号并登陆即可
-
-### 后续更新
-
-如果牛牛出了新功能你想要使用，同样在项目目录下打开 powershell，执行命令后重新运行牛牛即可
-
-```cmd
-git pull origin master
-```
-
-### 使用 jieba-fast 分词库
-
-项目默认安装 jieba， 加群较多、需要处理消息量大的用户可以自行安装 jieba-fast，以提升分词速度
-
-```cmd
-pip install jieba-fast
-```
-
-注：项目将优先尝试导入 jieba-fast 库，如果导入失败则使用 jieba 库, 无需手动修改代码
-
-## Linux系统
-
-（以 `Ubuntu 20.04` 为例，其它系统请自行变通）
-
-### 基本环境配置
-
-```bash
-sudo apt update
-sudo apt install -y git python # 安装 git, python
-sudo ldconfig                   # 更新系统路径
-python -m pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ # 更换 pip 源为国内源
-python -m pip install --upgrade pip # 更新 pip
-```
-
-### 配置 Linux 运行环境
-
-1. 安装 nonebot
+1. 通过手脚架安装 nonebot
 
     ```bash
     python -m pip install nb-cli
@@ -127,13 +38,14 @@ python -m pip install --upgrade pip # 更新 pip
 
     详情参见 [安装 NoneBot2](https://v2.nonebot.dev/docs/start/installation)
 
-2. clone 本仓库并安装项目依赖
+2. 安装依赖
 
-    ```bash  
-    git clone https://github.com/InvoluteHell/Pallas-Bot.git --depth=1
-    cd Pallas-Bot
+    ```bash
+    cd Pallas-Bot # 进入项目目录
     python -m pip install -r requirements.txt
     ```
+
+    如果这些依赖与其他 Python 程序产生了冲突，推荐使用 miniconda 等虚拟环境
 
 3. 安装 nonebot 的 apscheduler 插件和 websockets 驱动器
 
@@ -144,24 +56,64 @@ python -m pip install --upgrade pip # 更新 pip
     nb driver install fastapi
     ```
 
+    如果你的系统提示找不到 `nb`，请自行尝试添加相关环境变量~
+
 4. 安装并启动 Mongodb （这是启动核心功能所必须的）
 
-    👉 [Linux 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-linux-install.html)
+    👉 [Windows 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-window-install.html)  
+    👉 [Linux 平台安装 MongoDB](https://www.runoob.com/mongodb/mongodb-linux-install.html)  
 
-5. 安装 ffmpeg （如果不希望牛牛发送语音，可以跳过这一步）
+    只需要确认 Mongodb 启动即可，后面的部分会由 Pallas-Bot 自动完成
+
+5. 配置 FFmpeg （如果不希望牛牛发送语音，可以跳过这一步）
+
+    - [Windows 安装 FFmpeg](https://docs.go-cqhttp.org/guide/quick_start.html#%E5%AE%89%E8%A3%85-ffmpeg)
+    - Linux 安装 FFmpeg
+
+            ```bash
+            sudo apt install -y ffmpeg
+            sudo ldconfig
+            ```
+
+    并下载 [牛牛语音文件](https://huggingface.co/MistEO/Pallas-Bot/resolve/main/voices/voices.zip)，解压放到 `resource/voices/` 文件夹下，参考 [path_structure.txt](../resource/voices/path_structure.txt)
+
+6. 使用 `jieba-fast` 分词库
+
+    项目默认安装 jieba， 加群较多、需要处理消息量大的用户可以自行安装 jieba-fast，以提升分词速度（若群较少也可跳过这一步）  
+    在 Windows 上可能需要额外安装 `Visual Studio`，Linux 上需要 `build-essential`
 
     ```bash
-    sudo apt install -y ffmpeg
-    sudo ldconfig
+    python -m pip install jieba-fast
     ```
-    
-    👉 下载 [牛牛语音文件](https://huggingface.co/MistEO/Pallas-Bot/resolve/main/voices/voices.zip)，解压放到 `resource/voices/` 文件夹下（参考 `resource/voices/path_structure.txt`）
 
-### 启动 Pallas-Bot 及登陆账号
+    注：项目将优先尝试导入 jieba-fast 库，如果导入失败则使用 jieba 库, 无需手动修改代码
 
-同上面的 [Windows 教程](#启动-pallas-bot)
+## 启动 Pallas-Bot
+
+```bash
+cd Pallas-Bot # 进入项目目录
+nb run        # 运行
+```
+
+**注意！请不要关闭这个命令行窗口！这会导致 Pallas-Bot 停止运行！**
+
+## 访问后台并登陆账号
+
+一切顺利的话，在加载完后你大概会看到一个显眼链接。把提示的链接复制到浏览器打开（本地部署的话就直接在浏览器访问 `http://127.0.0.1:8080/go-cqhttp/` ）；然后就是比较直观的操作了，直接添加你的账号并登陆即可
+
+## 后续更新
+
+如果牛牛出了新功能你想要使用，同样在项目目录下打开 Powershell，执行命令后重新运行牛牛即可
+
+```bash
+git pull origin master --autostash
+```
 
 ## FAQ
+
+### 一直无法登陆
+
+最近腾讯管得严了（所以不要用大号），可以参考 https://github.com/Mrs4s/go-cqhttp/issues/1939 尝试解决下
 
 ### 牛牛只发语音不发文字怎么办？
 
