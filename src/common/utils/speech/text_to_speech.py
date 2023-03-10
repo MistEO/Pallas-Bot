@@ -1,12 +1,17 @@
 
 import paddle
+import nltk
 import numpy as np
 from pathlib import Path
 from paddlespeech.t2s.exps.syn_utils import get_am_output, get_frontend, get_predictor, get_voc_output
 
 AM_INFERENCE_DIR = Path("resource/tts/models/")
 VOC_INFERENCE_DIR = Path("resource/tts/models/vocoder")
+nltk.data.path.append('resource/tts/models/nltk_data')
 
+device = "gpu" if paddle.device.is_compiled_with_cuda(
+) else "cpu"  # paddle.fluid.is_compiled_with_cuda()
+paddle.device.set_device(device)
 
 # frontend
 frontend = get_frontend(
@@ -15,14 +20,12 @@ frontend = get_frontend(
     tones_dict=None
 )
 
-device = "gpu" if paddle.device.is_compiled_with_cuda(
-) else "cpu"  # paddle.fluid.is_compiled_with_cuda()
 
 # am_predictor
 am_predictor = get_predictor(
     model_dir=AM_INFERENCE_DIR,
-    model_file="pallas" + ".pdmodel",
-    params_file="pallas" + ".pdiparams",
+    model_file="pallas_cn" + ".pdmodel",
+    params_file="pallas_cn" + ".pdiparams",
     device=device)
 
 # voc_predictor
@@ -105,7 +108,7 @@ if __name__ == '__main__':
     for i in range(5):
         start_time = time.time()
         wav, sr = text_2_speech("我是来自米诺斯的祭司帕拉斯，会在罗德岛休息一段时间。虽然这么说，我渴望以美酒和戏剧被招待，更渴望走向战场。",
-                                speed=0.7)
+                                speed=1.0)
         duration = time.time() - start_time
         print(f'cost {duration} s')
     soundfile.write(("hello_pallas.wav"), wav, samplerate=sr)

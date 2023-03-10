@@ -20,6 +20,15 @@ from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.onebot.v11 import Message, MessageSegment
 
 from src.common.config import BotConfig
+try:
+    from src.common.utils.speech.text_to_speech import text_2_speech
+    import io
+    import soundfile
+    TTS_AVAIABLE = True
+except (ImportError, LookupError) as error:
+    TTS_AVAIABLE = False
+    print('TTS not available', error)
+    pass
 
 mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
 
@@ -112,7 +121,8 @@ class Chat:
     DUPLICATE_REPLY = 10            # 说过的话，接下来多少次不再说
 
     SPLIT_PROBABILITY = 0.5         # 按逗号分割回复语的概率
-    VOICE_PROBABILITY = 0           # 回复语音的概率（仅纯文字）
+    DRUNK_TTS_THRESHOLD = 6 if TTS_AVAIABLE else 99999999
+    # 喝醉之后，超过多长的文本全部转换成语音发送
     SPEAK_CONTINUOUSLY_PROBABILITY = 0.5  # 连续主动说话的概率
     SPEAK_POKE_PROBABILITY = 0.6    # 主动说话加上随机戳一戳群友的概率
     SPEAK_CONTINUOUSLY_MAX_LEN = 2  # 连续主动说话最多几句话
@@ -270,9 +280,8 @@ class Chat:
                     Chat._recent_topics[group_id] += [
                         k for k in self.chat_data._keywords_list if not k.startswith('牛牛')
                     ]
-                if '[CQ:' not in item and len(item) > 1 \
-                        and random.random() < Chat.VOICE_PROBABILITY:
-                    yield Chat._text_to_speech(item)
+                if '[CQ:' not in item and len(item) > Chat.DRUNK_TTS_THRESHOLD and self.config.drunkenness():
+                    yield Message(Chat._text_to_speech(item))
                 else:
                     yield Message(item)
 
@@ -771,13 +780,15 @@ class Chat:
         return ([answer_str, ], answer_keywords)
 
     @staticmethod
-    def _text_to_speech(text: str) -> Optional[Message]:
+    def _text_to_speech(text: str) -> MessageSegment:
         # if plugin_config.enable_voice:
         #     result = tts_client.synthesis(text, options={'per': 111})  # 度小萌
         #     if not isinstance(result, dict):  # error message
         #         return MessageSegment.record(result)
-
-        return Message(f'[CQ:tts,text={text}]')
+        bs = io.BytesIO()
+        wav, sr = text_2_speech(text, 1.0)
+        soundfile.write(bs, wav, sr, format='wav')
+        return MessageSegment.record(bs)
 
     @staticmethod
     def update_global_blacklist() -> None:
