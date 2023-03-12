@@ -6,7 +6,7 @@ import torch
 
 cuda = torch.cuda.is_available()
 os.environ['RWKV_JIT_ON'] = '1'
-os.environ["RWKV_CUDA_ON"] = '1' if cuda else '0'
+os.environ["RWKV_CUDA_ON"] = '0' # 这个要配个 ninja 啥的环境，能大幅提高推理速度，有需要可以自己弄下（仅支持 cuda 显卡）
 
 from .prompt import INIT_PROMPT, CHAT_FORMAT
 from .pipeline import PIPELINE, PIPELINE_ARGS
