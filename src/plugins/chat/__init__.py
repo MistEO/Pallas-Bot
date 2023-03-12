@@ -59,11 +59,6 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     if len(text) > 50:
         text = text[:50]
     ans = await asyncify(chat)(session, text)
-
-    config.reset_cooldown(cd_key)
-    if not ans:
-        return
-
     logger.info(f'session [{session}]: {text} -> {ans}')
 
     if TTS_AVAIABLE and len(ans) >= TTS_MIN_LENGTH:
@@ -71,4 +66,5 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         msg = MessageSegment.record(bs)
     else:
         msg = ans
+    config.reset_cooldown(cd_key)
     await drunk_msg.finish(msg)

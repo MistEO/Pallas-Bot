@@ -6,12 +6,12 @@ import torch
 
 cuda = torch.cuda.is_available()
 os.environ['RWKV_JIT_ON'] = '1'
-os.environ["RWKV_CUDA_ON"] = '0' # 这个要配个 ninja 啥的环境，能大幅提高推理速度，有需要可以自己弄下（仅支持 cuda 显卡）
+# 这个要配个 ninja 啥的环境，能大幅提高推理速度，有需要可以自己弄下（仅支持 cuda 显卡）
+os.environ["RWKV_CUDA_ON"] = '0'
 
-from .prompt import INIT_PROMPT, CHAT_FORMAT
-from .pipeline import PIPELINE, PIPELINE_ARGS
 from rwkv.model import RWKV  # pip install rwkv
-
+from .pipeline import PIPELINE, PIPELINE_ARGS
+from .prompt import INIT_PROMPT, CHAT_FORMAT
 
 # 这个可以照着原仓库的说明改一改，能省点显存啥的
 STRATEGY = 'cuda fp16' if cuda else 'cpu fp32'
@@ -35,8 +35,10 @@ if not MODEL_PATH:
 TOKEN_PATH = MODEL_DIR / '20B_tokenizer.json'
 
 if not TOKEN_PATH.exists():
-    print(f'AI Chat updated, please put token file to {TOKEN_PATH}, download: https://github.com/BlinkDL/ChatRWKV/blob/main/20B_tokenizer.json')
-    print(f'牛牛的 AI Chat 版本更新了，把 token 文件放到 {TOKEN_PATH} 里再启动, 下载地址：https://github.com/BlinkDL/ChatRWKV/blob/main/20B_tokenizer.json')
+    print(
+        f'AI Chat updated, please put token file to {TOKEN_PATH}, download: https://github.com/BlinkDL/ChatRWKV/blob/main/20B_tokenizer.json')
+    print(
+        f'牛牛的 AI Chat 版本更新了，把 token 文件放到 {TOKEN_PATH} 里再启动, 下载地址：https://github.com/BlinkDL/ChatRWKV/blob/main/20B_tokenizer.json')
     raise Exception('Chat token not found')
 
 torch.cuda.empty_cache()
@@ -59,8 +61,8 @@ chat_locker = Lock()
 
 def chat(session: str, text: str, token_count: int = 50) -> str:
     with chat_locker:
-        state = all_state[session] if session in all_state else deepcopy(
-            all_state[CHAT_INIT])
+        state = deepcopy(
+            all_state[session if session in all_state else CHAT_INIT])
         ctx = CHAT_FORMAT.format(text)
         out, state = pipeline.generate(
             ctx, token_count=token_count, args=args, state=state)
