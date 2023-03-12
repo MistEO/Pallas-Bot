@@ -67,7 +67,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     logger.info(f'session [{session}]: {text} -> {ans}')
 
     if TTS_AVAIABLE and len(ans) >= TTS_MIN_LENGTH:
-        bs = await asyncify(text_2_speech)(bs)
+        bs = await asyncify(text_2_speech)(ans)
         msg = MessageSegment.record(bs)
     else:
         msg = ans
