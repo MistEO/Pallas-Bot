@@ -65,7 +65,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     logger.info(f'session [{session}]: {text} -> {ans}')
 
     if TTS_AVAIABLE and random.random() < TTS_PROBABILITY:
-        bs = await asyncify(text_2_speech)(text, 1.0)
+        bs = await asyncify(text_2_speech)(ans, 1.0)
         msg = MessageSegment.record(bs)
     else:
         msg = ans
