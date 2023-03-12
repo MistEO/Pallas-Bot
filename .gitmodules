@@ -2,6 +2,3 @@
 	path = src/plugins/sing/so_vits_svc
 	url = https://github.com/MistEO/so-vits-svc.git
 	branch = 4.0_pallas
-[submodule "src/plugins/chat/ChatRWKV"]
-	path = src/plugins/chat/ChatRWKV
-	url = https://github.com/MistEO/ChatRWKV.git

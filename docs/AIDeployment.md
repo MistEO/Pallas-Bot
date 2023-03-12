@@ -40,26 +40,21 @@
 
 ## Chat
 
-1. 下载模型，参考 [原仓库说明](https://github.com/BlinkDL/ChatRWKV#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B)，把文件放到 `resource/chat/models` 文件夹（只要是 `.pth` 都行，根据你的显存和需求选择）
-2. 更新 git 子模块
+1. 下载模型，参考 [原仓库说明](https://github.com/BlinkDL/ChatRWKV#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B)；下载 [token 文件](https://github.com/BlinkDL/ChatRWKV/blob/main/20B_tokenizer.json)。都放到 `resource/chat/models` 文件夹（模型只要是 `.pth` 都行，根据你的显存和需求选择）
 
-    ```
-    git submodule update --init --recursive
-    ```
-
-3. 安装依赖
+2. 安装依赖
 
     - CPU
 
     ```bash
-    python -m pip install torch torchvision torchaudio tokenizers
+    python -m pip install torch tokenizers rwkv
     ```
 
     - GPU
     
     ```bash
-    python -m pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu117
-    python -m pip install tokenizers
+    python -m pip install torch --extra-index-url https://download.pytorch.org/whl/cu117
+    python -m pip install tokenizers rwkv
     ```
 
 4. `src/plugins/chat/model.py` 里的起手咒语 `init_prompt` 有兴趣可以试着改改

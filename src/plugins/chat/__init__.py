@@ -6,7 +6,7 @@ from nonebot.typing import T_State
 from nonebot import on_message, get_driver, logger
 import random
 
-from .model import answer, del_all_stat
+from .model import chat, del_session
 from src.common.config import BotConfig, GroupConfig
 try:
     from src.common.utils.speech.text_to_speech import text_2_speech
@@ -15,14 +15,14 @@ except Exception as error:
     print('TTS not available, error:', error)
     TTS_AVAIABLE = False
 
-TTS_PROBABILITY = 0.3
+TTS_MIN_LENGTH = 10
 
 
 def on_sober_up(bot_id, group_id, drunkenness) -> bool:
     session = f'{bot_id}_{group_id}'
     logger.info(
         f'bot [{bot_id}] sober up in group [{group_id}], clear session [{session}]')
-    del_all_stat(session)
+    del_session(session)
 
 
 BotConfig.register_sober_up(on_sober_up)
@@ -56,7 +56,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     session = f'{event.self_id}_{event.group_id}'
     if text.startswith('牛牛'):
         text = text[2:].strip()
-    ans = await asyncify(answer)(session, text)
+    ans = await asyncify(chat)(session, text)
 
     config.reset_cooldown(cd_key)
     if not ans:
@@ -64,8 +64,8 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     logger.info(f'session [{session}]: {text} -> {ans}')
 
-    if TTS_AVAIABLE and random.random() < TTS_PROBABILITY:
-        bs = await asyncify(text_2_speech)(ans[:50], 1.0)
+    if TTS_AVAIABLE and len(ans) >= TTS_MIN_LENGTH:
+        bs = await asyncify(text_2_speech)(bs)
         msg = MessageSegment.record(bs)
     else:
         msg = ans
