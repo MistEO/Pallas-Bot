@@ -4,18 +4,19 @@ from copy import deepcopy
 import os
 import torch
 
+cuda = torch.cuda.is_available()
 os.environ['RWKV_JIT_ON'] = '1'
-os.environ["RWKV_CUDA_ON"] = '0'
+os.environ["RWKV_CUDA_ON"] = '1' if cuda else '0'
 
 from .prompt import INIT_PROMPT, CHAT_FORMAT
 from .pipeline import PIPELINE, PIPELINE_ARGS
 from rwkv.model import RWKV  # pip install rwkv
 
 
-MODEL_DIR = Path('resource/chat/models')
-TOKEN_PATH = MODEL_DIR / '20B_tokenizer.json'
-STRATEGY = 'cuda fp16'
+# 这个可以照着原仓库的说明改一改，能省点显存啥的
+STRATEGY = 'cuda fp16' if cuda else 'cpu fp32'
 
+MODEL_DIR = Path('resource/chat/models')
 MODEL_EXT = '.pth'
 MODEL_PATH = None
 for f in MODEL_DIR.glob('*'):
@@ -30,6 +31,8 @@ if not MODEL_PATH:
     print(f'!!!!!!Chat model not found, please put it in {MODEL_DIR}!!!!!!')
     print(f'!!!!!!Chat 模型不存在，请放到 {MODEL_DIR} 文件夹下!!!!!!')
     raise Exception('Chat model not found')
+
+TOKEN_PATH = MODEL_DIR / '20B_tokenizer.json'
 
 if not TOKEN_PATH.exists():
     print(f'AI Chat updated, please put token file to {TOKEN_PATH}, download: https://github.com/BlinkDL/ChatRWKV/blob/main/20B_tokenizer.json')
