@@ -56,6 +56,8 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     session = f'{event.self_id}_{event.group_id}'
     if text.startswith('牛牛'):
         text = text[2:].strip()
+    if len(text) > 50:
+        text = text[:50]
     ans = await asyncify(chat)(session, text)
 
     config.reset_cooldown(cd_key)
