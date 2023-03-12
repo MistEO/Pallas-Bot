@@ -784,7 +784,7 @@ class Chat:
         #     result = tts_client.synthesis(text, options={'per': 111})  # 度小萌
         #     if not isinstance(result, dict):  # error message
         #         return MessageSegment.record(result)
-        bs = text_2_speech(text, 1.0)
+        bs = text_2_speech(text[:50], 1.0)
         return MessageSegment.record(bs)
 
     @staticmethod
