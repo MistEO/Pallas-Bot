@@ -44,18 +44,20 @@ if not TOKEN_PATH.exists():
 torch.cuda.empty_cache()
 model = RWKV(model=str(MODEL_PATH), strategy=STRATEGY)
 pipeline = PIPELINE(model, str(TOKEN_PATH))
-args = PIPELINE_ARGS(temperature=1.0, top_p=0.7,
-                     alpha_frequency=0.25,
-                     alpha_presence=0.25,
-                     token_ban=[0],  # ban the generation of some tokens
-                     token_stop=[187])  # stop generation whenever you see any token here
+args = PIPELINE_ARGS(
+    temperature=1.0,
+    top_p=0.7,
+    alpha_frequency=0.25,
+    alpha_presence=0.25,
+    token_ban=[0],  # ban the generation of some tokens
+    token_stop=[187])  # stop generation whenever you see any token here
 
 
 CHAT_INIT = "CHAT_INIT"
 all_state = {}
 all_state[CHAT_INIT] = deepcopy(pipeline.generate(
     INIT_PROMPT, token_count=200, args=args)[1])
-
+all_occurrence = {}
 chat_locker = Lock()
 
 
@@ -64,15 +66,19 @@ def chat(session: str, text: str, token_count: int = 50) -> str:
         state = deepcopy(
             all_state[session if session in all_state else CHAT_INIT])
         ctx = CHAT_FORMAT.format(text)
-        out, state = pipeline.generate(
-            ctx, token_count=token_count, args=args, state=state)
+        occurrence = all_occurrence.get(session, {})
+        out, state, occurrence = pipeline.generate(
+            ctx, token_count=token_count, args=args, state=state, occurrence=occurrence)
         all_state[session] = deepcopy(state)
+        all_occurrence[session] = occurrence
         return out
 
 
 def del_session(session: str):
     if session in all_state:
         del all_state[session]
+    if session in all_occurrence:
+        del all_occurrence[session]
 
 
 if __name__ == "__main__":
