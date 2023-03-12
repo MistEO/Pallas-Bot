@@ -4,9 +4,18 @@ from nonebot.adapters import Bot, Event
 from nonebot.rule import Rule
 from nonebot.typing import T_State
 from nonebot import on_message, get_driver, logger
+import random
 
 from .model import answer, del_all_stat
 from src.common.config import BotConfig, GroupConfig
+try:
+    from src.common.utils.speech.text_to_speech import text_2_speech
+    TTS_AVAIABLE = True
+except Exception as error:
+    print('TTS not available, error:', error)
+    TTS_AVAIABLE = False
+
+TTS_PROBABILITY = 0.3
 
 
 def on_sober_up(bot_id, group_id, drunkenness) -> bool:
@@ -50,5 +59,14 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     ans = await asyncify(answer)(session, text)
 
     config.reset_cooldown(cd_key)
-    if ans:
-        await drunk_msg.finish(ans)
+    if not ans:
+        return
+
+    logger.info(f'session [{session}]: {text} -> {ans}')
+
+    if TTS_AVAIABLE and random.random() < TTS_PROBABILITY:
+        bs = await asyncify(text_2_speech)(text, 1.0)
+        msg = MessageSegment.record(bs)
+    else:
+        msg = ans
+    await drunk_msg.finish(msg)

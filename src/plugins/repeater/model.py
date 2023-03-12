@@ -24,7 +24,7 @@ try:
     from src.common.utils.speech.text_to_speech import text_2_speech
     TTS_AVAIABLE = True
 except Exception as error:
-    print('TTS not available', error)
+    print('TTS not available, error:', error)
     TTS_AVAIABLE = False
 
 mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
