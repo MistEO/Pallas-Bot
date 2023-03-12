@@ -96,7 +96,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     for item in answers:
         msg = await replace_at(item, event.self_id, event.group_id)
         logger.info(
-            'bot [{}] ready to send [{}] to group [{}]'.format(event.self_id, msg, event.group_id))
+            'bot [{}] ready to send [{}] to group [{}]'.format(event.self_id, str(msg)[:30], event.group_id))
 
         await asyncio.sleep(delay)
         config.refresh_cooldown('repeat')
