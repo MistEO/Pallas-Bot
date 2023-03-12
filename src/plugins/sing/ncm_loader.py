@@ -49,7 +49,7 @@ def download(song_id):
 
 def get_audio_url(song_id):
     response = ncm.track.GetTrackAudio(song_id)
-    if response["data"][0]["size"] > 20000000:  # 20MB
+    if response["data"][0]["size"] > 100000000:  # 100MB
         return None
     return response["data"][0]["url"]
 
