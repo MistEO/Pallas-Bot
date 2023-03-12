@@ -770,6 +770,8 @@ class Chat:
             list(candidate_answers.values()), weights=weights)[0]
         answer_str = random.choice(final_answer['messages'])
         answer_keywords = final_answer['keywords']
+        if answer_str.startswith('牛牛'):
+            answer_str = answer_str[2:]
 
         if 0 < answer_str.count('，') <= 3 and '[CQ:' not in answer_str \
                 and random.random() < Chat.SPLIT_PROBABILITY:
