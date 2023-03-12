@@ -57,7 +57,8 @@
     python -m pip install tokenizers rwkv
     ```
 
-4. `src/plugins/chat/model.py` 里的起手咒语 `init_prompt` 有兴趣可以试着改改
+4. `src/plugins/chat/prompt.py` 里的起手咒语 `INIT_PROMPT` 有兴趣可以试着改改
+5. `src/plugins/chat/model.py` 里的 `STRATEGY` 可以按上游仓库的 [说明](https://github.com/BlinkDL/ChatRWKV/tree/main#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B) 改改，能省点显存啥的
 
 ## TTS
 
