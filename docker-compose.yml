@@ -3,7 +3,7 @@ version: "3"
 services:
   pallasbot:
     container_name: pallasbot
-    image: MistEO/pallas-bot-lite
+    image: misteo/pallas-bot
     restart: always
     ports:
       - "8080:8080"

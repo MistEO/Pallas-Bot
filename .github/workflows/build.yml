@@ -28,7 +28,7 @@ jobs:
         id: metadata
         with:
           images: |
-            MistEO/pallas-bot
+            misteo/pallas-bot
           tags: |
             type=raw,value=latest
 
