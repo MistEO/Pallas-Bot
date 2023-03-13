@@ -69,7 +69,7 @@ def chat(session: str, text: str, token_count: int = 50) -> str:
         out, state = pipeline.generate(
             ctx, token_count=token_count, args=args, state=state)
         all_state[session] = deepcopy(state)
-        return out
+        return out.strip()
 
 
 def del_session(session: str):
