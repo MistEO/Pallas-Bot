@@ -13,7 +13,7 @@ from tokenizers import Tokenizer
 
 
 class PIPELINE_ARGS():
-    def __init__(self, temperature=1.0, top_p=0.85, top_k=0, alpha_frequency=0.2, alpha_presence=0.2, token_ban=[], token_stop=[]):
+    def __init__(self, temperature=1.0, top_p=0.85, top_k=0, alpha_frequency=0.2, alpha_presence=0.2, token_ban=[], token_stop=[], ends='\n\n'):
         self.temperature = temperature
         self.top_p = top_p
         self.top_k = top_k
@@ -22,6 +22,7 @@ class PIPELINE_ARGS():
         self.alpha_presence = alpha_presence  # Presence Penalty (as in GPT-3)
         self.token_ban = token_ban  # ban the generation of some tokens
         self.token_stop = token_stop  # stop generation whenever you see any token here
+        self.ends = ends
 
 
 class PIPELINE():
@@ -110,4 +111,6 @@ class PIPELINE():
                     callback(tmp)
                 out_str += tmp
                 out_last = i + 1
+            if out_str.endswith(args.ends):
+                break
         return out_str, state

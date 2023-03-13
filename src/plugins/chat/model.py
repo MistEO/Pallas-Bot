@@ -1,6 +1,7 @@
 from pathlib import Path
 from threading import Lock
 from copy import deepcopy
+from collections import defaultdict
 import os
 import torch
 
@@ -8,6 +9,7 @@ cuda = torch.cuda.is_available()
 os.environ['RWKV_JIT_ON'] = '1'
 # 这个要配个 ninja 啥的环境，能大幅提高推理速度，有需要可以自己弄下（仅支持 cuda 显卡）
 os.environ["RWKV_CUDA_ON"] = '0'
+
 
 from rwkv.model import RWKV  # pip install rwkv
 from .pipeline import PIPELINE, PIPELINE_ARGS
@@ -41,28 +43,28 @@ if not TOKEN_PATH.exists():
         f'牛牛的 AI Chat 版本更新了，把 token 文件放到 {TOKEN_PATH} 里再启动, 下载地址：https://github.com/BlinkDL/ChatRWKV/blob/main/20B_tokenizer.json')
     raise Exception('Chat token not found')
 
-torch.cuda.empty_cache()
 model = RWKV(model=str(MODEL_PATH), strategy=STRATEGY)
 pipeline = PIPELINE(model, str(TOKEN_PATH))
-args = PIPELINE_ARGS(temperature=1.0, top_p=0.7,
-                     alpha_frequency=0.25,
-                     alpha_presence=0.25,
-                     token_ban=[0],  # ban the generation of some tokens
-                     token_stop=[187])  # stop generation whenever you see any token here
+args = PIPELINE_ARGS(
+    temperature=1.0,
+    top_p=0.7,
+    alpha_frequency=0.25,
+    alpha_presence=0.25,
+    token_ban=[0],  # ban the generation of some tokens
+    token_stop=[],  # stop generation whenever you see any token here
+    ends='\n\n')
 
 
-CHAT_INIT = "CHAT_INIT"
-all_state = {}
-all_state[CHAT_INIT] = deepcopy(pipeline.generate(
+INIT_STATE = deepcopy(pipeline.generate(
     INIT_PROMPT, token_count=200, args=args)[1])
+all_state = defaultdict(lambda: deepcopy(INIT_STATE))
 
 chat_locker = Lock()
 
 
 def chat(session: str, text: str, token_count: int = 50) -> str:
     with chat_locker:
-        state = deepcopy(
-            all_state[session if session in all_state else CHAT_INIT])
+        state = all_state[session]
         ctx = CHAT_FORMAT.format(text)
         out, state = pipeline.generate(
             ctx, token_count=token_count, args=args, state=state)
