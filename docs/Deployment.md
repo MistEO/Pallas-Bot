@@ -145,7 +145,7 @@ git pull origin master --autostash
     docker-compose up -d
     ```
 
-    可以通过 `docker-compose logs -f` 查看实时日志，启动完成后就可以[访问后台并登陆账号](#访问后台并登陆账号)了。
+    可以通过 `docker-compose logs -f` 查看实时日志，启动完成后就可以[访问后台并登陆账号](#访问后台并登陆账号)了。日志中报错未成功加载 `chat` 和 `sing` 插件是正常的，因为目前的镜像未安装相关依赖。
 
 5. 后续更新
 
