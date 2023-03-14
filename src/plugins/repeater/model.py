@@ -4,10 +4,11 @@ from dataclasses import dataclass
 from collections import defaultdict, deque
 
 try:
-    import jieba_fast.analyse
+    import jieba_fast.analyse as jieba_analyse
+    print("Using jieba_fast for repeater")
 except ImportError:
-    import jieba.analyse
-    jieba_fast = jieba.analyse
+    import jieba.analyse as jieba_analyse
+    print("Using jieba for repeater")
 import threading
 import pypinyin
 import pymongo
@@ -76,7 +77,7 @@ class ChatData:
         if not self.is_plain_text and len(self.plain_text) == 0:
             return []
 
-        return jieba_fast.analyse.extract_tags(
+        return jieba_analyse.extract_tags(
             self.plain_text, topK=ChatData._keywords_size)
 
     @cached_property
