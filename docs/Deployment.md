@@ -6,6 +6,7 @@
 
 - 你需要一个额外的 QQ 小号，一台自己的 `电脑` 或 `服务器`，不推荐用大号进行部署
 - 你自己部署的牛牛与其他牛牛数据并不互通，是一张白纸，需要从头调教
+- 牛牛的基础功能（不包含 AI 功能）支持使用 Docker Compose 一键部署，可以参考 [Docker 部署](#docker-部署)
 
 ## 基本环境配置
 
@@ -104,6 +105,56 @@ nb run        # 运行
 ```bash
 git pull origin master --autostash
 ```
+
+## Docker 部署
+
+如果你不想自己配置环境，且只想使用牛牛的基础功能，可以使用 Docker Compose 一键部署已构建好的镜像：
+
+1. 安装 Docker 与 Docker Compose
+
+    - [Windows Docker Desktop 安装](https://docs.docker.com/desktop/install/windows-install/) ，推荐使用基于 [WSL 2](https://learn.microsoft.com/zh-cn/windows/wsl/install) 的 Docker CE
+    - [Linux Docker 安装](https://docs.docker.com/engine/install/ubuntu/)，推荐使用 `curl -sSL https://get.daocloud.io/docker | sh` 命令一键安装
+    - 安装 [Docker Compose 插件](https://docs.docker.com/compose/install/linux/)，如果你之前已经安装过 Docker，推荐 [单独安装 Docker Compose](https://docs.docker.com/compose/install/other/)。Windows 用户可以直接在 Docker Desktop 中启用 Docker Compose（Settings -> General -> Use Docker Compose V2）。
+
+    不要忘了[配置镜像加速](https://www.runoob.com/docker/docker-mirror-acceleration.html)
+
+2. 复制一份 [docker-compose.yml](../docker-compose.yml) 文件到本地单独的目录并按需修改 `volumes` 的路径
+
+    ```yml
+    ...
+    volumes:
+    # 根据需求修改冒号左边路径
+    # Windows用户请修改左边为 D:\Pallas-Bot 这样的路径
+        - /opt/dockerstore/pallas-bot/resource/:/app/resource
+        - /opt/dockerstore/pallas-bot/accounts/:/app/accounts
+    ...
+    volumes:
+    # 同上
+      - /opt/dockerstore/mongo/data:/data/db
+      - /opt/dockerstore/mongo/logs:/var/log/mongodb
+    ...
+    ```
+
+3. 在 docker-compose.yml 所在目录下创建 [.env.prod](../.env.prod) 文件
+
+4. 启动牛牛并在后台运行
+    插件形式安装的 Docker Compose 请使用 `docker compose` 代替 `docker-compose`
+
+    ```bash
+    # Windows 管理员/Linux root 用户在 docker-compose.yml 所在目录下执行
+    docker-compose up -d
+    ```
+
+    可以通过 `docker-compose logs -f` 查看实时日志，启动完成后就可以[访问后台并登陆账号](#访问后台并登陆账号)了。日志中报错未成功加载 `chat` 和 `sing` 插件是正常的，因为目前的镜像未安装相关依赖。
+
+5. 后续更新
+
+    ```bash
+    # Windows 管理员/Linux root 用户在 docker-compose.yml 所在目录下执行
+    docker-compose down     # 停止容器
+    docker-compose pull     # 拉取最新镜像
+    docker-compose up -d    # 重新启动容器
+    ```
 
 ## AI 功能
 
