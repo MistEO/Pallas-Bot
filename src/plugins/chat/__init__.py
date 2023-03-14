@@ -63,8 +63,8 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 
     if TTS_AVAIABLE and len(ans) >= TTS_MIN_LENGTH:
         bs = await asyncify(text_2_speech)(ans)
-        msg = MessageSegment.record(bs)
-    else:
-        msg = ans
+        voice = MessageSegment.record(bs)
+        await drunk_msg.send(voice)
+
     config.reset_cooldown(cd_key)
-    await drunk_msg.finish(msg)
+    await drunk_msg.finish(ans)
