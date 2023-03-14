@@ -16,7 +16,7 @@ services:
       MAX_WORKERS: 1
       WAIT_HOSTS: mongodb:27017
     networks:
-      - pallas-bot
+      - pallasbot
     volumes:
       - /opt/dockerstore/pallas-bot/resource/:/app/resource
       - /opt/dockerstore/pallas-bot/accounts/:/app/accounts
