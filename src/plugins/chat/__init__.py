@@ -56,8 +56,13 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     session = f'{event.self_id}_{event.group_id}'
     if text.startswith('牛牛'):
         text = text[2:].strip()
+    if '\n' in text:
+        text = text.split('\n')[0]
     if len(text) > 50:
         text = text[:50]
+    if not text:
+        return
+    
     ans = await asyncify(chat)(session, text)
     logger.info(f'session [{session}]: {text} -> {ans}')
 
