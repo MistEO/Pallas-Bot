@@ -13,7 +13,10 @@ from tokenizers import Tokenizer
 
 
 class PIPELINE_ARGS():
-    def __init__(self, temperature=1.0, top_p=0.85, top_k=0, alpha_frequency=0.2, alpha_presence=0.2, token_ban=[], token_stop=[], ends='\n\n'):
+    def __init__(self, temperature=1.0, top_p=0.85, top_k=0,
+                 alpha_frequency=0.2, alpha_presence=0.2, 
+                 token_ban=[], token_stop=[],
+                 ends='\n\n', ends_if_too_long='。'):
         self.temperature = temperature
         self.top_p = top_p
         self.top_k = top_k
@@ -23,6 +26,7 @@ class PIPELINE_ARGS():
         self.token_ban = token_ban  # ban the generation of some tokens
         self.token_stop = token_stop  # stop generation whenever you see any token here
         self.ends = ends
+        self.ends_if_too_long = ends_if_too_long
 
 
 class PIPELINE():
@@ -111,5 +115,7 @@ class PIPELINE():
                 out_str += tmp
                 out_last = i + 1
             if out_str.endswith(args.ends):
+                break
+            if i > token_count / 2 and out_str.endswith(args.ends_if_too_long):
                 break
         return out_str, state, occurrence

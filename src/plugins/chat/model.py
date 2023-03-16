@@ -52,7 +52,8 @@ args = PIPELINE_ARGS(
     alpha_presence=0.25,
     token_ban=[0],  # ban the generation of some tokens
     token_stop=[],  # stop generation whenever you see any token here
-    ends='\n\n')
+    ends='\n\n',
+    ends_if_too_long=("。", "！", "？","\n"))
 
 
 INIT_STATE = deepcopy(pipeline.generate(
