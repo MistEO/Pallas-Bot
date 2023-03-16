@@ -77,11 +77,10 @@ class PIPELINE():
             out = torch.multinomial(probs, num_samples=1)[0]
             return int(out)
 
-    def generate(self, ctx, token_count=100, args=PIPELINE_ARGS(), callback=None, state=None):
+    def generate(self, ctx, token_count=100, args=PIPELINE_ARGS(), callback=None, state=None, occurrence = {}):
         all_tokens = []
         out_last = 0
         out_str = ''
-        occurrence = {}
         for i in range(token_count):
 
             # forward & adjust prob.
@@ -113,4 +112,4 @@ class PIPELINE():
                 out_last = i + 1
             if out_str.endswith(args.ends):
                 break
-        return out_str, state
+        return out_str, state, occurrence

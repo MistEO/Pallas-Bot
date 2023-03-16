@@ -58,6 +58,7 @@ args = PIPELINE_ARGS(
 INIT_STATE = deepcopy(pipeline.generate(
     INIT_PROMPT, token_count=200, args=args)[1])
 all_state = defaultdict(lambda: deepcopy(INIT_STATE))
+all_occurrence = {}
 
 chat_locker = Lock()
 
@@ -66,15 +67,21 @@ def chat(session: str, text: str, token_count: int = 50) -> str:
     with chat_locker:
         state = all_state[session]
         ctx = CHAT_FORMAT.format(text)
-        out, state = pipeline.generate(
-            ctx, token_count=token_count, args=args, state=state)
+        occurrence = all_occurrence.get(session, {})
+
+        out, state, occurrence = pipeline.generate(
+            ctx, token_count=token_count, args=args, state=state, occurrence=occurrence)
+
         all_state[session] = deepcopy(state)
+        all_occurrence[session] = occurrence
         return out.strip()
 
 
 def del_session(session: str):
     if session in all_state:
         del all_state[session]
+    if session in all_occurrence:
+        del all_occurrence[session]
 
 
 if __name__ == "__main__":
