@@ -2,10 +2,11 @@ from pathlib import Path
 from threading import Lock
 from asyncer import asyncify
 import random
+import time
 import os
 
 from pydantic import BaseModel, Extra
-from nonebot import get_driver, on_message, logger
+from nonebot import get_driver, on_message, require, logger
 from nonebot.typing import T_State
 from nonebot.rule import Rule
 from nonebot.adapters import Bot, Event
@@ -38,6 +39,9 @@ class Config(BaseModel, extra=Extra.ignore):
     }
 
     sing_cuda_device: str = ''
+
+    song_cache_size: int = 100
+    song_cache_days: int = 30
 
 
 plugin_config = Config.parse_obj(get_driver().config)
@@ -289,3 +293,49 @@ async def _(bot: Bot, event: Event, state: T_State):
         return
 
     await song_title_cmd.finish(f'{song_title}')
+
+
+cleanup_sched = require('nonebot_plugin_apscheduler').scheduler
+
+
+@cleanup_sched.scheduled_job('cron', hour=4, minute=15)
+def cleanup_cache():
+    logger.info('cleaning up cache...')
+
+    cache_size = plugin_config.song_cache_size
+    cache_days = plugin_config.song_cache_days
+    current_time = time.time()
+    song_atime = {}
+
+    for root, dirs, files in os.walk(SONG_PATH):
+        for file in files:
+            file_path = os.path.join(root, file)
+            try:
+                last_access_time = os.path.getatime(file_path)
+            except OSError:
+                continue
+            song_atime[file_path] = last_access_time
+    # 只保留最近最多 cache_size 首歌
+    recent_songs = sorted(song_atime, key=song_atime.get, reverse=True)[
+        :cache_size]
+
+    prefix_path = 'resource/sing/'
+    cache_dirs = [os.path.join(prefix_path, suffix) for suffix in [
+        'hdemucs_mmi/', 'mix/', 'ncm/', 'slices/', 'splices/', 'svc/']]
+    removed_files = 0
+
+    for dir_path in cache_dirs:
+        for root, dirs, files in os.walk(dir_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                if file_path not in recent_songs:
+                    try:
+                        last_access_time = os.path.getatime(file_path)
+                    except OSError:
+                        continue
+                    # 清理超过 cache_days 天未访问的文件
+                    if (current_time - last_access_time) > (24*60*60) * cache_days:
+                        os.remove(file_path)
+                        removed_files += 1
+
+    logger.info(f'cleaned up {removed_files} files.')
