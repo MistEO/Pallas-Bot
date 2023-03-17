@@ -324,14 +324,15 @@ def cleanup_cache():
 
     for dir_path in cache_dirs:
         for file_path in dir_path.glob(f"**\*.*"):
-            if file_path not in recent_songs:
-                try:
-                    last_access_time = os.path.getatime(file_path)
-                except OSError:
-                    continue
-                # 清理超过 cache_days 天未访问的文件
-                if (current_time - last_access_time) > (24*60*60) * cache_days:
-                    os.remove(file_path)
-                    removed_files += 1
+            if file_path in recent_songs:
+                continue
+            try:
+                last_access_time = os.path.getatime(file_path)
+            except OSError:
+                continue
+            # 清理超过 cache_days 天未访问的文件
+            if (current_time - last_access_time) > (24*60*60) * cache_days:
+                os.remove(file_path)
+                removed_files += 1
 
     logger.info(f'cleaned up {removed_files} files.')
