@@ -307,35 +307,31 @@ def cleanup_cache():
     current_time = time.time()
     song_atime = {}
 
-    for root, dirs, files in os.walk(SONG_PATH):
-        for file in files:
-            file_path = os.path.join(root, file)
-            try:
-                last_access_time = os.path.getatime(file_path)
-            except OSError:
-                continue
-            song_atime[file_path] = last_access_time
+    for file_path in Path(SONG_PATH).glob(f"**\*.*"):
+        try:
+            last_access_time = os.path.getatime(file_path)
+        except OSError:
+            continue
+        song_atime[file_path] = last_access_time
     # 只保留最近最多 cache_size 首歌
     recent_songs = sorted(song_atime, key=song_atime.get, reverse=True)[
         :cache_size]
 
-    prefix_path = 'resource/sing/'
-    cache_dirs = [os.path.join(prefix_path, suffix) for suffix in [
-        'hdemucs_mmi/', 'mix/', 'ncm/', 'slices/', 'splices/', 'svc/']]
+    prefix_path = 'resource/sing'
+    cache_dirs = [Path(prefix_path, suffix) for suffix in [
+        'hdemucs_mmi', 'mix', 'ncm', 'slices', 'splices', 'svc']]
     removed_files = 0
 
     for dir_path in cache_dirs:
-        for root, dirs, files in os.walk(dir_path):
-            for file in files:
-                file_path = os.path.join(root, file)
-                if file_path not in recent_songs:
-                    try:
-                        last_access_time = os.path.getatime(file_path)
-                    except OSError:
-                        continue
-                    # 清理超过 cache_days 天未访问的文件
-                    if (current_time - last_access_time) > (24*60*60) * cache_days:
-                        os.remove(file_path)
-                        removed_files += 1
+        for file_path in dir_path.glob(f"**\*.*"):
+            if file_path not in recent_songs:
+                try:
+                    last_access_time = os.path.getatime(file_path)
+                except OSError:
+                    continue
+                # 清理超过 cache_days 天未访问的文件
+                if (current_time - last_access_time) > (24*60*60) * cache_days:
+                    os.remove(file_path)
+                    removed_files += 1
 
     logger.info(f'cleaned up {removed_files} files.')
