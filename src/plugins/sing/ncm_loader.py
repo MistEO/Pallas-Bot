@@ -67,13 +67,7 @@ def get_song_id(song_name: str):
     if not song_name:
         return None
 
-    url = 'http://music.163.com/api/search/get/'
-    params = {'s': song_name, 'type': 1, 'limit': 1}
-    r = requests.get(url, params=params)
-    r_json = r.json()
-    if r_json['code'] != 200:
+    res = ncm.cloudsearch.GetSearchResult(song_name, 1, 1)
+    if res["result"]["songCount"] == 0:
         return None
-    if not r_json['result']['songs']:
-        return None
-    song_id = r_json['result']['songs'][0]['id']
-    return song_id
+    return res["result"]["songs"][0]["id"]
