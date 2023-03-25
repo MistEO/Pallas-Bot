@@ -47,7 +47,7 @@ backup_session() {
     done
     
     mkdir -p $output/accounts/binary
-    cp $working_path/accounts/binary/accounts.pkl $output/accounts/binary/accounts.pkl
+    cp $working_path/accounts/binary/accounts.* $output/accounts/binary/
 
     echo "Backup session.token and device.json to $output/accounts"
 }
