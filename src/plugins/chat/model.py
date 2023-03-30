@@ -79,10 +79,11 @@ def chat(session: str, text: str, token_count: int = 50) -> str:
 
 
 def del_session(session: str):
-    if session in all_state:
-        del all_state[session]
-    if session in all_occurrence:
-        del all_occurrence[session]
+    with chat_locker:
+        if session in all_state:
+            del all_state[session]
+        if session in all_occurrence:
+            del all_occurrence[session]
 
 
 if __name__ == "__main__":
