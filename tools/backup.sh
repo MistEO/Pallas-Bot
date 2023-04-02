@@ -19,9 +19,11 @@ if [ $# -eq 0 ]; then
 fi
 
 output=$working_path"/backups/"`date "+%Y_%m_%d_%H_%M_%S"`
+output_latest=$working_path"/backups/latest"
 
 backup_full_mongodb() {
     mongodump -o $output/mongodb
+    ln -s $output/mongodb $output_latest/full_mongodb
     echo "Backup full mongodb data to $output/mongodb"
 }
 
@@ -35,6 +37,8 @@ backup_important_data_in_mongodb() {
     mongodump -d gocq-database -c image-cache -o $output/mongodb
     mongodump -d gocq-database -c video-cache -o $output/mongodb
 
+    ln -s $output/mongodb $output_latest/important_data_in_mongodb
+
     echo "Backup important data in mongodb to $output/mongodb"
 }
 
@@ -44,10 +48,17 @@ backup_session() {
         target=$output/accounts/$account
         mkdir -p $target
         cp $path $target
+        
+        target_latest=$output_latest/accounts/$account
+        mkdir -p $target_latest
+        cp $path $target_latest
     done
     
     mkdir -p $output/accounts/binary
     cp $working_path/accounts/binary/accounts.* $output/accounts/binary/
+
+    mkdir -p $output_latest/accounts/binary
+    cp $working_path/accounts/binary/accounts.* $output_latest/accounts/binary/
 
     echo "Backup session.token and device.json to $output/accounts"
 }
