@@ -1,4 +1,5 @@
 import os
+import platform
 from threading import Lock
 from pathlib import Path
 
@@ -22,7 +23,10 @@ def separate(song_path: Path, output_dir: Path, locker: Lock = Lock()):
         # 这个库没提供 APIs，暂时简单粗暴用命令行了
         cmd = ''
         if cuda_devices:
-            cmd = f'CUDA_VISIBLE_DEVICES={cuda_devices} '
+            if platform.system() == 'Windows':
+                cmd = f'set CUDA_VISIBLE_DEVICES={cuda_devices} && '
+            else:
+                cmd = f'CUDA_VISIBLE_DEVICES={cuda_devices} '
         cmd += f'python -m demucs --two-stems=vocals --mp3 --mp3-bitrate 128 -n {MODEL} {str(song_path)} -o {output_dir}'
         with locker:
             print(cmd)

@@ -66,7 +66,10 @@ def inference(song_path: Path, output_dir: Path, key: int = 0, speaker: str = "p
 
         cmd = ''
         if cuda_devices:
-            cmd = f'CUDA_VISIBLE_DEVICES={cuda_devices} '
+            if platform.system() == 'Windows':
+                cmd = f'set CUDA_VISIBLE_DEVICES={cuda_devices} && '
+            else:
+                cmd = f'CUDA_VISIBLE_DEVICES={cuda_devices} '
         cmd += f'python {SVC_MAIN} -m {model} -c {config} -hb {SVC_HUBERT.absolute()} \
             -f {song_path.absolute()} -t {key} -s {speaker} -sd {SVC_SLICE_DB} -sf {SVC_FORCE_SLICE}\
             -o {output_dir.absolute()} -wf {SVC_OUPUT_FORMAT}'
