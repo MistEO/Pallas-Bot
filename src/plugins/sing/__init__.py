@@ -74,6 +74,14 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
     if not has_spk:
         return False
 
+    if "key=" in text:
+        key_pos = text.find("key=")
+        key_val = text[key_pos+4:].strip() # 获取key=后面的值
+        text = text.replace("key="+key_val, "") # 去掉消息中的key信息
+    else:
+        key_val = 0
+    state['key'] = key_val
+
     if text.startswith(SING_CMD):
         song_key = text.replace(SING_CMD, '').strip()
         song_id = song_key if song_key.isdigit() else await asyncify(get_song_id)(song_key)
@@ -115,7 +123,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     speaker = state['speaker']
     song_id = state['song_id']
     chunk_index = state['chunk_index']
-    key = 0
+    key = state['key']
 
     async def failed():
         config.reset_cooldown(SING_COOLDOWN_KEY)
@@ -173,7 +181,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     vocals, no_vocals = separated
 
     # 音色转换（SVC）
-    svc = await asyncify(inference)(vocals, Path('resource/sing/svc'), speaker=speaker, locker=gpu_locker)
+    svc = await asyncify(inference)(vocals, Path('resource/sing/svc'), speaker=speaker, locker=gpu_locker, key=key)
     if not svc:
         logger.error('svc failed', song_id)
         await failed()
