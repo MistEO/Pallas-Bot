@@ -95,10 +95,12 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
     if text in SING_CONTINUE_CMDS and progress:
         song_id = progress['song_id']
         chunk_index = progress['chunk_index']
+        key_val = progress['key']
         if not song_id or chunk_index > 100:
             return False
         state['song_id'] = song_id
         state['chunk_index'] = chunk_index
+        state['key'] = key_val
         return True
 
     return False
@@ -134,6 +136,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         config.update_sing_progress({
             'song_id': song_id,
             'chunk_index': (spec_index if spec_index else chunk_index) + 1,
+            'key': key,
         })
 
         msg: Message = MessageSegment.record(file=song)
