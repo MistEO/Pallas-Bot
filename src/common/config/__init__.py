@@ -55,6 +55,24 @@ class Config(ABC):
             cache = cache[k]
         cache[splited_keys[-1]] = value
 
+    @classmethod
+    def _update_all(cls, key: str, value: Any, db: bool = True) -> None:
+        splited_keys = key.split(KEY_JOINER)
+        for cache_key, cache in cls._document_cache.items():
+            if db:
+                cls._get_config_mongo().update_one(
+                    {cls._key: cache_key}, {'$set': {key: value}})
+
+            if not cache:
+                cls._document_cache[cache_key] = {}
+                cache = cls._document_cache[cache_key]
+
+            for k in splited_keys[:-1]:
+                if k not in cache:
+                    cache[k] = {}
+                cache = cache[k]
+            cache[splited_keys[-1]] = value
+
     def __init__(self, table: str, key: str, key_id: int) -> None:
         self._document_key = key_id
         self._db_filter = {key: key_id}
@@ -168,7 +186,7 @@ class BotConfig(Config):
         '''
         完全醒酒
         '''
-        cls._update('drunk', {})
+        cls._update_all('drunk', {})
 
     def is_sleep(self) -> bool:
         '''
@@ -294,3 +312,11 @@ class UserConfig(Config):
         '''
         banned = self._find('banned')
         return True if banned else False
+
+
+def test():
+    BotConfig(1234567).drink()
+    BotConfig.fully_sober_up()
+
+if __name__ == "__main__":
+    test()
