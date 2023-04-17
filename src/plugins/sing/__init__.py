@@ -176,7 +176,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     chunk = slices_list[chunk_index]
 
     # 人声分离
-    separated = await asyncify(separate)(chunk, Path('resource/sing'), locker=gpu_locker)
+    separated = await asyncify(separate)(chunk, Path('resource/sing'), locker=gpu_locker, key=key)
     if not separated:
         logger.error('separate failed', song_id)
         await failed()
