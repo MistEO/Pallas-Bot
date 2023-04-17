@@ -18,14 +18,12 @@ except Exception as error:
 TTS_MIN_LENGTH = 10
 
 
+@BotConfig.handle_sober_up
 def on_sober_up(bot_id, group_id, drunkenness) -> bool:
     session = f'{bot_id}_{group_id}'
     logger.info(
         f'bot [{bot_id}] sober up in group [{group_id}], clear session [{session}]')
     del_session(session)
-
-
-BotConfig.register_sober_up(on_sober_up)
 
 
 def is_drunk(bot: Bot, event: Event, state: T_State) -> bool:

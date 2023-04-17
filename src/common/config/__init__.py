@@ -55,6 +55,24 @@ class Config(ABC):
             cache = cache[k]
         cache[splited_keys[-1]] = value
 
+    @classmethod
+    def _update_all(cls, key: str, value: Any, db: bool = True) -> None:
+        splited_keys = key.split(KEY_JOINER)
+        for cache_key, cache in cls._document_cache.items():
+            if db:
+                cls._get_config_mongo().update_one(
+                    {cls._key: cache_key}, {'$set': {key: value}})
+
+            if not cache:
+                cls._document_cache[cache_key] = {}
+                cache = cls._document_cache[cache_key]
+
+            for k in splited_keys[:-1]:
+                if k not in cache:
+                    cache[k] = {}
+                cache = cache[k]
+            cache[splited_keys[-1]] = value
+
     def __init__(self, table: str, key: str, key_id: int) -> None:
         self._document_key = key_id
         self._db_filter = {key: key_id}
@@ -118,22 +136,24 @@ class BotConfig(Config):
         self._update(
             f'cooldown{KEY_JOINER}{action_type}{KEY_JOINER}{self.group_id}', 0, db=False)
 
-    on_drink_funcs = []
-    on_sober_up_funcs = []
+    _drink_handlers = []
+    _sober_up_handlers = []
 
     @classmethod
-    def register_drink(cls, func) -> None:
+    def handle_drink(cls, func):
         '''
         注册喝酒回调函数
         '''
-        cls.on_drink_funcs.append(func)
+        cls._drink_handlers.append(func)
+        return func
 
     @classmethod
-    def register_sober_up(cls, func) -> None:
+    def handle_sober_up(cls, func):
         '''
         注册醒酒回调函数
         '''
-        cls.on_sober_up_funcs.append(func)
+        cls._sober_up_handlers.append(func)
+        return func
 
     def drink(self) -> None:
         '''
@@ -141,7 +161,7 @@ class BotConfig(Config):
         '''
         value = self.drunkenness() + 1
         self._update(f'drunk{KEY_JOINER}{self.group_id}', value, db=False)
-        for on_drink in self.on_drink_funcs:
+        for on_drink in self._drink_handlers:
             on_drink(self.bot_id, self.group_id, value)
 
     def sober_up(self) -> bool:
@@ -152,7 +172,7 @@ class BotConfig(Config):
         self._update(f'drunk{KEY_JOINER}{self.group_id}', value, db=False)
         if value > 0:
             return False
-        for on_sober_up in self.on_sober_up_funcs:
+        for on_sober_up in self._sober_up_handlers:
             on_sober_up(self.bot_id, self.group_id, value)
         return True
 
@@ -168,7 +188,7 @@ class BotConfig(Config):
         '''
         完全醒酒
         '''
-        cls._update('drunk', {})
+        cls._update_all('drunk', {})
 
     def is_sleep(self) -> bool:
         '''
@@ -294,3 +314,17 @@ class UserConfig(Config):
         '''
         banned = self._find('banned')
         return True if banned else False
+
+
+def test():
+    BotConfig(1234567).drink()
+    BotConfig.fully_sober_up()
+
+
+@BotConfig.handle_drink
+def my_callback(bot_id, group_id, value):
+    print(bot_id, group_id, value)
+
+
+if __name__ == "__main__":
+    test()
