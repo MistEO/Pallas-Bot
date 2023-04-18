@@ -1,12 +1,11 @@
 import os
 import platform
+import librosa
+import soundfile as sf
 from threading import Lock
 from pathlib import Path
-from pydub import AudioSegment
 
 cuda_devices = ''
-
-SEMITONE = 2 ** (1/12)
 
 def set_separate_cuda_devices(devices: str):
     global cuda_devices
@@ -41,11 +40,11 @@ def separate(song_path: Path, output_dir: Path, key: int = 0, locker: Lock = Loc
             no_vocals = no_vocals_0key
         else:
             # 加载伴奏音频文件
-            no_vocals_audio = AudioSegment.from_file(no_vocals_0key, format="mp3")
+            y, sr = librosa.load(no_vocals_0key, sr=None)
             # 半音调节
-            no_vocals_audio = no_vocals_audio + int(key) * SEMITONE
+            y_shifted = librosa.effects.pitch_shift(y, sr=sr, n_steps=key)
             # 保存音调调节后的伴奏文件
-            no_vocals_audio.export(no_vocals, format="mp3")
+            sf.write(no_vocals, y_shifted, sr)
 
         if not vocals.exists() or not no_vocals.exists():
             return None
