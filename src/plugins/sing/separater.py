@@ -34,15 +34,18 @@ def separate(song_path: Path, output_dir: Path, key: int = 0, locker: Lock = Loc
             print(cmd)
             os.system(cmd)
 
-        # 加载伴奏音频文件
         no_vocals_0key = output_dir / MODEL / STEM / "no_vocals.mp3"
-        no_vocals_audio = AudioSegment.from_file(no_vocals_0key, format="mp3")
 
-        # 半音调节
-        no_vocals_audio = no_vocals_audio + int(key) * SEMITONE
-
-        # 保存音调调节后的伴奏文件
-        no_vocals_audio.export(no_vocals, format="mp3")
+        if key == 0:
+            # 不调节半音，节省几秒钟
+            no_vocals = no_vocals_0key
+        else:
+            # 加载伴奏音频文件
+            no_vocals_audio = AudioSegment.from_file(no_vocals_0key, format="mp3")
+            # 半音调节
+            no_vocals_audio = no_vocals_audio + int(key) * SEMITONE
+            # 保存音调调节后的伴奏文件
+            no_vocals_audio.export(no_vocals, format="mp3")
 
         if not vocals.exists() or not no_vocals.exists():
             return None
