@@ -78,6 +78,12 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
         key_pos = text.find("key=")
         key_val = text[key_pos+4:].strip() # 获取key=后面的值
         text = text.replace("key="+key_val, "") # 去掉消息中的key信息
+        try:
+            key_int = int(key_val) #判断输入的key是不是整数
+            if key_int < -12 or key_int > 12:
+                return False #限制一下key的大小，一个八度应该够了
+        except ValueError:
+            return False
     else:
         key_val = 0
     state['key'] = key_val
