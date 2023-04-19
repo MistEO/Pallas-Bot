@@ -74,6 +74,20 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
     if not has_spk:
         return False
 
+    if "key=" in text:
+        key_pos = text.find("key=")
+        key_val = text[key_pos+4:].strip() # 获取key=后面的值
+        text = text.replace("key="+key_val, "") # 去掉消息中的key信息
+        try:
+            key_int = int(key_val) #判断输入的key是不是整数
+            if key_int < -12 or key_int > 12:
+                return False #限制一下key的大小，一个八度应该够了
+        except ValueError:
+            return False
+    else:
+        key_val = 0
+    state['key'] = key_val
+
     if text.startswith(SING_CMD):
         song_key = text.replace(SING_CMD, '').strip()
         song_id = song_key if song_key.isdigit() else await asyncify(get_song_id)(song_key)
@@ -87,10 +101,12 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
     if text in SING_CONTINUE_CMDS and progress:
         song_id = progress['song_id']
         chunk_index = progress['chunk_index']
+        key_val = progress['key']
         if not song_id or chunk_index > 100:
             return False
         state['song_id'] = song_id
         state['chunk_index'] = chunk_index
+        state['key'] = key_val
         return True
 
     return False
@@ -115,7 +131,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     speaker = state['speaker']
     song_id = state['song_id']
     chunk_index = state['chunk_index']
-    key = 0
+    key = state['key']
 
     async def failed():
         config.reset_cooldown(SING_COOLDOWN_KEY)
@@ -126,6 +142,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         config.update_sing_progress({
             'song_id': song_id,
             'chunk_index': (spec_index if spec_index else chunk_index) + 1,
+            'key': key,
         })
 
         msg: Message = MessageSegment.record(file=song)
@@ -165,7 +182,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     chunk = slices_list[chunk_index]
 
     # 人声分离
-    separated = await asyncify(separate)(chunk, Path('resource/sing'), locker=gpu_locker)
+    separated = await asyncify(separate)(chunk, Path('resource/sing'), locker=gpu_locker, key=key)
     if not separated:
         logger.error('separate failed', song_id)
         await failed()
@@ -173,7 +190,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     vocals, no_vocals = separated
 
     # 音色转换（SVC）
-    svc = await asyncify(inference)(vocals, Path('resource/sing/svc'), speaker=speaker, locker=gpu_locker)
+    svc = await asyncify(inference)(vocals, Path('resource/sing/svc'), speaker=speaker, locker=gpu_locker, key=key)
     if not svc:
         logger.error('svc failed', song_id)
         await failed()
