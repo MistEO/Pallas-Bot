@@ -1,0 +1,41 @@
+name: Code Quality Checks
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  quality-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Install dependencies
+        run: |
+          pip install pycodestyle
+          pip install pylint
+          pip install mypy
+
+      - name: Run PEP 8 check
+        run: pycodestyle --ignore=E266 src/ $(find src/ -name '*.py')
+
+      - name: Run pylint
+        run: pylint --disable=R,C $(find src/ -name "*.py")
+
+      - name: Run mypy
+        run: mypy $(find src/ -name "*.py")
+
+      - name: Display results
+        run: |
+          if [ $? -eq 0 ]; then
+            echo "Code quality checks passed."
+          else
+            echo "Some code quality checks failed. Please fix before committing."
+            exit 1
+          fi
