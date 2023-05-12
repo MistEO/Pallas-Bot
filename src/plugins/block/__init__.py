@@ -1,71 +1,66 @@
-import asyncio
-import time
 import os
 import threading
-from typing import Union
+import time
+from typing import List, Union
 
-from nonebot import on_message, on_notice
-from nonebot.typing import T_State
-from nonebot.rule import Rule
 from nonebot.adapters import Bot
-from nonebot.adapters.onebot.v11 import GroupMessageEvent, GroupIncreaseNoticeEvent, PokeNotifyEvent
-from nonebot.adapters.onebot.v11 import permission
+from nonebot.adapters.onebot.v11 import GroupIncreaseNoticeEvent, GroupMessageEvent, PokeNotifyEvent, permission
+from nonebot.rule import Rule
+from nonebot.typing import T_State
+from nonebot import on_message, on_notice
+
 from src.common.config import BotConfig
 
-accounts_dir = 'accounts'
-accounts = []
-accounts_refresh_time = 0
-accounts_refresh_lock = threading.Lock()
+
+class AccountManager:
+    def __init__(self, accounts_dir: str) -> None:
+        self.accounts_dir = accounts_dir
+        self.accounts: List[int] = []
+        self.refresh_time = 0
+        self.refresh_lock = threading.Lock()
+
+    def refresh_accounts(self) -> None:
+        if time.time() - self.refresh_time < 60 and self.accounts:
+            return
+
+        if not self.accounts and not os.path.exists(self.accounts_dir):
+            return
+
+        with self.refresh_lock:
+            self.refresh_time = time.time()
+            self.accounts = [
+                int(d) for d in os.listdir(self.accounts_dir) if d.isnumeric()
+            ]
+
+    async def is_other_bot(self, bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
+        self.refresh_accounts()
+        return event.user_id in self.accounts
+
+    async def is_sleep(self, bot: Bot, event: Union[GroupMessageEvent, GroupIncreaseNoticeEvent, PokeNotifyEvent], state: T_State) -> bool:
+        if not event.group_id:
+            return False
+        return BotConfig(event.self_id, event.group_id).is_sleep()
 
 
-def refresh_accounts():
-    global accounts_dir
-    global accounts
-    global accounts_refresh_time
-    global accounts_refresh_lock
-
-    if time.time() - accounts_refresh_time < 60 and accounts:
-        return
-
-    if not accounts and not os.path.exists(accounts_dir):
-        return
-
-    with accounts_refresh_lock:
-        accounts_refresh_time = time.time()
-        accounts = [
-            int(d) for d in os.listdir(accounts_dir) if d.isnumeric()
-        ]
-
-
-async def is_other_bot(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
-    # 不响应其他牛牛的消息
-    global accounts
-
-    refresh_accounts()
-    return event.user_id in accounts
+account_manager = AccountManager('accounts')
 
 other_bot_msg = on_message(
     priority=1,
     block=True,
-    rule=Rule(is_other_bot),
+    rule=Rule(account_manager.is_other_bot),
     permission=permission.GROUP
 )
 
 
-async def is_sleep(bot: Bot, event: Union[GroupMessageEvent, GroupIncreaseNoticeEvent, PokeNotifyEvent], state: T_State) -> bool:
-    if not event.group_id:
-        return False
-    return BotConfig(event.self_id, event.group_id).is_sleep()
-
 any_msg = on_message(
     priority=4,
     block=True,
-    rule=Rule(is_sleep),
+    rule=Rule(account_manager.is_sleep),
     permission=permission.GROUP
 )
 
 any_notice = on_notice(
     priority=4,
     block=True,
-    rule=Rule(is_sleep)
+    rule=Rule(account_manager.is_sleep)
 )
