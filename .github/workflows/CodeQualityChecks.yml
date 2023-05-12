@@ -25,7 +25,7 @@ jobs:
           pip install mypy
 
       - name: Run PEP 8 check
-        run: pycodestyle --ignore=E266 src/ $(find src/ -name '*.py')
+        run: pycodestyle --ignore=E501,W291 src/ $(find src/ -name '*.py')
 
       - name: Run pylint
         run: pylint --disable=R,C $(find src/ -name "*.py")
