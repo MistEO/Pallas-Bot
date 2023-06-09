@@ -18,7 +18,7 @@ def separate(song_path: Path, output_dir: Path, key: int = 0, locker: Lock = Loc
 
     vocals = output_dir / MODEL / STEM / "vocals.mp3"
     no_vocals_0key = output_dir / MODEL / STEM / "no_vocals.mp3"
-    no_vocals = output_dir / MODEL / STEM / f'no_vocals_{key}key.mp3'
+    no_vocals = output_dir / MODEL / STEM / f'no_vocals_{key}key.wav'
     vocals_with_stem = vocals.parent / f'{STEM}.mp3'
 
     if (not vocals_with_stem.exists() and not vocals_with_stem.exists()) or not no_vocals_0key.exists():
