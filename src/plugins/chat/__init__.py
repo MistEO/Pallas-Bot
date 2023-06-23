@@ -45,7 +45,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     if not text.startswith('牛牛') and not event.is_tome():
         return
 
-    config = BotConfig(event.self_id, event.group_id, cooldown=10)
+    config = GroupConfig(event.group_id, cooldown=10)
     cd_key = f'chat'
     if not config.is_cooldown(cd_key):
         return
