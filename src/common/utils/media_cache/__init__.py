@@ -13,7 +13,7 @@ image_cache.create_index(name='cq_code_index',
 
 
 async def insert_image(image_seg):
-    cq_code = re.sub(r"\.image,.+?\]", "]", str(image_seg))
+    cq_code = re.sub(r"\.image,.+?\]", ".image]", str(image_seg))
 
     cache = image_cache.find_one({'cq_code': cq_code})
     if cache:

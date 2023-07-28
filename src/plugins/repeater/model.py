@@ -170,7 +170,7 @@ class Chat:
                 # 删除图片子类型字段，同一张图子类型经常不一样，影响判断
                 raw_message=re.sub(
                     r"\.image,.+?\]",
-                    "]",
+                    ".image]",
                     data.raw_message),
                 plain_text=data.get_plaintext(),
                 time=data.time,
@@ -185,7 +185,7 @@ class Chat:
                 # 删除图片子类型字段，同一张图子类型经常不一样，影响判断
                 raw_message=re.sub(
                     r"\.image,.+?\]",
-                    "]",
+                    ".image]",
                     data.raw_message),
                 plain_text=data.get_plaintext(),
                 time=data.time,
