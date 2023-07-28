@@ -28,7 +28,8 @@ except Exception as error:
     print('TTS not available, error:', error)
     TTS_AVAIABLE = False
 
-mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
+mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0,
+        unicode_decode_error_handler='ignore')
 
 mongo_db = mongo_client['PallasBot']
 
