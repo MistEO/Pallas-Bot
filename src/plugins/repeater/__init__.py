@@ -2,7 +2,6 @@ import random
 import asyncio
 import re
 import time
-import os
 import threading
 
 from nonebot import on_message, require, get_bot, logger, get_driver
@@ -15,6 +14,7 @@ from nonebot.adapters.onebot.v11 import permission, Message, MessageSegment
 from nonebot.permission import Permission
 from nonebot.permission import SUPERUSER
 from src.common.config import BotConfig
+from src.common.utils.media_cache import insert_image, get_image
 
 from .model import Chat
 
@@ -41,7 +41,7 @@ message_id_lock = threading.Lock()
 message_id_dict = {}
 
 
-async def replace_at(message: Message, self_id: int, group_id: int) -> Message:
+async def post_proc(message: Message, self_id: int, group_id: int) -> Message:
     new_msg = Message()
     for seg in message:
         if seg.type == 'at':
@@ -54,6 +54,13 @@ async def replace_at(message: Message, self_id: int, group_id: int) -> Message:
                 continue
             nick_name = info['card'] if info['card'] else info['nickname']
             new_msg += '@{}'.format(nick_name)
+        elif seg.type == 'image':
+            cq_code = str(seg)
+            base64_data = get_image(cq_code)
+            if base64_data:
+                new_msg += MessageSegment.image(file=base64_data)
+            else:
+                new_msg += seg
         else:
             new_msg += seg
 
@@ -86,6 +93,10 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         answers = chat.answer()
 
     if to_learn:
+        for seg in event.message:
+            if seg.type == "image":
+                await insert_image(seg)
+                
         chat.learn()
 
     if not answers:
@@ -94,7 +105,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     config.refresh_cooldown('repeat')
     delay = random.randint(2, 5)
     for item in answers:
-        msg = await replace_at(item, event.self_id, event.group_id)
+        msg = await post_proc(item, event.self_id, event.group_id)
         logger.info(
             'bot [{}] ready to send [{}] to group [{}]'.format(event.self_id, str(msg)[:30], event.group_id))
 
