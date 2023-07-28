@@ -12,14 +12,14 @@ context_mongo = mongo_db['context']
 
 query = {
           "answers.keywords": {
-            "$regex": "\\[CQ\\:image.*is_origin="
+            "$regex": "\\[CQ\\:image.*url="
         }}
 all_old_answers = context_mongo.find(query)
 index = 0
 for old_answers in all_old_answers:
     new_answers = []
     for answer in old_answers['answers']:
-        if "is_origin=" in answer['keywords']:
+        if "url=" in answer['keywords'] or "is_origin=" in answer['keywords']:
             continue
         new_answers.append(answer)
     context_mongo.update_one({"_id": old_answers['_id']}, {"$set": {"answers": new_answers}})

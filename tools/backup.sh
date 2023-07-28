@@ -23,6 +23,7 @@ output_latest=$working_path"/backups/latest"
 
 backup_full_mongodb() {
     mongodump -o $output/mongodb
+    rm $output_latest/full_mongodb
     ln -s $output/mongodb $output_latest/full_mongodb
     echo "Backup full mongodb data to $output/mongodb"
 }
@@ -35,6 +36,7 @@ backup_important_data_in_mongodb() {
     mongodump -d PallasBot -c context -o $output/mongodb
     mongodump -d PallasBot -c image_cache -o $output/mongodb
 
+    rm $output_latest/important_data_in_mongodb
     ln -s $output/mongodb $output_latest/important_data_in_mongodb
 
     echo "Backup important data in mongodb to $output/mongodb"
