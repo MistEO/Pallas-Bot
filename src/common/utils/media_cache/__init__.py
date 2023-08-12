@@ -33,6 +33,8 @@ async def insert_image(image_seg):
         else:
             ref_times = 1
     
+    ref_times += 1
+
     # 不是经常收到的图不缓存，不然会占用大量空间
     if ref_times > 2 and 'base64_data' not in cache:
         url = image_seg.data["url"]
