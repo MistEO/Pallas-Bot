@@ -1,7 +1,7 @@
 import pymongo
 import time
 
-mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0,
+mongo_client = pymongo.MongoClient('127.0.0.1', 27017,
         unicode_decode_error_handler='ignore')
 
 mongo_db = mongo_client['PallasBot']

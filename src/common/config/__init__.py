@@ -15,7 +15,7 @@ class Config(ABC):
     @classmethod
     def _get_config_mongo(cls) -> Collection:
         if cls._config_mongo is None:
-            mongo_client = pymongo.MongoClient('127.0.0.1', 27017, w=0)
+            mongo_client = pymongo.MongoClient('127.0.0.1', 27017)
             mongo_db = mongo_client['PallasBot']
             cls._config_mongo = mongo_db[cls._table]
             cls._config_mongo.create_index(name='{}_index'.format(cls._key),
