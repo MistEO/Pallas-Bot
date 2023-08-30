@@ -20,7 +20,7 @@ AI 功能均对设备硬件要求较高，且配置操作更加复杂一些。�
 
 2. 更新 git 子模块
 
-    ```
+    ```bash
     git submodule update --init --recursive
     ```
 
@@ -37,7 +37,7 @@ AI 功能均对设备硬件要求较高，且配置操作更加复杂一些。�
 
     - GPU  
 
-        需要 5G 或更高**显存**，否则跑不起来，P106-100 (差不多 GTX1060 的性能）合成 60 秒音频大概需要 30 秒
+        需要 5G 或更高**显存**，否则跑不起来，P106-100 （差不多 GTX1060 的性能）合成 60 秒音频大概需要 30 秒
 
         ```bash
         python -m pip install -r src/plugins/sing/requirements.txt
@@ -59,14 +59,15 @@ AI 功能均对设备硬件要求较高，且配置操作更加复杂一些。�
     ```
 
     - GPU
-    
+
     ```bash
     python -m pip install torch --extra-index-url https://download.pytorch.org/whl/cu117
     python -m pip install tokenizers rwkv
     ```
 
-4. `src/plugins/chat/prompt.py` 里的起手咒语 `INIT_PROMPT` 有兴趣可以试着改改
-5. `src/plugins/chat/model.py` 里的 `STRATEGY` 可以按上游仓库的 [说明](https://github.com/BlinkDL/ChatRWKV/tree/main#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B) 改改，能省点显存啥的
+3. `src/plugins/chat/prompt.py` 里的起手咒语 `INIT_PROMPT` 有兴趣可以试着改改
+
+4. `src/plugins/chat/model.py` 里的 `STRATEGY` 可以按上游仓库的 [说明](https://github.com/BlinkDL/ChatRWKV/tree/main#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B) 改改，能省点显存啥的
 
 ## 酒后语音说话（TTS）
 
@@ -75,11 +76,12 @@ AI 功能均对设备硬件要求较高，且配置操作更加复杂一些。�
 1. 下载 [模型资源](https://huggingface.co/MistEO/Pallas-Bot/tree/main/paddlespeech/tts) common.zip 和 pallas_cn.zip。解压放入 `resource/tts/models` 文件夹中
     - 具体路径结构请参考 [path_structure.txt](../resource/tts/models/path_structure.txt)
     - `vocoder` 下有两个声码器，`pwgan_aishell3` 快，`wavernn_csmsc` 慢很多效果好一点，可以自行选择
+
 2. 安装依赖
 
     - CPU 版本（合成耗时 20s 左右）
 
-        ```
+        ```bash
         python3 -m pip install paddlepaddle-gpu==2.4.2.post117 paddlespeech==1.3.0 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
         ```
 

@@ -33,3 +33,21 @@ RUN pip install --no-cache-dir --upgrade -r requirements.txt
 RUN rm requirements.txt
 
 COPY ./ /app/
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y portaudio19-dev python3-all-dev
+
+RUN git submodule update --init --recursive
+
+RUN pip install --no-cache-dir --upgrade -r src/plugins/sing/requirements.txt
+
+RUN pip install --no-cache-dir torch==1.11.0 torchvision==0.12.0 torchaudio==0.11.0
+
+RUN pip install tokenizers rwkv
+
+RUN pip install --no-cache-dir paddlepaddle==2.4.2 paddlespeech==1.3.0
+
+RUN pip install --no-cache-dir numpy==1.23.5 typeguard==2.13.3
+
+COPY ./ /app/

@@ -20,6 +20,7 @@ services:
     volumes:
       - /opt/dockerstore/pallas-bot/resource/:/app/resource
       - /opt/dockerstore/pallas-bot/accounts/:/app/accounts
+      - /opt/dockerstore/pallas-bot/.env.prod:/app/.env.prod
     depends_on:
       - mongodb
 
@@ -37,6 +38,15 @@ services:
     volumes:
       - /opt/dockerstore/mongo/data:/data/db
       - /opt/dockerstore/mongo/logs:/var/log/mongodb
+
+  qsign:
+    container_name: qsign
+    image: xzhouqd/qsign:8.9.63
+    environment:
+      - PORT=8080
+      - COUNT=3
+      - ANDROID_ID=114514
+    restart: always
 
 networks:
   pallasbot:
