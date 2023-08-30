@@ -30,10 +30,29 @@ jobs:
           tags: |
             type=raw,value=latest
 
-      - name: Build and Publish
+      - name: Build and Publish Base
         uses: docker/build-push-action@v4
         with:
           context: .
+          file: Dockerfile
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
+      
+      - name: Generate AI Tags
+        uses: docker/metadata-action@v4
+        id: aimetadata
+        with:
+          images: |
+            misteo/pallas-bot
+          tags: |
+            type=raw,value=latest-ai
+
+      - name: Build and Publish AI
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: AI.Dockerfile
+          push: true
+          tags: ${{ steps.aimetadata.outputs.tags }}
+          labels: ${{ steps.aimetadata.outputs.labels }}
