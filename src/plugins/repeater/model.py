@@ -738,7 +738,7 @@ class Chat:
                 continue
             if '\n' in sample_msg:
                 continue
-            if sample_msg in recent_message:  # 别人刚发的就重复，显得很笨
+            if count < 3 and sample_msg in recent_message:  # 别人刚发的就重复，显得很笨
                 continue
 
             if answer['group_id'] == group_id:
