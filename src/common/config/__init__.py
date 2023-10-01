@@ -2,20 +2,72 @@ import pymongo
 import time
 from pymongo.collection import Collection
 from abc import ABC
-from typing import Any, Optional
+from typing import Any, Optional, List
 from pydantic import BaseModel, Extra
 from nonebot import get_driver
 
 KEY_JOINER = '.'
 
 
-class EnvConfig(BaseModel, extra=Extra.ignore):
-    mongo_host: str = '127.0.0.1'
-    mongo_port: int = 27017
+class PluginConfig(BaseModel, extra=Extra.ignore):
+    # 默认轮盘模式
     default_roulette_mode: int = 0
+    # mongodb host
+    mongo_host: str = '127.0.0.1'
+    # mongodb port
+    mongo_port: int = 27017
+    # answer 相关阈值，值越大，牛牛废话越少；越小，牛牛废话越多
+    answer_threshold: int = 3
+    # answer 阈值权重
+    answer_threshold_weights: List[int] = [7, 23, 70]
+    # 上下文联想，记录多少个关键词（每个群）
+    topics_size: int = 16
+    # 上下文命中后，额外的权重系数
+    topics_importance: int = 10000
+    # N 个群有相同的回复，就跨群作为全局回复
+    cross_group_threshold: int = 2
+    # 复读的阈值，群里连续多少次有相同的发言，就复读
+    repeat_threshold: int = 3
+    # 主动发言的阈值，越小废话越多
+    speak_threshold: int = 5
+    # 说过的话，接下来多少次不再说
+    duplicate_reply: int = 10
+    # 按逗号分割回复语的概率
+    split_probability: float = 0.5
+    # 喝醉之后，超过多长的文本全部转换成语音发送
+    drunk_tts_threshold: int = 6
+    # 连续主动说话的概率
+    speak_continuously_probability: float = 0.5
+    # 主动说话加上随机戳一戳群友的概率
+    speak_poke_probability: float = 0.6
+    # 连续主动说话最多几句话
+    speak_continuously_max_len: int = 2
+    # 每隔多久进行一次持久化 ( 秒 )
+    save_time_threshold: int = 3600
+    # 单个群超过多少条聊天记录就进行一次持久化，与时间是或的关系
+    save_count_threshold: int = 1000
+    # 保存时，给内存中保留的大小
+    save_reserved_size: int = 100
+    # sing 每次发送的语音长度，单位：秒
+    sing_length: int = 120
+    # 模型对应词
+    sing_speakers: dict = {
+        "帕拉斯": "pallas",
+        "牛牛": "pallas",
+    }
+    # sing cuda 设备指定
+    sing_cuda_device: str = ''
+    # 歌曲缓存大小
+    song_cache_size: int = 100
+    # 歌曲缓存天数
+    song_cache_days: int = 30
+    # tts 声码器
+    tts_vocoder: str = 'pwgan_aishell3'
+    # chat 模型的strategy
+    chat_strategy: str = ''
 
 
-env_config = EnvConfig.parse_obj(get_driver().config)
+plugin_config = PluginConfig.parse_obj(get_driver().config)
 
 
 class Config(ABC):
@@ -26,7 +78,8 @@ class Config(ABC):
     @classmethod
     def _get_config_mongo(cls) -> Collection:
         if cls._config_mongo is None:
-            mongo_client = pymongo.MongoClient(env_config.mongo_host, env_config.mongo_port)
+            mongo_client = pymongo.MongoClient(
+                plugin_config.mongo_host, plugin_config.mongo_port)
             mongo_db = mongo_client['PallasBot']
             cls._config_mongo = mongo_db[cls._table]
             cls._config_mongo.create_index(name='{}_index'.format(cls._key),
@@ -246,7 +299,7 @@ class GroupConfig(Config):
         :return: 0 踢人 1 禁言
         '''
         mode = self._find('roulette_mode')
-        return mode if mode else env_config.default_roulette_mode
+        return mode if mode else plugin_config.default_roulette_mode
 
     def set_roulette_mode(self, mode: int) -> None:
         '''

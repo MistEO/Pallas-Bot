@@ -1,15 +1,15 @@
+import os
+from pathlib import Path
+from copy import deepcopy
+from threading import Lock
+from collections import defaultdict
+
+import torch
 from rwkv.model import RWKV  # pip install rwkv
+
 from .prompt import INIT_PROMPT, CHAT_FORMAT
 from .pipeline import PIPELINE, PIPELINE_ARGS
-from pathlib import Path
-from threading import Lock
-from copy import deepcopy
-from collections import defaultdict
-from pydantic import BaseModel, Extra
-from nonebot import get_driver
-import os
-import torch
-
+from src.common.config import plugin_config
 
 cuda = torch.cuda.is_available()
 os.environ['RWKV_JIT_ON'] = '1'
@@ -17,14 +17,10 @@ os.environ['RWKV_JIT_ON'] = '1'
 os.environ["RWKV_CUDA_ON"] = '0'
 
 
-class EnvConfig(BaseModel, extra=Extra.ignore):
-    strategy: str = 'cuda fp16' if cuda else 'cpu fp32'
-
-
-env_config = EnvConfig.parse_obj(get_driver().config)
-
 # 这个可以照着原仓库的说明改一改，能省点显存啥的
-STRATEGY = env_config.strategy
+STRATEGY = 'cuda fp16' if cuda else 'cpu fp32'
+if plugin_config.chat_strategy:
+    STRATEGY = plugin_config.chat_strategy
 
 MODEL_DIR = Path('resource/chat/models')
 MODEL_EXT = '.pth'
