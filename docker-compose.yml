@@ -15,6 +15,7 @@ services:
       APP_MODULE: bot:app
       MAX_WORKERS: 1
       WAIT_HOSTS: mongodb:27017
+      TIMEOUT: 480
     networks:
       - pallasbot
     volumes:

@@ -21,7 +21,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Generate Tags
+      - name: Base Generate Tags
         uses: docker/metadata-action@v4
         id: metadata
         with:
@@ -30,7 +30,7 @@ jobs:
           tags: |
             type=raw,value=latest
 
-      - name: Build and Publish Base
+      - name: Base Build and Publish
         uses: docker/build-push-action@v4
         with:
           context: .
@@ -38,21 +38,39 @@ jobs:
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
-      
-      - name: Generate AI Tags
+
+      - name: AI on GPU Generate Tags
         uses: docker/metadata-action@v4
-        id: aimetadata
+        id: gpuaimetadata
         with:
           images: |
             misteo/pallas-bot
           tags: |
-            type=raw,value=latest-ai
+            type=raw,value=gpuai-latest
 
-      - name: Build and Publish AI
+      - name: AI on GPU Build and Publish
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: AI.Dockerfile
+          file: GPU.Dockerfile
           push: true
-          tags: ${{ steps.aimetadata.outputs.tags }}
-          labels: ${{ steps.aimetadata.outputs.labels }}
+          tags: ${{ steps.gpuaimetadata.outputs.tags }}
+          labels: ${{ steps.gpuaimetadata.outputs.labels }}
+
+      - name: AI on CPU Generate Tags
+        uses: docker/metadata-action@v4
+        id: cpuaimetadata
+        with:
+          images: |
+            misteo/pallas-bot
+          tags: |
+            type=raw,value=cpuai-latest
+
+      - name: AI on CPU Build and Publish
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: CPU.Dockerfile
+          push: true
+          tags: ${{ steps.cpuaimetadata.outputs.tags }}
+          labels: ${{ steps.cpuaimetadata.outputs.labels }}

@@ -6,7 +6,7 @@
 
 - 你需要一个额外的 QQ 小号，一台自己的 `电脑` 或 `服务器`，不推荐用大号进行部署
 - 你自己部署的牛牛与其他牛牛数据并不互通，是一张白纸，需要从头调教
-- 牛牛的基础功能和使用 CPU 推理的 AI 功能支持使用 Docker Compose 一键部署，可以参考 [Docker 部署](DockerDeployment.md)。GPU 版本正在开发测试中。
+- 牛牛支持使用 Docker Compose 一键部署，可以参考 [Docker 部署](DockerDeployment.md)。
 
 ## 基本环境配置
 
