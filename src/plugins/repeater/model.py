@@ -2,6 +2,7 @@ from typing import Generator, List, Optional, Union, Tuple, Dict, Any
 from functools import cached_property, cmp_to_key
 from dataclasses import dataclass
 from collections import defaultdict, deque
+from pydantic import BaseModel, Extra
 
 try:
     import jieba_fast.analyse as jieba_analyse
@@ -17,6 +18,7 @@ import random
 import re
 import atexit
 
+from nonebot import get_driver
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.onebot.v11 import Message, MessageSegment
 
@@ -28,8 +30,50 @@ except Exception as error:
     print('TTS not available, error:', error)
     TTS_AVAIABLE = False
 
-mongo_client = pymongo.MongoClient('127.0.0.1', 27017,
-        unicode_decode_error_handler='ignore')
+
+class EnvConfig(BaseModel, extra=Extra.ignore):
+    # mongodb host
+    mongo_host: str = '127.0.0.1'
+    # mongodb port
+    mongo_port: int = 27017
+    # answer 相关阈值，值越大，牛牛废话越少；越小，牛牛废话越多
+    answer_threshold: int = 3
+    # answer 阈值权重
+    answer_threshold_weights: List[int] = [7, 23, 70]
+    # 上下文联想，记录多少个关键词（每个群）
+    topics_size: int = 16
+    # 上下文命中后，额外的权重系数
+    topics_importance: int = 10000
+    # N 个群有相同的回复，就跨群作为全局回复
+    cross_group_threshold: int = 2
+    # 复读的阈值，群里连续多少次有相同的发言，就复读
+    repeat_threshold: int = 3
+    # 主动发言的阈值，越小废话越多
+    speak_threshold: int = 5
+    # 说过的话，接下来多少次不再说
+    duplicate_reply: int = 10
+    # 按逗号分割回复语的概率
+    split_probability: float = 0.5
+    # 喝醉之后，超过多长的文本全部转换成语音发送
+    drunk_tts_threshold: int = 6
+    # 连续主动说话的概率
+    speak_continuously_probability: float = 0.5
+    # 主动说话加上随机戳一戳群友的概率
+    speak_poke_probability: float = 0.6
+    # 连续主动说话最多几句话
+    speak_continuously_max_len: int = 2
+    # 每隔多久进行一次持久化 ( 秒 )
+    save_time_threshold: int = 3600
+    # 单个群超过多少条聊天记录就进行一次持久化，与时间是或的关系
+    save_count_threshold: int = 1000
+    # 保存时，给内存中保留的大小
+    save_reserved_size: int = 100
+
+
+env_config = EnvConfig.parse_obj(get_driver().config)
+
+mongo_client = pymongo.MongoClient(
+    env_config.mongo_host, env_config.mongo_port, unicode_decode_error_handler='ignore')
 
 mongo_db = mongo_client['PallasBot']
 
@@ -110,25 +154,24 @@ class Chat:
 
     # 可以试着改改的参数
 
-    ANSWER_THRESHOLD = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
-    ANSWER_THRESHOLD_WEIGHTS = [7, 23, 70]  # answer 阈值权重，不知道怎么解释，自己看源码吧（
-    TOPICS_SIZE = 16                # 上下文联想，记录多少个关键词（每个群）
-    TOPICS_IMPORTANCE = 10000       # 上下文命中后，额外的权重系数
-    CROSS_GROUP_THRESHOLD = 2       # N 个群有相同的回复，就跨群作为全局回复
-    REPEAT_THRESHOLD = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
-    SPEAK_THRESHOLD = 5             # 主动发言的阈值，越小废话越多
-    DUPLICATE_REPLY = 10            # 说过的话，接下来多少次不再说
+    ANSWER_THRESHOLD = env_config.answer_threshold
+    ANSWER_THRESHOLD_WEIGHTS = env_config.answer_threshold_weights
+    TOPICS_SIZE = env_config.topics_size
+    TOPICS_IMPORTANCE = env_config.topics_importance
+    CROSS_GROUP_THRESHOLD = env_config.cross_group_threshold
+    REPEAT_THRESHOLD = env_config.repeat_threshold
+    SPEAK_THRESHOLD = env_config.speak_threshold
+    DUPLICATE_REPLY = env_config.duplicate_reply
 
-    SPLIT_PROBABILITY = 0.5         # 按逗号分割回复语的概率
-    DRUNK_TTS_THRESHOLD = 6 if TTS_AVAIABLE else 99999999
-    # 喝醉之后，超过多长的文本全部转换成语音发送
-    SPEAK_CONTINUOUSLY_PROBABILITY = 0.5  # 连续主动说话的概率
-    SPEAK_POKE_PROBABILITY = 0.6    # 主动说话加上随机戳一戳群友的概率
-    SPEAK_CONTINUOUSLY_MAX_LEN = 2  # 连续主动说话最多几句话
+    SPLIT_PROBABILITY = env_config.split_probability
+    DRUNK_TTS_THRESHOLD = env_config.drunk_tts_threshold if TTS_AVAIABLE else 99999999
+    SPEAK_CONTINUOUSLY_PROBABILITY = env_config.speak_continuously_probability
+    SPEAK_POKE_PROBABILITY = env_config.speak_poke_probability
+    SPEAK_CONTINUOUSLY_MAX_LEN = env_config.speak_continuously_max_len
 
-    SAVE_TIME_THRESHOLD = 3600      # 每隔多久进行一次持久化 ( 秒 )
-    SAVE_COUNT_THRESHOLD = 1000     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
-    SAVE_RESERVED_SIZE = 100        # 保存时，给内存中保留的大小
+    SAVE_TIME_THRESHOLD = env_config.save_time_threshold
+    SAVE_COUNT_THRESHOLD = env_config.save_count_threshold
+    SAVE_RESERVED_SIZE = env_config.save_reserved_size
 
     # 最好别动的参数
 

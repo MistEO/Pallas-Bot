@@ -3,8 +3,19 @@ import time
 from pymongo.collection import Collection
 from abc import ABC
 from typing import Any, Optional
+from pydantic import BaseModel, Extra
+from nonebot import get_driver
 
 KEY_JOINER = '.'
+
+
+class EnvConfig(BaseModel, extra=Extra.ignore):
+    mongo_host: str = '127.0.0.1'
+    mongo_port: int = 27017
+    default_roulette_mode: int = 0
+
+
+env_config = EnvConfig.parse_obj(get_driver().config)
 
 
 class Config(ABC):
@@ -15,7 +26,7 @@ class Config(ABC):
     @classmethod
     def _get_config_mongo(cls) -> Collection:
         if cls._config_mongo is None:
-            mongo_client = pymongo.MongoClient('127.0.0.1', 27017)
+            mongo_client = pymongo.MongoClient(env_config.mongo_host, env_config.mongo_port)
             mongo_db = mongo_client['PallasBot']
             cls._config_mongo = mongo_db[cls._table]
             cls._config_mongo.create_index(name='{}_index'.format(cls._key),
@@ -235,7 +246,7 @@ class GroupConfig(Config):
         :return: 0 踢人 1 禁言
         '''
         mode = self._find('roulette_mode')
-        return mode if mode else 0
+        return mode if mode else env_config.default_roulette_mode
 
     def set_roulette_mode(self, mode: int) -> None:
         '''

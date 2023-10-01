@@ -7,6 +7,14 @@ import numpy as np
 from pathlib import Path
 from paddlespeech.t2s.exps.syn_utils import get_am_output, get_frontend, get_predictor, get_voc_output
 from threading import Lock
+from pydantic import BaseModel, Extra
+from nonebot import get_driver
+
+
+class EnvConfig(BaseModel, extra=Extra.ignore):
+    vocoder: str = 'pwgan_aishell3'
+
+env_config = EnvConfig.parse_obj(get_driver().config)
 
 AM_INFERENCE_DIR = Path("resource/tts/models/")
 VOC_INFERENCE_DIR = Path("resource/tts/models/vocoder")
@@ -34,8 +42,8 @@ am_predictor = get_predictor(
 # voc_predictor
 voc_predictor = get_predictor(
     model_dir=VOC_INFERENCE_DIR,
-    model_file="pwgan_aishell3" + ".pdmodel",
-    params_file="pwgan_aishell3" + ".pdiparams",
+    model_file=env_config.vocoder + ".pdmodel",
+    params_file=env_config.vocoder + ".pdiparams",
     device=device)
 
 
