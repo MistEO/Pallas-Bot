@@ -14,9 +14,12 @@ os.environ["RWKV_CUDA_ON"] = '0'
 from rwkv.model import RWKV  # pip install rwkv
 from .pipeline import PIPELINE, PIPELINE_ARGS
 from .prompt import INIT_PROMPT, CHAT_FORMAT
+from src.common.config import plugin_config
 
 # 这个可以照着原仓库的说明改一改，能省点显存啥的
 STRATEGY = 'cuda fp16' if cuda else 'cpu fp32'
+if plugin_config.chat_strategy:
+    STRATEGY = plugin_config.chat_strategy
 
 MODEL_DIR = Path('resource/chat/models')
 MODEL_EXT = '.pth'
@@ -53,7 +56,7 @@ args = PIPELINE_ARGS(
     token_ban=[0],  # ban the generation of some tokens
     token_stop=[],  # stop generation whenever you see any token here
     ends=('\n'),
-    ends_if_too_long=("。", "！", "？","\n"))
+    ends_if_too_long=("。", "！", "？", "\n"))
 
 
 INIT_STATE = deepcopy(pipeline.generate(

@@ -20,7 +20,7 @@ import atexit
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.onebot.v11 import Message, MessageSegment
 
-from src.common.config import BotConfig
+from src.common.config import BotConfig, plugin_config
 try:
     from src.common.utils.speech.text_to_speech import text_2_speech
     TTS_AVAIABLE = True
@@ -28,8 +28,9 @@ except Exception as error:
     print('TTS not available, error:', error)
     TTS_AVAIABLE = False
 
-mongo_client = pymongo.MongoClient('127.0.0.1', 27017,
-        unicode_decode_error_handler='ignore')
+
+mongo_client = pymongo.MongoClient(
+    plugin_config.mongo_host, plugin_config.mongo_port, unicode_decode_error_handler='ignore')
 
 mongo_db = mongo_client['PallasBot']
 
@@ -110,25 +111,24 @@ class Chat:
 
     # 可以试着改改的参数
 
-    ANSWER_THRESHOLD = 3            # answer 相关的阈值，值越小牛牛废话越多，越大话越少
-    ANSWER_THRESHOLD_WEIGHTS = [7, 23, 70]  # answer 阈值权重，不知道怎么解释，自己看源码吧（
-    TOPICS_SIZE = 16                # 上下文联想，记录多少个关键词（每个群）
-    TOPICS_IMPORTANCE = 10000       # 上下文命中后，额外的权重系数
-    CROSS_GROUP_THRESHOLD = 2       # N 个群有相同的回复，就跨群作为全局回复
-    REPEAT_THRESHOLD = 3            # 复读的阈值，群里连续多少次有相同的发言，就复读
-    SPEAK_THRESHOLD = 5             # 主动发言的阈值，越小废话越多
-    DUPLICATE_REPLY = 10            # 说过的话，接下来多少次不再说
+    ANSWER_THRESHOLD = plugin_config.answer_threshold
+    ANSWER_THRESHOLD_WEIGHTS = plugin_config.answer_threshold_weights
+    TOPICS_SIZE = plugin_config.topics_size
+    TOPICS_IMPORTANCE = plugin_config.topics_importance
+    CROSS_GROUP_THRESHOLD = plugin_config.cross_group_threshold
+    REPEAT_THRESHOLD = plugin_config.repeat_threshold
+    SPEAK_THRESHOLD = plugin_config.speak_threshold
+    DUPLICATE_REPLY = plugin_config.duplicate_reply
 
-    SPLIT_PROBABILITY = 0.5         # 按逗号分割回复语的概率
-    DRUNK_TTS_THRESHOLD = 6 if TTS_AVAIABLE else 99999999
-    # 喝醉之后，超过多长的文本全部转换成语音发送
-    SPEAK_CONTINUOUSLY_PROBABILITY = 0.5  # 连续主动说话的概率
-    SPEAK_POKE_PROBABILITY = 0.6    # 主动说话加上随机戳一戳群友的概率
-    SPEAK_CONTINUOUSLY_MAX_LEN = 2  # 连续主动说话最多几句话
+    SPLIT_PROBABILITY = plugin_config.split_probability
+    DRUNK_TTS_THRESHOLD = plugin_config.drunk_tts_threshold if TTS_AVAIABLE else 99999999
+    SPEAK_CONTINUOUSLY_PROBABILITY = plugin_config.speak_continuously_probability
+    SPEAK_POKE_PROBABILITY = plugin_config.speak_poke_probability
+    SPEAK_CONTINUOUSLY_MAX_LEN = plugin_config.speak_continuously_max_len
 
-    SAVE_TIME_THRESHOLD = 3600      # 每隔多久进行一次持久化 ( 秒 )
-    SAVE_COUNT_THRESHOLD = 1000     # 单个群超过多少条聊天记录就进行一次持久化。与时间是或的关系
-    SAVE_RESERVED_SIZE = 100        # 保存时，给内存中保留的大小
+    SAVE_TIME_THRESHOLD = plugin_config.save_time_threshold
+    SAVE_COUNT_THRESHOLD = plugin_config.save_count_threshold
+    SAVE_RESERVED_SIZE = plugin_config.save_reserved_size
 
     # 最好别动的参数
 
