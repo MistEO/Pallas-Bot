@@ -27,7 +27,7 @@ RUN wget http://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.
 ADD https://github.com/ufoscout/docker-compose-wait/releases/download/2.9.0/wait /app/wait
 
 RUN chmod +x /app/wait && \
-    echo "./wait" >> /app/prestart.sh && \
+    echo "./wait" >> /app/prestart.sh
 
 COPY --from=requirements-stage /tmp/requirements.txt /app/requirements.txt
 
