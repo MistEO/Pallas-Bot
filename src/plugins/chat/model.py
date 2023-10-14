@@ -1,21 +1,20 @@
-import os
 from pathlib import Path
-from copy import deepcopy
 from threading import Lock
+from copy import deepcopy
 from collections import defaultdict
-
+import os
 import torch
-from rwkv.model import RWKV  # pip install rwkv
-
-from .prompt import INIT_PROMPT, CHAT_FORMAT
-from .pipeline import PIPELINE, PIPELINE_ARGS
-from src.common.config import plugin_config
 
 cuda = torch.cuda.is_available()
 os.environ['RWKV_JIT_ON'] = '1'
 # 这个要配个 ninja 啥的环境，能大幅提高推理速度，有需要可以自己弄下（仅支持 cuda 显卡）
 os.environ["RWKV_CUDA_ON"] = '0'
 
+
+from rwkv.model import RWKV  # pip install rwkv
+from .pipeline import PIPELINE, PIPELINE_ARGS
+from .prompt import INIT_PROMPT, CHAT_FORMAT
+from src.common.config import plugin_config
 
 # 这个可以照着原仓库的说明改一改，能省点显存啥的
 STRATEGY = 'cuda fp16' if cuda else 'cpu fp32'
