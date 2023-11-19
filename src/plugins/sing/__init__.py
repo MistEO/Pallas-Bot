@@ -34,6 +34,12 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
     text = event.get_plaintext()
     if not text:
         return False
+    
+    if not SING_CMD in text:
+        return False
+    
+    if text.endswith(SING_CMD):
+        return False
 
     has_spk = False
     for name, speaker in plugin_config.sing_speakers.items():
@@ -63,6 +69,8 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
 
     if text.startswith(SING_CMD):
         song_key = text.replace(SING_CMD, '').strip()
+        if not song_key:
+            return False
         state['song_id'] = song_key
         state['chunk_index'] = 0
         return True
