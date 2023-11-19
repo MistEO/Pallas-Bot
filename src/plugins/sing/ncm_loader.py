@@ -68,6 +68,9 @@ def get_song_id(song_name: str):
         return None
 
     res = ncm.cloudsearch.GetSearchResult(song_name, 1, 1)
+    if "result" not in res or "songCount" not in res["result"]:
+        return None
+
     if res["result"]["songCount"] == 0:
         return None
     return res["result"]["songs"][0]["id"]

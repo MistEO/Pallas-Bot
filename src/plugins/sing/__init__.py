@@ -63,10 +63,7 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
 
     if text.startswith(SING_CMD):
         song_key = text.replace(SING_CMD, '').strip()
-        song_id = song_key if song_key.isdigit() else await asyncify(get_song_id)(song_key)
-        if not song_id:
-            return False
-        state['song_id'] = song_id
+        state['song_id'] = song_key
         state['chunk_index'] = 0
         return True
 
@@ -102,7 +99,8 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     config.refresh_cooldown(SING_COOLDOWN_KEY)
 
     speaker = state['speaker']
-    song_id = state['song_id']
+    song_key = state['song_id']
+    song_id = song_key if song_key.isdigit() else await asyncify(get_song_id)(song_key)
     chunk_index = state['chunk_index']
     key = state['key']
 
@@ -124,6 +122,10 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     # 下载 -> 切片 -> 人声分离 -> 音色转换（SVC） -> 混音
     # 其中 人声分离和音色转换是吃 GPU 的，所以要加锁，不然显存不够用
     await sing_msg.send('欢呼吧！')
+
+    if not song_id:
+        logger.error('get_song_id failed', song_key, song_id)
+        await failed()
 
     if chunk_index == 0:
         for cache_path in Path('resource/sing/splices').glob(f'{song_id}_*_{key}key_{speaker}.mp3'):
