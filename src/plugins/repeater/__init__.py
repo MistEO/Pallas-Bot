@@ -37,6 +37,7 @@ async def is_shutup(self_id: int, group_id: int) -> bool:
 
     return flag
 
+
 message_id_lock = threading.Lock()
 message_id_dict = {}
 
@@ -50,7 +51,7 @@ async def post_proc(message: Message, self_id: int, group_id: int) -> Message:
                     'user_id': seg.data['qq'],
                     'group_id': group_id
                 })
-            except ActionFailed:    # 群员不存在
+            except ActionFailed:  # 群员不存在
                 continue
             nick_name = info['card'] if info['card'] else info['nickname']
             new_msg += '@{}'.format(nick_name)
@@ -96,7 +97,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         for seg in event.message:
             if seg.type == "image":
                 await insert_image(seg)
-                
+
         chat.learn()
 
     if not answers:
@@ -131,12 +132,14 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 async def is_config_admin(event: GroupMessageEvent) -> bool:
     return BotConfig(event.self_id).is_admin_of_bot(event.user_id)
 
+
 IsAdmin = permission.GROUP_OWNER | permission.GROUP_ADMIN | SUPERUSER | Permission(
     is_config_admin)
 
 
 async def is_reply(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
     return bool(event.reply)
+
 
 ban_msg = on_message(
     rule=to_me() & keyword('不可以') & Rule(is_reply),
@@ -148,7 +151,6 @@ ban_msg = on_message(
 
 @ban_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-
     if '[CQ:reply,' not in event.raw_message:
         return False
 
@@ -162,6 +164,11 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     logger.info('bot [{}] ready to ban [{}] in group [{}]'.format(
         event.self_id, raw_message, event.group_id))
 
+    try:
+        await bot.delete_msg(message_id=event.reply.message_id)
+    except ActionFailed:
+        logger.warning("撤回消息失败")
+
     if Chat.ban(event.group_id, event.self_id, raw_message, str(event.user_id)):
         await ban_msg.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
 
@@ -171,6 +178,7 @@ speak_sched = require('nonebot_plugin_apscheduler').scheduler
 
 async def message_is_ban(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
     return event.get_plaintext().strip() == '不可以发这个'
+
 
 ban_msg_latest = on_message(
     rule=to_me() & Rule(message_is_ban),
@@ -186,13 +194,17 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         'bot [{}] ready to ban latest reply in group [{}]'.format(
             event.self_id, event.group_id))
 
+    try:
+        await bot.delete_msg(message_id=event.reply.message_id)
+    except ActionFailed:
+        logger.warning("撤回消息失败")
+
     if Chat.ban(event.group_id, event.self_id, '', str(event.user_id)):
         await ban_msg_latest.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
 
 
 @speak_sched.scheduled_job('interval', seconds=60)
 async def speak_up():
-
     ret = Chat.speak()
     if not ret:
         return
