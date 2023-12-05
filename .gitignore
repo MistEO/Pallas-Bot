@@ -144,3 +144,5 @@ resource
 accounts
 mixed_data
 backups
+
+poetry.lock
