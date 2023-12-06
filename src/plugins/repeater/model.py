@@ -290,6 +290,23 @@ class Chat:
         return yield_results(results)
 
     @ staticmethod
+    def reply_post_proc(raw_message: str, new_msg: str, bot_id: int, group_id: int) -> bool:
+        '''
+        对 bot 回复的消息进行后处理，将缓存替换为处理后的消息
+        '''
+
+        if raw_message == new_msg:
+            return True
+
+        reply_data = Chat._reply_dict[group_id][bot_id][::-1]
+        for item in reply_data:
+            if item['reply'] == raw_message:
+                with Chat._reply_lock:
+                    item['reply'] = new_msg
+                return True
+        return False
+
+    @ staticmethod
     def speak() -> Optional[Tuple[int, int, List[Message]]]:
         '''
         主动发言，返回当前最希望发言的 bot 账号、群号、发言消息 List，也有可能不发言
