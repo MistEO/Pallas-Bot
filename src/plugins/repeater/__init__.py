@@ -4,12 +4,12 @@ import re
 import time
 import threading
 
-from nonebot import on_message, require, get_bot, logger, get_driver
+from nonebot import on_message, on_notice, require, get_bot, logger, get_driver
 from nonebot.exception import ActionFailed
 from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me, Rule
 from nonebot.adapters import Bot, Event
-from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
+from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent, GroupRecallNoticeEvent
 from nonebot.adapters.onebot.v11 import permission, Message, MessageSegment
 from nonebot.permission import Permission
 from nonebot.permission import SUPERUSER
@@ -37,6 +37,7 @@ async def is_shutup(self_id: int, group_id: int) -> bool:
 
     return flag
 
+
 message_id_lock = threading.Lock()
 message_id_dict = {}
 
@@ -50,7 +51,7 @@ async def post_proc(message: Message, self_id: int, group_id: int) -> Message:
                     'user_id': seg.data['qq'],
                     'group_id': group_id
                 })
-            except ActionFailed:    # 群员不存在
+            except ActionFailed:  # 群员不存在
                 continue
             nick_name = info['card'] if info['card'] else info['nickname']
             new_msg += '@{}'.format(nick_name)
@@ -96,7 +97,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         for seg in event.message:
             if seg.type == "image":
                 await insert_image(seg)
-                
+
         chat.learn()
 
     if not answers:
@@ -131,12 +132,14 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
 async def is_config_admin(event: GroupMessageEvent) -> bool:
     return BotConfig(event.self_id).is_admin_of_bot(event.user_id)
 
+
 IsAdmin = permission.GROUP_OWNER | permission.GROUP_ADMIN | SUPERUSER | Permission(
     is_config_admin)
 
 
 async def is_reply(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
     return bool(event.reply)
+
 
 ban_msg = on_message(
     rule=to_me() & keyword('不可以') & Rule(is_reply),
@@ -148,7 +151,6 @@ ban_msg = on_message(
 
 @ban_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-
     if '[CQ:reply,' not in event.raw_message:
         return False
 
@@ -162,15 +164,73 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     logger.info('bot [{}] ready to ban [{}] in group [{}]'.format(
         event.self_id, raw_message, event.group_id))
 
+    try:
+        await bot.delete_msg(message_id=event.reply.message_id)
+    except ActionFailed:
+        logger.warning(
+            'bot [{}] failed to delete [{}] in group [{}]'.format(
+                event.self_id,
+                raw_message, event.group_id))
+
     if Chat.ban(event.group_id, event.self_id, raw_message, str(event.user_id)):
         await ban_msg.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
 
 
-speak_sched = require('nonebot_plugin_apscheduler').scheduler
+async def is_admin_recall_self_msg(bot: Bot, event: GroupRecallNoticeEvent):
+    # 好像不需要这句
+    # if event.notice_type != "group_recall":
+    #     return False
+    self_id = event.self_id
+    user_id = event.user_id
+    group_id = event.group_id
+    operator_id = event.operator_id
+    if self_id != user_id:
+        return False
+    # 如果是自己撤回的就不用管
+    if operator_id == self_id:
+        return False
+    operator_info = await bot.get_group_member_info(
+        group_id=group_id, user_id=operator_id
+    )
+    return operator_info['role'] == 'owner' or operator_info['role'] == 'admin'
+
+
+ban_recalled_msg = on_notice(
+    rule=Rule(is_admin_recall_self_msg),
+    priority=5,
+    block=True
+)
+
+
+@ban_recalled_msg.handle()
+async def _(bot: Bot, event: GroupRecallNoticeEvent, state: T_State):
+    try:
+        msg = await bot.get_msg(message_id=event.message_id)
+    except ActionFailed:
+        logger.warning(
+            'bot [{}] failed to get msg [{}]'.format(
+                event.self_id,
+                event.message_id))
+        return
+
+    raw_message = ''
+    # 使用get_msg得到的消息不是消息序列，使用正则生成一个迭代对象
+    for item in re.compile(r'\[[^\]]*\]|\w+').findall(msg['message']):
+        raw_reply = str(item)
+        # 去掉图片消息中的 url, subType 等字段
+        raw_message += re.sub(r'(\[CQ\:.+)(?:,url=*)(\])',
+                              r'\1\2', raw_reply)
+
+    logger.info('bot [{}] ready to ban [{}] in group [{}]'.format(
+        event.self_id, raw_message, event.group_id))
+
+    if Chat.ban(event.group_id, event.self_id, raw_message, str(f'recall by {event.operator_id}')):
+        await ban_recalled_msg.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
 
 
 async def message_is_ban(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
     return event.get_plaintext().strip() == '不可以发这个'
+
 
 ban_msg_latest = on_message(
     rule=to_me() & Rule(message_is_ban),
@@ -186,13 +246,23 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         'bot [{}] ready to ban latest reply in group [{}]'.format(
             event.self_id, event.group_id))
 
+    try:
+        await bot.delete_msg(message_id=event.reply.message_id)
+    except ActionFailed:
+        logger.warning(
+            'bot [{}] failed to delete latest reply [{}] in group [{}]'.format(
+                event.self_id, event.raw_message,
+                event.group_id))
+
     if Chat.ban(event.group_id, event.self_id, '', str(event.user_id)):
         await ban_msg_latest.finish('这对角可能会不小心撞倒些家具，我会尽量小心。')
 
 
+speak_sched = require('nonebot_plugin_apscheduler').scheduler
+
+
 @speak_sched.scheduled_job('interval', seconds=60)
 async def speak_up():
-
     ret = Chat.speak()
     if not ret:
         return
