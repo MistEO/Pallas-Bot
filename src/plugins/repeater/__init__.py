@@ -65,6 +65,10 @@ async def post_proc(message: Message, self_id: int, group_id: int) -> Message:
         else:
             new_msg += seg
 
+    if not Chat.reply_post_proc(str(message), str(new_msg), self_id, group_id):
+        logger.warning('bot [{}] post_proc failed in group [{}]: [{}] -> [{}]'.format(
+            self_id, group_id, str(message)[:30], str(new_msg)[:30]))
+
     return new_msg
 
 
