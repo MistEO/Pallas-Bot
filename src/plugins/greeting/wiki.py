@@ -1,6 +1,5 @@
 import os
 import random
-from src.common.utils.download_tools import DownloadTools
 
 # 这里的值是CN不代表是中文语音，wiki的定义有点怪，所有语言都叫CN_xx
 # 实际的url类似 'https://static.prts.wiki/voice_jp/char_485_pallas/CN_01.wav'
@@ -30,29 +29,7 @@ voice_dict = {
 voices_source = 'resource/voices'
 
 
-class WikiVoice(DownloadTools):
-    def download_voice_from_wiki(self, operator, url, filename):
-        folder = f'{voices_source}/{operator}'
-        f = f'{folder}/{filename}'
-        if os.path.exists(f):
-            return
-
-        print('Downloading', url, "as", filename, "to", folder)
-        content = self.request_file(url)
-        if content:
-            os.makedirs(folder, exist_ok=True)
-            with open(f, mode='wb+') as voice:
-                voice.write(content)
-        else:
-            print("Download failed!")
-
-    def download_voices(self, folder, oper_id):
-        base_url = f'https://static.prts.wiki/voice/{oper_id}/'
-        for key, web_file in voice_dict.items():
-            url = f'{base_url}{web_file}.wav'
-            filename = f'{key}.wav'
-            self.download_voice_from_wiki(folder, url, filename)
-
+class WikiVoice():
     def get_voice_filename(self, operator, key):
         if key not in voice_dict:
             return None
@@ -65,11 +42,3 @@ class WikiVoice(DownloadTools):
     def get_random_voice(self, operator, ranges):
         key = random.choice([r for r in ranges if r in voice_dict])
         return self.get_voice_filename(operator, key)
-
-
-if __name__ == '__main__':
-    operator = 'Pallas'
-    wiki = WikiVoice()
-    wiki.download_voices('Pallas', 'char_485_pallas')
-
-    print(wiki.get_random_voice(operator))

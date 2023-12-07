@@ -4,18 +4,29 @@ from nonebot.adapters import Bot, Event
 from nonebot.rule import Rule
 from nonebot.typing import T_State
 from nonebot import on_message, get_driver, logger
-import random
 
-from .model import chat, del_session
-from src.common.config import BotConfig, GroupConfig
+from src.common.config import BotConfig, GroupConfig, plugin_config
+
 try:
     from src.common.utils.speech.text_to_speech import text_2_speech
     TTS_AVAIABLE = True
 except Exception as error:
-    print('TTS not available, error:', error)
+    logger.error('TTS not available, error: ', error)
     TTS_AVAIABLE = False
 
+try:
+    from .model import Chat
+except Exception as error:
+    logger.error('Chat model import error: ', error)
+    raise error
+
 TTS_MIN_LENGTH = 10
+
+try:
+    chat = Chat(plugin_config.chat_strategy)
+except Exception as error:
+    logger.error('Chat model init error: ', error)
+    raise error
 
 
 @BotConfig.handle_sober_up
@@ -23,7 +34,7 @@ def on_sober_up(bot_id, group_id, drunkenness) -> bool:
     session = f'{bot_id}_{group_id}'
     logger.info(
         f'bot [{bot_id}] sober up in group [{group_id}], clear session [{session}]')
-    del_session(session)
+    chat.del_session(session)
 
 
 def is_drunk(bot: Bot, event: Event, state: T_State) -> bool:
@@ -60,8 +71,7 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
         text = text[:50]
     if not text:
         return
-    
-    ans = await asyncify(chat)(session, text)
+    ans = await asyncify(chat.chat)(session, text)
     logger.info(f'session [{session}]: {text} -> {ans}')
 
     if TTS_AVAIABLE and len(ans) >= TTS_MIN_LENGTH:
