@@ -82,8 +82,6 @@ class Config(ABC):
                 plugin_config.mongo_host, plugin_config.mongo_port)
             mongo_db = mongo_client['PallasBot']
             cls._config_mongo = mongo_db[cls._table]
-            cls._config_mongo.create_index(name='{}_index'.format(cls._key),
-                                           keys=[(cls._key, pymongo.HASHED)])
         return cls._config_mongo
 
     _document_cache: Optional[dict] = None
