@@ -66,8 +66,9 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
         return
     config.refresh_cooldown('call_me')
 
-    msg: Message = MessageSegment.record(
-        file=Path(wiki.get_random_voice(operator, greeting_voices)))
+    with open(Path(wiki.get_random_voice(operator, greeting_voices)), 'rb') as f:
+        data = f.read()
+    msg: Message = MessageSegment.record(file=data)
     await call_me_cmd.finish(msg)
 
 to_me_cmd = on_message(
