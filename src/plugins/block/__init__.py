@@ -3,6 +3,8 @@ import threading
 import time
 from typing import List, Union
 
+import nonebot
+from nonebot import get_bots
 from nonebot.adapters import Bot
 from nonebot.adapters.onebot.v11 import GroupIncreaseNoticeEvent, GroupMessageEvent, PokeNotifyEvent, permission
 from nonebot.rule import Rule
@@ -28,15 +30,20 @@ class AccountManager:
 
         with self.refresh_lock:
             self.refresh_time = time.time()
-            self.accounts = [
+            go_cqhttp_plugin_accounts: list[int] = [
                 int(d) for d in os.listdir(self.accounts_dir) if d.isnumeric()
             ]
+            onebot_accounts: list[int] = [
+                int(self_id) for self_id, bot in get_bots().items() if self_id.isnumeric() and bot.type == 'onebot'
+            ]
+            self.accounts = list(set(go_cqhttp_plugin_accounts + onebot_accounts))
 
     async def is_other_bot(self, bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
         self.refresh_accounts()
         return event.user_id in self.accounts
 
-    async def is_sleep(self, bot: Bot, event: Union[GroupMessageEvent, GroupIncreaseNoticeEvent, PokeNotifyEvent], state: T_State) -> bool:
+    async def is_sleep(self, bot: Bot, event: Union[GroupMessageEvent, GroupIncreaseNoticeEvent, PokeNotifyEvent],
+                       state: T_State) -> bool:
         if not event.group_id:
             return False
         return BotConfig(event.self_id, event.group_id).is_sleep()
@@ -50,7 +57,6 @@ other_bot_msg = on_message(
     rule=Rule(account_manager.is_other_bot),
     permission=permission.GROUP
 )
-
 
 any_msg = on_message(
     priority=4,
