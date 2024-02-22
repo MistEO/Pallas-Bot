@@ -13,7 +13,7 @@
 </div>
 <br>
 
-## 牛牛项目，堂堂完结！
+## 什么都，守护不了啊！
 
 由于 QQ 官方针对协议库的围追堵截，不断更新加密方案，我们已无力继续维护此项目。  
 在 [go-cqhttp](https://github.com/Mrs4s/go-cqhttp) 有完美的平替前，Pallas-Bot 将无限期 archive，感谢大家一直以来的支持！
