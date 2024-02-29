@@ -15,6 +15,7 @@ from nonebot.permission import Permission
 from nonebot.permission import SUPERUSER
 from src.common.config import BotConfig
 from src.common.utils.media_cache import insert_image, get_image
+from src.common.utils.array2cqcode import try_convert_to_cqcode
 
 from .model import Chat
 
@@ -155,7 +156,7 @@ ban_msg = on_message(
 
 @ban_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
-    if '[CQ:reply,' not in event.raw_message:
+    if '[CQ:reply,' not in try_convert_to_cqcode(event.raw_message):
         return False
 
     raw_message = ''
@@ -219,7 +220,7 @@ async def _(bot: Bot, event: GroupRecallNoticeEvent, state: T_State):
 
     raw_message = ''
     # 使用get_msg得到的消息不是消息序列，使用正则生成一个迭代对象
-    for item in re.compile(r'\[[^\]]*\]|\w+').findall(msg['message']):
+    for item in re.compile(r'\[[^\]]*\]|\w+').findall(try_convert_to_cqcode(msg['message'])):
         raw_reply = str(item)
         # 去掉图片消息中的 url, subType 等字段
         raw_message += re.sub(r'(\[CQ\:.+)(?:,url=*)(\])',
