@@ -4,7 +4,13 @@ from pymongo.collection import Collection
 from abc import ABC
 from typing import Any, Optional, List
 from pydantic import BaseModel, Extra
-from nonebot import get_driver
+
+try:
+    # pydantic v2
+    from nonebot import get_plugin_config
+except ImportError:
+    # pydantic v1
+    from nonebot import get_driver
 
 KEY_JOINER = '.'
 
@@ -67,7 +73,12 @@ class PluginConfig(BaseModel, extra=Extra.ignore):
     chat_strategy: str = ''
 
 
-plugin_config = PluginConfig.parse_obj(get_driver().config)
+try:
+    # pydantic v2
+    plugin_config = get_plugin_config(PluginConfig)
+except:
+    # pydantic v1
+    plugin_config = PluginConfig.parse_obj(get_driver().config)
 
 
 class Config(ABC):
