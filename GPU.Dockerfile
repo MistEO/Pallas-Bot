@@ -20,9 +20,9 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends ffmpeg portaudio19-dev python3-all-dev && \
     rm -rf /var/lib/apt/lists/*
 
-RUN wget http://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2.20_amd64.deb && \
-    dpkg -i libssl1.1_1.1.1f-1ubuntu2.20_amd64.deb && \
-    rm libssl1.1_1.1.1f-1ubuntu2.20_amd64.deb
+RUN curl -s http://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/ | grep 'libssl1.1_1.1.1f-1ubuntu.*_amd64\.deb' | sort | head -n 1 | sed 's/.*\(libssl1\.1_1\.1\.1f-1ubuntu.*_amd64\.deb\).*/\1/' | xargs -I {} wget http://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/{} -O libssl_latest.deb && \
+    dpkg -i libssl_latest.deb && \
+    rm libssl_latest.deb
 
 ADD https://github.com/ufoscout/docker-compose-wait/releases/download/2.9.0/wait /app/wait
 
