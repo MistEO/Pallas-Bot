@@ -25,16 +25,16 @@ class AccountManager:
         if time.time() - self.refresh_time < 60 and self.accounts:
             return
 
-        if not self.accounts and not os.path.exists(self.accounts_dir):
-            return
-
         with self.refresh_lock:
             self.refresh_time = time.time()
-            go_cqhttp_plugin_accounts: list[int] = [
-                int(d) for d in os.listdir(self.accounts_dir) if d.isnumeric()
-            ]
+            if os.path.exists(self.accounts_dir):
+                go_cqhttp_plugin_accounts: list[int] = [
+                    int(d) for d in os.listdir(self.accounts_dir) if d.isnumeric()
+                ]
+            else:
+                go_cqhttp_plugin_accounts = []
             onebot_accounts: list[int] = [
-                int(self_id) for self_id, bot in get_bots().items() if self_id.isnumeric() and bot.type == 'onebot'
+                int(self_id) for self_id, bot in get_bots().items() if self_id.isnumeric() and bot.type == 'OneBot V11'
             ]
             self.accounts = list(set(go_cqhttp_plugin_accounts + onebot_accounts))
 
@@ -70,3 +70,8 @@ any_notice = on_notice(
     block=True,
     rule=Rule(account_manager.is_sleep)
 )
+
+
+@other_bot_msg.handle()
+async def _():
+    return
