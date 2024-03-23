@@ -21,6 +21,10 @@ from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.onebot.v11 import Message, MessageSegment
 
 from src.common.config import BotConfig, plugin_config
+if plugin_config.use_rpc:
+    from src.common.utils.rpc import MongoClient
+else:
+    from pymongo import MongoClient
 try:
     from src.common.utils.speech.text_to_speech import text_2_speech
     TTS_AVAIABLE = True
@@ -29,7 +33,7 @@ except Exception as error:
     TTS_AVAIABLE = False
 
 
-mongo_client = pymongo.MongoClient(
+mongo_client = MongoClient(
     plugin_config.mongo_host, plugin_config.mongo_port, unicode_decode_error_handler='ignore')
 
 mongo_db = mongo_client['PallasBot']

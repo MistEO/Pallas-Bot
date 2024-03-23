@@ -16,6 +16,10 @@ KEY_JOINER = '.'
 
 
 class PluginConfig(BaseModel, extra=Extra.ignore):
+    # 是否使用云端数据库
+    use_rpc: bool = False
+    # 远程数据库token
+    rpc_token: str = ''
     # 默认轮盘模式
     default_roulette_mode: int = 0
     # mongodb host
@@ -80,6 +84,11 @@ except:
     # pydantic v1
     plugin_config = PluginConfig.parse_obj(get_driver().config)
 
+if plugin_config.use_rpc:
+    from src.common.utils.rpc import MongoClient
+else:
+    from pymongo import MongoClient
+
 
 class Config(ABC):
     _config_mongo: Optional[Collection] = None
@@ -89,7 +98,7 @@ class Config(ABC):
     @classmethod
     def _get_config_mongo(cls) -> Collection:
         if cls._config_mongo is None:
-            mongo_client = pymongo.MongoClient(
+            mongo_client = MongoClient(
                 plugin_config.mongo_host, plugin_config.mongo_port)
             mongo_db = mongo_client['PallasBot']
             cls._config_mongo = mongo_db[cls._table]
