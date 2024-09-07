@@ -1,10 +1,10 @@
 import json
 
 from .message_segment import BaseMessageSegment
-from typing import Any
+from typing import Union, Any
 
 
-def try_convert_to_cqcode(data: Any) -> str | Any:
+def try_convert_to_cqcode(data: Any) -> Union[str, Any]:
     try:
         msg = json.loads(data)
         if not isinstance(msg, list):
