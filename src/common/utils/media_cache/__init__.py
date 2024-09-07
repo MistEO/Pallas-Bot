@@ -4,8 +4,14 @@ import base64
 import re
 from datetime import datetime, timedelta
 from typing import Optional
+from src.common.config import plugin_config
 
-mongo_client = pymongo.MongoClient('127.0.0.1', 27017)
+if plugin_config.use_rpc:
+    from src.common.utils.rpc import MongoClient
+else:
+    from pymongo import MongoClient
+
+mongo_client = MongoClient(plugin_config.mongo_host, plugin_config.mongo_port)
 mongo_db = mongo_client['PallasBot']
 
 image_cache = mongo_db['image_cache']
@@ -23,16 +29,16 @@ async def insert_image(image_seg):
         '$inc': {'ref_times': 1},
         '$set': {'date': idate},
     }
-    
+
     cache = image_cache.find_one(db_filter)
-    
+
     ref_times = 0
     if cache:
         if "ref_times" in cache:
             ref_times = cache["ref_times"]
         else:
             ref_times = 1
-    
+
     ref_times += 1
 
     # 不是经常收到的图不缓存，不然会占用大量空间
@@ -46,7 +52,7 @@ async def insert_image(image_seg):
 
         base64_data = base64.b64encode(rsp.content)
         base64_data = base64_data.decode()
-        
+
         db_update['$set']['base64_data'] = base64_data
 
     image_cache.update_one(db_filter, db_update, upsert=True)

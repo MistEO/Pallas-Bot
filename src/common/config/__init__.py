@@ -4,12 +4,22 @@ from pymongo.collection import Collection
 from abc import ABC
 from typing import Any, Optional, List
 from pydantic import BaseModel, Extra
-from nonebot import get_driver
+
+try:
+    # pydantic v2
+    from nonebot import get_plugin_config
+except ImportError:
+    # pydantic v1
+    from nonebot import get_driver
 
 KEY_JOINER = '.'
 
 
 class PluginConfig(BaseModel, extra=Extra.ignore):
+    # 是否使用云端数据库
+    use_rpc: bool = False
+    # 远程数据库token
+    rpc_token: str = ''
     # 默认轮盘模式
     default_roulette_mode: int = 0
     # mongodb host
@@ -67,7 +77,17 @@ class PluginConfig(BaseModel, extra=Extra.ignore):
     chat_strategy: str = ''
 
 
-plugin_config = PluginConfig.parse_obj(get_driver().config)
+try:
+    # pydantic v2
+    plugin_config = get_plugin_config(PluginConfig)
+except:
+    # pydantic v1
+    plugin_config = PluginConfig.parse_obj(get_driver().config)
+
+if plugin_config.use_rpc:
+    from src.common.utils.rpc import MongoClient
+else:
+    from pymongo import MongoClient
 
 
 class Config(ABC):
@@ -78,12 +98,10 @@ class Config(ABC):
     @classmethod
     def _get_config_mongo(cls) -> Collection:
         if cls._config_mongo is None:
-            mongo_client = pymongo.MongoClient(
+            mongo_client = MongoClient(
                 plugin_config.mongo_host, plugin_config.mongo_port)
             mongo_db = mongo_client['PallasBot']
             cls._config_mongo = mongo_db[cls._table]
-            cls._config_mongo.create_index(name='{}_index'.format(cls._key),
-                                           keys=[(cls._key, pymongo.HASHED)])
         return cls._config_mongo
 
     _document_cache: Optional[dict] = None

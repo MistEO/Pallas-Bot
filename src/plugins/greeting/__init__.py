@@ -67,8 +67,9 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
     config.refresh_cooldown('call_me')
 
     msg: Message = MessageSegment.record(
-        file=Path(wiki.get_random_voice(operator, greeting_voices)))
+        file=Path(wiki.get_random_voice(operator, greeting_voices)).read_bytes())
     await call_me_cmd.finish(msg)
+
 
 to_me_cmd = on_message(
     rule=to_me(),
@@ -86,8 +87,9 @@ async def handle_first_receive(bot: Bot, event: GroupMessageEvent, state: T_Stat
 
     if len(event.get_plaintext().strip()) == 0 and not event.reply:
         msg: Message = MessageSegment.record(
-            file=Path(wiki.get_random_voice(operator, greeting_voices)))
+            file=Path(wiki.get_random_voice(operator, greeting_voices)).read_bytes())
         await to_me_cmd.finish(msg)
+
 
 all_notice = on_notice(
     priority=14,
@@ -121,12 +123,12 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
 
     elif event.notice_type == 'group_admin' and event.sub_type == 'set' and event.user_id == event.self_id:
         msg: Message = MessageSegment.record(
-            file=Path(wiki.get_voice_filename(operator, '任命助理')))
+            file=Path(wiki.get_voice_filename(operator, '任命助理')).read_bytes())
         await all_notice.finish(msg)
 
     elif event.notice_type == 'friend_add':
         msg: Message = MessageSegment.record(
-            file=Path(wiki.get_voice_filename(operator, '精英化晋升2')))
+            file=Path(wiki.get_voice_filename(operator, '精英化晋升2')).read_bytes())
         await all_notice.finish(msg)
 
     # 被禁言自动退群
