@@ -1,7 +1,10 @@
 import random
-from nonebot import require, logger, get_bot
+from nonebot import require, logger, get_bot, on_notice
+from nonebot.rule import Rule
+from nonebot.typing import T_State
+from nonebot.adapters import Bot, Event
 from nonebot.exception import ActionFailed
-from nonebot.adapters.onebot.v11 import Message
+from nonebot.adapters.onebot.v11 import Message, NoticeEvent
 
 from src.plugins.repeater.model import Chat
 from src.common.config import BotConfig
@@ -77,3 +80,48 @@ async def change_name():
         except ActionFailed:
             # 可能牛牛退群了
             continue
+
+
+async def is_change_name_notice(bot: Bot, event: NoticeEvent, state: T_State) -> bool:
+    config = BotConfig(event.self_id, event.group_id)
+    if event.notice_type == 'group_card' and event.user_id == config.taken_name():
+        return True
+    return False
+
+
+watch_name = on_notice(rule=Rule(is_change_name_notice), priority=4)
+
+
+@watch_name.handle()
+async def watch_name_handle(bot: Bot, event: NoticeEvent, state: T_State):
+    group_id = event.group_id
+    user_id = event.user_id
+
+    try:
+        info = await bot.call_api('get_group_member_info', **{
+            'group_id': group_id,
+            'user_id': user_id,
+            'no_cache': True
+        })
+    except ActionFailed:
+        return
+
+    card = info['card'] if info['card'] else info['nickname']
+
+    logger.info(
+        'bot [{}] watch name change by [{}] in group [{}]'.format(
+            bot.self_id, user_id, group_id))
+
+    config = BotConfig(bot.self_id, group_id)
+
+    try:
+        await bot.call_api('set_group_card', **{
+            'group_id': group_id,
+            'user_id': user_id,
+            'card': card
+        })
+
+        config.update_taken_name(user_id)
+
+    except ActionFailed:
+        return

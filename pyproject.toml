@@ -23,7 +23,7 @@ nonebot-plugin-gocqhttp = "^0.6.4"
 nb-cli = "^1.2.0"
 
 [tool.nonebot]
-plugins = ["nonebot_plugin_apscheduler", "nonebot_plugin_gocqhttp"]
+plugins = ["nonebot_plugin_apscheduler"]
 plugin_dirs = ["src/plugins"]
 
 [build-system]
