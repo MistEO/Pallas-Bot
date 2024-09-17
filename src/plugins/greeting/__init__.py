@@ -2,9 +2,9 @@ import random
 import asyncio
 
 from pathlib import Path
-from nonebot import on_command, on_message, on_notice, get_driver, get_bot
+from nonebot import on_message, on_notice, get_bot
 from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
-from nonebot.rule import keyword, startswith, to_me, Rule
+from nonebot.rule import to_me, Rule
 from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 from src.common.config import BotConfig, GroupConfig, UserConfig

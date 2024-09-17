@@ -3,7 +3,6 @@ import threading
 import time
 from typing import List, Union
 
-import nonebot
 from nonebot import get_bots
 from nonebot.adapters import Bot
 from nonebot.adapters.onebot.v11 import GroupIncreaseNoticeEvent, GroupMessageEvent, PokeNotifyEvent, permission
@@ -36,7 +35,8 @@ class AccountManager:
             onebot_accounts: list[int] = [
                 int(self_id) for self_id, bot in get_bots().items() if self_id.isnumeric() and bot.type == 'OneBot V11'
             ]
-            self.accounts = list(set(go_cqhttp_plugin_accounts + onebot_accounts))
+            self.accounts = list(
+                set(go_cqhttp_plugin_accounts + onebot_accounts))
 
     async def is_other_bot(self, bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:
         self.refresh_accounts()

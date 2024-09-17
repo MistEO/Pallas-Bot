@@ -4,12 +4,12 @@ import re
 import time
 import threading
 
-from nonebot import on_message, on_notice, require, get_bot, logger, get_driver
+from nonebot import on_message, on_notice, require, get_bot, logger
 from nonebot.exception import ActionFailed
 from nonebot.typing import T_State
 from nonebot.rule import keyword, to_me, Rule
 from nonebot.adapters import Bot, Event
-from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent, GroupRecallNoticeEvent
+from nonebot.adapters.onebot.v11 import GroupMessageEvent, GroupRecallNoticeEvent
 from nonebot.adapters.onebot.v11 import permission, Message, MessageSegment
 from nonebot.permission import Permission
 from nonebot.permission import SUPERUSER
