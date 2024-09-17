@@ -317,7 +317,7 @@ class GroupConfig(Config):
         :return: 0 踢人 1 禁言
         '''
         mode = self._find('roulette_mode')
-        return mode if mode else plugin_config.default_roulette_mode
+        return mode if mode != None else plugin_config.default_roulette_mode
 
     def set_roulette_mode(self, mode: int) -> None:
         '''
