@@ -96,6 +96,7 @@ watch_name = on_notice(rule=Rule(is_change_name_notice), priority=4)
 async def watch_name_handle(bot: Bot, event: NoticeEvent, state: T_State):
     group_id = event.group_id
     user_id = event.user_id
+    bot_id = event.self_id
 
     try:
         info = await bot.call_api('get_group_member_info', **{
@@ -117,7 +118,7 @@ async def watch_name_handle(bot: Bot, event: NoticeEvent, state: T_State):
     try:
         await bot.call_api('set_group_card', **{
             'group_id': group_id,
-            'user_id': user_id,
+            'user_id': bot_id,
             'card': card
         })
 

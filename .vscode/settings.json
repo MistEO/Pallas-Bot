@@ -1,3 +1,10 @@
 {
-    "python.formatting.provider": "autopep8"
+    "[python]": {
+        "diffEditor.ignoreTrimWhitespace": false,
+        "editor.defaultFormatter": "ms-python.autopep8",
+        "editor.formatOnType": true,
+        "editor.formatOnSave": true
+    },
+    "python.languageServer": "Pylance",
+    "python.analysis.typeCheckingMode": "basic"
 }
