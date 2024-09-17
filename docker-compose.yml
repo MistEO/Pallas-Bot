@@ -40,14 +40,5 @@ services:
       - /opt/dockerstore/mongo/data:/data/db
       - /opt/dockerstore/mongo/logs:/var/log/mongodb
 
-  qsign:
-    container_name: qsign
-    image: xzhouqd/qsign:8.9.63
-    environment:
-      - PORT=8080
-      - COUNT=3
-      - ANDROID_ID=114514
-    restart: always
-
 networks:
   pallasbot:

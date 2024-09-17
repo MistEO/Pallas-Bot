@@ -17,12 +17,15 @@ jieba-fast = "^0.53"
 pypinyin = "^0.49.0"
 asyncer = "^0.0.2"
 nonebot-plugin-apscheduler = "^0.3.0"
-nonebot-plugin-gocqhttp = "^0.6.4"
+setuptools = "^74.1.2"
 
 [tool.poetry.dev-dependencies]
 nb-cli = "^1.2.0"
 
 [tool.nonebot]
+adapters = [
+    { name = "OneBot V11", module_name = "nonebot.adapters.onebot.v11" }
+]
 plugins = ["nonebot_plugin_apscheduler"]
 plugin_dirs = ["src/plugins"]
 
