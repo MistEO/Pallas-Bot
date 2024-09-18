@@ -1,12 +1,12 @@
 import asyncio
 from collections import defaultdict
 from typing import Awaitable, Optional
-from nonebot import on_message, on_request, get_bot, logger, get_driver
+from nonebot import on_message, on_request, get_bot, logger
 from nonebot.typing import T_State
-from nonebot.rule import keyword, to_me, Rule
+from nonebot.rule import Rule
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, GroupRequestEvent
-from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
+from nonebot.adapters.onebot.v11 import MessageSegment, permission, GroupMessageEvent
 from nonebot.permission import Permission
 from src.common.config import BotConfig, GroupConfig
 
@@ -164,7 +164,7 @@ async def shot(self_id: int, user_id: int, group_id: int) -> Optional[Awaitable[
             if self_role == 'owner':  # 牛牛是群主不能退群，不然群就解散了
                 return None
 
-            async def group_leave():
+            async def group_leave() -> None:
                 await get_bot(str(self_id)).call_api('set_group_leave', **{
                     'group_id': group_id
                 })

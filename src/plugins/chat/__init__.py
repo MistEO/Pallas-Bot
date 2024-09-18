@@ -1,9 +1,9 @@
 from asyncer import asyncify
-from nonebot.adapters.onebot.v11 import MessageSegment, Message, permission, GroupMessageEvent
+from nonebot.adapters.onebot.v11 import MessageSegment, permission, GroupMessageEvent
 from nonebot.adapters import Bot, Event
 from nonebot.rule import Rule
 from nonebot.typing import T_State
-from nonebot import on_message, get_driver, logger
+from nonebot import on_message, logger
 
 from src.common.config import BotConfig, GroupConfig, plugin_config
 
@@ -30,14 +30,14 @@ except Exception as error:
 
 
 @BotConfig.handle_sober_up
-def on_sober_up(bot_id, group_id, drunkenness) -> bool:
+def on_sober_up(bot_id, group_id, drunkenness) -> None:
     session = f'{bot_id}_{group_id}'
     logger.info(
         f'bot [{bot_id}] sober up in group [{group_id}], clear session [{session}]')
     chat.del_session(session)
 
 
-def is_drunk(bot: Bot, event: Event, state: T_State) -> bool:
+def is_drunk(bot: Bot, event: Event, state: T_State) -> int:
     config = BotConfig(event.self_id, event.group_id)
     return config.drunkenness()
 

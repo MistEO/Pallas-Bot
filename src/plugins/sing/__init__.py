@@ -5,7 +5,7 @@ import random
 import time
 import os
 
-from nonebot import get_driver, on_message, require, logger
+from nonebot import on_message, require, logger
 from nonebot.typing import T_State
 from nonebot.rule import Rule
 from nonebot.adapters import Bot, Event
@@ -34,10 +34,10 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
     text = event.get_plaintext()
     if not text:
         return False
-    
+
     if not SING_CMD in text and not any([cmd in text for cmd in SING_CONTINUE_CMDS]):
         return False
-    
+
     if text.endswith(SING_CMD):
         return False
 
@@ -79,7 +79,7 @@ async def is_to_sing(bot: Bot, event: Event, state: T_State) -> bool:
         progress = GroupConfig(group_id=event.group_id).sing_progress()
         if not progress:
             return False
-        
+
         song_id = progress['song_id']
         chunk_index = progress['chunk_index']
         key_val = progress['key']

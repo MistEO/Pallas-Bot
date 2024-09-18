@@ -13,7 +13,14 @@ class Config(BaseModel, extra=Extra.ignore):
     ncm_ctcode: int = 86
 
 
-config = Config.parse_obj(get_driver().config)
+try:
+    # pydantic v2
+    from nonebot import get_plugin_config
+    config = get_plugin_config(Config)
+except ImportError:
+    # pydantic v1
+    config = Config.parse_obj(get_driver().config)
+
 
 if config.ncm_phone and config.ncm_password:
     ncm.login.LoginViaCellphone(
@@ -72,7 +79,7 @@ def get_song_id(song_name: str):
 
     if res["result"]["songCount"] == 0:
         return None
-    
+
     for song in res["result"]["songs"]:
         privilege = song["privilege"]
         if "chargeInfoList" not in privilege:
@@ -86,5 +93,5 @@ def get_song_id(song_name: str):
             continue
 
         return song["id"]
-        
+
     return None

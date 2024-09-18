@@ -1,14 +1,14 @@
 import random
 import asyncio
 
-from nonebot import on_message, require, get_bot, logger, get_driver
+from nonebot import on_message, require, logger
 from nonebot.exception import ActionFailed
 from nonebot.typing import T_State
-from nonebot.rule import keyword, to_me, Rule
-from nonebot.adapters import Bot, Event
+from nonebot.rule import Rule
+from nonebot.adapters import Bot
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.onebot.v11 import permission
-from src.common.config import BotConfig, GroupConfig
+from src.common.config import BotConfig
 
 
 async def is_drink_msg(bot: Bot, event: GroupMessageEvent, state: T_State) -> bool:

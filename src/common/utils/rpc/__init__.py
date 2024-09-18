@@ -1,19 +1,16 @@
 import json
 import grpc
-from typing import List, Dict, Tuple, Optional, Type, TypeVar, Any
+from typing import List, Dict, Tuple, Optional, Any
 from src.common.utils.rpc import pymongo_rpc_pb2, pymongo_rpc_pb2_grpc
 from src.common.config import plugin_config
 
 
-T = TypeVar('T')
-
-
 class CollectionProxy:
-    def __init__(self, rpc_client: Type['MongoClient'], collection_name: str):
+    def __init__(self, rpc_client: 'MongoClient', collection_name: str):
         self.rpc_client = rpc_client
         self.collection_name = collection_name
 
-    def __getitem__(self: T, collection_name: str) -> T:
+    def __getitem__(self, collection_name: str) -> 'CollectionProxy':
         return CollectionProxy(self.rpc_client, collection_name)
 
     def find(self, filter: Dict = {}) -> List[Dict[str, Any]]:
@@ -39,7 +36,7 @@ class CollectionProxy:
 
 
 class MongoClient:
-    def __init__(self, mongo_host: str, mongo_port: str, **kwargs):
+    def __init__(self, mongo_host: str, mongo_port: int, **kwargs):
         self.channel = grpc.insecure_channel(f'{mongo_host}:{mongo_port}')
         self.stub = pymongo_rpc_pb2_grpc.MongoDBServiceStub(self.channel)
         self.metadata = [('authorization', plugin_config.rpc_token)]
