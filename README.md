@@ -116,7 +116,6 @@
 
 请作者喝杯咖啡吧~ （请备注牛牛项目，感谢你的资瓷 ✿✿ヽ(°▽°)ノ✿）
 
-<div>
-<img alt="sponsor" src="https://user-images.githubusercontent.com/18511905/171821963-be1247d1-2959-4d2f-91c1-095a215dd601.jpg" width=262 height=408/>
-<img alt="sponsor" src="https://user-images.githubusercontent.com/18511905/171821974-c5b13928-c66a-4168-b472-02b7048a2eff.png" width=298 height=408/>
-</div>
+<a href="https://afdian.com/a/misteo">
+  <img width="200" src="https://pic1.afdiancdn.com/static/img/welcome/button-sponsorme.png">
+</a>
