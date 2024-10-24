@@ -81,16 +81,16 @@
     若安装失败，在 Windows 上可能需要额外安装 `Visual Studio`，Linux 上需要 `build-essential`  
     注：项目将优先尝试导入 `jieba-fast` 库，如果导入失败则使用 `jieba` 库，无需手动修改代码
 
-7. 安装并配置NapCat
+7. 安装并配置 NapCat
     
-    该分支适配了 `NapCat`作为QQ客户端，重新支持了戳一戳功能~~目前就改了这个~~。具体部署方法参照[NapCat](https://napneko.com/guide/start-install)官方步骤。
-    在NapCat配置文件中使用反向WebSocket连接牛牛
+    若使用 `NapCat` 作为 QQ 客户端，可重新支持了戳一戳功能 ~~目前就改了这个~~ 。具体部署方法参照 [NapCat](https://napneko.com/guide/start-install) 官方步骤。
+    在 NapCat 配置文件中使用反向 WebSocket 连接牛牛
 
     ```bash
     ws://localhost:8080/onebot/v11/ws
     ```
     
-    **注意!使用戳一戳功能需要用到NapCat自有API，因此需要额外配置[PacketServer](https://napneko.com/config/advanced#%E9%85%8D%E7%BD%AE-packetserver)**
+    **注意！使用戳一戳功能需要用到 NapCat 自有 API，因此需要额外配置 [PacketServer](https://napneko.com/config/advanced#%E9%85%8D%E7%BD%AE-packetserver)**
 
 ## 启动 Pallas-Bot
 
