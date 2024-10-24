@@ -90,15 +90,15 @@ nb run        # 运行
 
 **注意！请不要关闭这个命令行窗口！这会导致 Pallas-Bot 停止运行！**
 
-## 通过反向WebSocket连接可用机器人框架
+## 通过反向 WebSocket 连接可用机器人框架
 
-由于gocqhttp已经无法使用，现在需找到并安装一个可用机器人框架，登录你的账号
+由于 gocqhttp 已经无法使用，现在需找到并安装一个可用机器人框架，登录你的账号
 
-使用反向WebSocket连接牛牛
+使用反向 WebSocket 连接牛牛
 
-    ```bash
-    ws://localhost:8080/onebot/v11/ws
-    ```
+```bash
+ws://localhost:8080/onebot/v11/ws
+```
 
 ## 后续更新
 
