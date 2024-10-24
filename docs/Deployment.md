@@ -52,7 +52,6 @@
 
     ```bash
     nb plugin install nonebot_plugin_apscheduler
-    nb plugin install nonebot_plugin_gocqhttp
     nb driver install websockets
     nb driver install fastapi
     ```
@@ -82,6 +81,17 @@
     若安装失败，在 Windows 上可能需要额外安装 `Visual Studio`，Linux 上需要 `build-essential`  
     注：项目将优先尝试导入 `jieba-fast` 库，如果导入失败则使用 `jieba` 库，无需手动修改代码
 
+7. 安装并配置 NapCat
+    
+    若使用 `NapCat` 作为 QQ 客户端，可重新支持了戳一戳功能 ~~目前就改了这个~~ 。具体部署方法参照 [NapCat](https://napneko.com/guide/start-install) 官方步骤。
+    在 NapCat 配置文件中使用反向 WebSocket 连接牛牛
+
+    ```bash
+    ws://localhost:8080/onebot/v11/ws
+    ```
+    
+    **注意！使用戳一戳功能需要用到 NapCat 自有 API，因此需要额外配置 [PacketServer](https://napneko.com/config/advanced#%E9%85%8D%E7%BD%AE-packetserver)**
+
 ## 启动 Pallas-Bot
 
 ```bash
@@ -91,12 +101,6 @@ nb run        # 运行
 
 **注意！请不要关闭这个命令行窗口！这会导致 Pallas-Bot 停止运行！**
 
-## 访问后台并登陆账号
-
-一切顺利的话，在加载完后你大概会看到一个显眼链接，把它复制到浏览器打开  
-（本地部署的话可以直接访问 <http://127.0.0.1:8080/go-cqhttp/>）  
-
-然后就是比较直观的操作了，直接添加你的账号并登陆即可  
 
 ## 后续更新
 
@@ -115,19 +119,6 @@ AI 功能均对设备硬件要求较高（要么有一块 6G 显存或更高的�
 若设备性能不足，或对额外的 AI 功能不感兴趣，可以跳过这部分内容。如果每次启动的报错嫌烦，可以直接把对应文件夹删掉，不影响其他功能。  
 
 配置 AI 功能请参考 [部署教程 AI 篇](AIDeployment.md)
-
-## FAQ
-
-### 一直无法登陆
-
-最近腾讯管得严了（所以不要用大号），可以参考 https://github.com/Mrs4s/go-cqhttp/issues/1939 尝试解决下
-
-### 牛牛只发语音不发文字怎么办？
-
-多半是被风控了（ WebUI 上点开账号可以看到输出提示）  
-自己拿手机登下随便找个群发句话，应该会有提示让你验证  
-
-如果没有就多挂几天吧，可能过几天就好了 ( ´_ゝ` )
 
 ## 开发者群
 

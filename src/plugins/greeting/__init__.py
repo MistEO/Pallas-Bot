@@ -108,8 +108,10 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
         await asyncio.sleep(delay)
         config.refresh_cooldown('poke')
 
-        poke_msg: str = '[CQ:poke,qq={}]'.format(event.user_id)
-        await all_notice.finish(Message(poke_msg))
+        await get_bot(str(event.self_id)).call_api('group_poke', **{
+            "group_id": event.group_id,
+            "user_id": event.user_id
+        })
 
     elif event.notice_type == 'group_increase':
         if event.user_id == event.self_id:
