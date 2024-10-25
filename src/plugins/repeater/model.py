@@ -311,9 +311,9 @@ class Chat:
         return False
 
     @ staticmethod
-    def speak() -> Optional[Tuple[int, int, List[Message]]]:
+    def speak() -> Optional[Tuple[int, int, List[Message], Optional[int]]]:
         '''
-        主动发言，返回当前最希望发言的 bot 账号、群号、发言消息 List，也有可能不发言
+        主动发言，返回当前最希望发言的 bot 账号、群号、发言消息 List、戳一戳目标，也有可能不发言
         '''
 
         basic_msgs_len = 10
@@ -426,13 +426,13 @@ class Chat:
                 if not answer:
                     break
                 speak_list.extend(answer)
-
+            
+            target_id = None
             if random.random() < Chat.SPEAK_POKE_PROBABILITY:
                 target_id = random.choice(
                     Chat._message_dict[group_id])['user_id']
-                speak_list.append(Message('[CQ:poke,qq={}]'.format(target_id)))
 
-            return (bot_id, group_id, speak_list)
+            return (bot_id, group_id, speak_list, target_id)
 
         return None
 

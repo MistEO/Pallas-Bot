@@ -272,7 +272,7 @@ async def speak_up():
     if not ret:
         return
 
-    bot_id, group_id, messages = ret
+    bot_id, group_id, messages, target_id = ret
 
     for msg in messages:
         logger.info(
@@ -282,6 +282,11 @@ async def speak_up():
             'message': msg,
             'group_id': group_id
         })
+        if target_id:
+          await get_bot(str(bot_id)).call_api('group_poke', **{
+            'user_id': target_id,
+            'group_id': group_id
+            })
         await asyncio.sleep(random.randint(2, 5))
 
 
