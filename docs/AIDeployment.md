@@ -65,19 +65,17 @@ AI 功能均对设备硬件要求较高，且配置操作更加复杂一些。�
     python -m pip install tokenizers rwkv
     ```
 
-3. 可以在".env"里配置是否启用 api,实现与 Bot 进程的独立,这样重启bot的时候不用再载入一次模型，同时方便其他服务的调用，可在"/src/pluings/chat"下执行
+3. （可选）在 `.env` 里配置是否启用 chat server，由独立进程加载聊天模型。默认不启用，由 Pallas-Bot 直接加载聊天模型
+    
+    ```bash
+    python src/pluings/chat/server.py
+    ```
 
-   ```bash
-   python src/pluings/chat/server.py
-   ```
+    `src/plugins/chat/server.py`中的端口可以自行修改，默认为 5000，保证与 `src/plugins/chat/__init__.py` 中一致即可。也可以自行部署 gunicorn 等生产服务器。
 
-   或者自行部署 gunicorn 等生产服务器
+4. `src/plugins/chat/prompt.py` 里的起手咒语 `INIT_PROMPT` 有兴趣可以试着改改
 
-4.`src/plugins/chat/server.py`中的端口可以自行修改，默认为 5000，保证与`src/plugins/chat/__init__.py`中一致即可
-
-5. `src/plugins/chat/prompt.py` 里的起手咒语 `INIT_PROMPT` 有兴趣可以试着改改
-
-6. `src/plugins/chat/model.py` 里的 `STRATEGY` 可以按上游仓库的 [说明](https://github.com/BlinkDL/ChatRWKV/tree/main#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B) 改改，能省点显存啥的
+5. `src/plugins/chat/model.py` 里的 `STRATEGY` 可以按上游仓库的 [说明](https://github.com/BlinkDL/ChatRWKV/tree/main#%E4%B8%AD%E6%96%87%E6%A8%A1%E5%9E%8B) 改改，能省点显存啥的
 
 ## 酒后语音说话（TTS）
 
