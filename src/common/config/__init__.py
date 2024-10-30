@@ -76,11 +76,11 @@ class PluginConfig(BaseModel, extra=Extra.ignore):
     # chat 模型的strategy
     chat_strategy: str = ''
     # chat 是否使用本地api
-    chat_use_local_api: bool = False
+    chat_use_local_server: bool = False
     # chat api超时时间
-    chat_timeout: int = 15
+    chat_server_timeout: int = 15
     # chat api重试次数
-    chat_retry: int = 3
+    chat_server_retry: int = 3
 
 
 try:

@@ -24,9 +24,9 @@ except Exception as error:
 
 TTS_MIN_LENGTH = 10
 CHAT_API_URL = 'http://127.0.0.1:5000/chat'
-USE_API = plugin_config.chat_use_local_api
-TIMEOUT = plugin_config.chat_timeout 
-MAX_RETRIES = plugin_config.chat_retry  
+USE_API = plugin_config.chat_use_local_server
+TIMEOUT = plugin_config.chat_server_timeout 
+MAX_RETRIES = plugin_config.chat_server_retry  
 RETRY_BACKOFF_FACTOR = 1  # 重试间隔
 
 # 用来重试的
