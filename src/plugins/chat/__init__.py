@@ -1,33 +1,80 @@
-import asyncio
 from asyncer import asyncify
 from nonebot.adapters.onebot.v11 import MessageSegment, permission, GroupMessageEvent
 from nonebot.adapters import Bot, Event
 from nonebot.rule import Rule
 from nonebot.typing import T_State
-from nonebot import on_message, logger
+from nonebot import on_message, logger, get_driver
 import httpx
+import asyncio
 
+from .Config import Setconfig, InitConnect
 from src.common.config import BotConfig, GroupConfig, plugin_config
 
-try:
-    from src.common.utils.speech.text_to_speech import text_2_speech
+
+config = Setconfig()
+plugins_loaded = False
+TTS_MIN_LENGTH = plugin_config.drunk_tts_threshold
+SERVER_HOST = config.SERVER_HOST
+SERVER_PORT = config.SERVER_PORT
+TTS_SERVER = config.TTS_SERVER
+CHAT_SERVER = config.CHAT_SERVER
+TIMEOUT = config.SERVER_TIMEOUT
+MAX_RETRIES = config.SERVER_RETRY
+RETRY_BACKOFF_FACTOR = 1 #发消息时的重试间隔
+SERVER_URL = f'http://{SERVER_HOST}:{SERVER_PORT}'
+
+driver = get_driver()
+connected = False
+# 加个锁
+connect_lock = asyncio.Lock()
+
+@driver.on_bot_connect
+async def on_bot_connect():
+    '''
+    bot 连上了再连 server
+    '''
+    global connected
+
+    if TTS_SERVER or CHAT_SERVER:
+        async with connect_lock:
+            # 检查有没有尝试的连接
+            if not connected:
+                bot_start = True
+                if bot_start:
+                    init_connect = InitConnect(config)
+                    logger.info("准备连接 server ,等待30秒")
+                    await init_connect.connect_to_server()
+                    connected = True
+    
+def chat_init():
+    global chat
+    try:
+        from .model import Chat
+        chat = Chat(plugin_config.chat_strategy)
+        logger.info(f"Chat module initialized with strategy: {plugin_config.chat_strategy}")
+    except Exception as error:
+        chat = None
+        logger.error(f"Failed to initialize Chat module, error: {error}")
+
+def tts_init():
+    global TTS_AVAIABLE
+    try:
+        from src.common.utils.speech.text_to_speech import text_2_speech 
+        TTS_AVAIABLE = True
+        logger.info("TTS is available.")
+    except Exception as error:
+        TTS_AVAIABLE = False
+        logger.error(f"TTS not available, error: {error}")
+
+if CHAT_SERVER:
+    chat = None
+else:
+    chat_init()
+
+if TTS_SERVER:
     TTS_AVAIABLE = True
-except Exception as error:
-    logger.error('TTS not available, error: ', error)
-    TTS_AVAIABLE = False
-
-try:
-    from .model import Chat
-except Exception as error:
-    logger.error('Chat model import error: ', error)
-    raise error
-
-TTS_MIN_LENGTH = 10
-CHAT_API_URL = 'http://127.0.0.1:5000/chat'
-USE_API = plugin_config.chat_use_local_server
-TIMEOUT = plugin_config.chat_server_timeout 
-MAX_RETRIES = plugin_config.chat_server_retry  
-RETRY_BACKOFF_FACTOR = 1  # 重试间隔
+else:
+    tts_init()
 
 # 用来重试的
 client = httpx.AsyncClient(
@@ -35,29 +82,31 @@ client = httpx.AsyncClient(
     transport=httpx.AsyncHTTPTransport(retries=MAX_RETRIES)
 )
 
-if USE_API:
-    try:
-        chat = None
-    except Exception as error:
-        logger.error('Chat api init error: ', error)
-        raise error
-else:
-    try:
-        chat = Chat(plugin_config.chat_strategy)
-    except Exception as error:
-        logger.error('Chat model init error: ', error)
-        raise error
-
+async def make_api_request(url, method, name, json_data=None, params=None):
+    """
+    异步请求数据
+    """
+    for a in range(MAX_RETRIES + 1):
+        try:
+            if method == 'POST':
+                response = await client.post(f'{url}/{name}', json=json_data)
+            elif method == 'DELETE':
+                response = await client.delete(f'{url}/{name}', params=params)
+            response.raise_for_status()
+            return response
+        except httpx.HTTPError as error:
+            logger.error(f'Request failed (attempt {a + 1}): {error}')
+            if a < MAX_RETRIES:
+                await asyncio.sleep(RETRY_BACKOFF_FACTOR * (2 ** a))
+    return None
 @BotConfig.handle_sober_up
-def on_sober_up(bot_id, group_id, drunkenness) -> None:
+async def on_sober_up(bot_id, group_id, drunkenness) -> None:
     session = f'{bot_id}_{group_id}'
     logger.info(f'bot [{bot_id}] sober up in group [{group_id}], clear session [{session}]')
-    if USE_API:
-        try:
-            response = client.delete(f'{CHAT_API_URL}/del_session', params={'session': session})
-            response.raise_for_status()
-        except httpx.HTTPError as error:
-            logger.error(f'Failed to delete session [{session}]: {error}')
+    if CHAT_SERVER:
+        response = await make_api_request(SERVER_URL, 'DELETE', 'del_session', params={'session': session})
+        if response and response.status_code != 200:
+            logger.error(f'Failed to delete session [{session}]: {response.status_code} {response.text}')
     else:
         if chat is not None:
             chat.del_session(session)
@@ -72,21 +121,6 @@ drunk_msg = on_message(
     block=True,
     permission=permission.GROUP,
 )
-
-async def make_api_request(url, method, json_data=None, params=None):
-    for a in range(MAX_RETRIES + 1):
-        try:
-            if method == 'POST':
-                response = await client.post(url, json=json_data)
-            elif method == 'DELETE':
-                response = await client.delete(url, params=params)
-            response.raise_for_status()
-            return response
-        except httpx.HTTPError as error:
-            logger.error(f'Request failed (attempt {a + 1}): {error}')
-            if a < MAX_RETRIES:
-                await asyncio.sleep(RETRY_BACKOFF_FACTOR * (2 ** a))
-    return None
 
 @drunk_msg.handle()
 async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
@@ -110,8 +144,8 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     if not text:
         return
 
-    if USE_API:
-        response = await make_api_request(CHAT_API_URL, 'POST', json_data={'session': session, 'text': text, 'token_count': 50})
+    if CHAT_SERVER:
+        response = await make_api_request(SERVER_URL, 'POST', 'chat', json_data={'session': session, 'text': text, 'token_count': 50})
         if response:
             ans = response.json().get('response', '')
         else:
@@ -122,9 +156,21 @@ async def _(bot: Bot, event: GroupMessageEvent, state: T_State):
     logger.info(f'session [{session}]: {text} -> {ans}')
 
     if TTS_AVAIABLE and len(ans) >= TTS_MIN_LENGTH:
-        bs = await asyncify(text_2_speech)(ans)
-        voice = MessageSegment.record(bs)
-        await drunk_msg.send(voice)
+        if TTS_SERVER:
+            tts_response = await make_api_request(SERVER_URL, 'POST', 'tts', json_data={'text': ans})
+            if tts_response and tts_response.status_code == 200:
+                bs = tts_response.content
+                voice = MessageSegment.record(bs)
+                await drunk_msg.send(voice)
+        else:
+            from src.common.utils.speech.text_to_speech import text_2_speech 
+            bs = await asyncify(text_2_speech)(ans)
+            voice = MessageSegment.record(bs)
+            await drunk_msg.send(voice)
 
     config.reset_cooldown(cd_key)
     await drunk_msg.finish(ans)
+    
+    
+    
+    
