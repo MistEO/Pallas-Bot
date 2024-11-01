@@ -1,6 +1,7 @@
 import os
 import time
 import aiohttp
+import asyncio
 from dotenv import load_dotenv
 
 
@@ -70,16 +71,15 @@ class InitConnect:
         for attempt in range(max_attempts):
             try:
                 # 连接 chat server
-                time.sleep(30)  # 等30s启动
+                await asyncio.sleep(30)# 等30s启动
                 if self.config.CHAT_SERVER:
                     chat_connected = await self.ping_server(self.chat_server_url)
                     print(f"Chat server connection attempt {attempt + 1}: {'success' if chat_connected else 'failed'}")
-                    
+
                 # 连接 tts server
                 if self.config.TTS_SERVER:
                     tts_connected = await self.ping_server(self.tts_server_url)
                     print(f"TTS server connection attempt {attempt + 1}: {'success' if tts_connected else 'failed'}")
-                
                 # 检查连接状态
                 if (not self.config.CHAT_SERVER or chat_connected) and (not self.config.TTS_SERVER or tts_connected):
                     self.connected = True
@@ -96,7 +96,7 @@ class InitConnect:
 
             # 等待一段时间后再次尝试
             print(f"等待 {attempt_interval} 秒后重试...")
-            time.sleep(attempt_interval)
+            await asyncio.sleep(attempt_interval)
 
         if not self.connected:
             print("连接失败，未能成功连接到 server")

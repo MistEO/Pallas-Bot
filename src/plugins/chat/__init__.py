@@ -24,18 +24,27 @@ RETRY_BACKOFF_FACTOR = 1 #发消息时的重试间隔
 SERVER_URL = f'http://{SERVER_HOST}:{SERVER_PORT}'
 
 driver = get_driver()
+connected = False
+# 加个锁
+connect_lock = asyncio.Lock()
+
 @driver.on_bot_connect
 async def on_bot_connect():
     '''
     bot 连上了再连 server
     '''
-    if TTS_SERVER or CHAT_SERVER :
-        logger.info("准备连接 server,等待30秒")
-        bot_start = True
-        if bot_start:
-            init_connect = InitConnect(config)
-            await init_connect.connect_to_server()
+    global connected
 
+    if TTS_SERVER or CHAT_SERVER:
+        async with connect_lock:
+            # 检查有没有尝试的连接
+            if not connected:
+                bot_start = True
+                if bot_start:
+                    init_connect = InitConnect(config)
+                    logger.info("准备连接 server ,等待30秒")
+                    await init_connect.connect_to_server()
+                    connected = True
     
 def chat_init():
     global chat
