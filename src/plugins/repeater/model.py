@@ -2,6 +2,8 @@ from typing import Generator, List, Optional, Union, Tuple, Dict, Any
 from functools import cached_property, cmp_to_key
 from dataclasses import dataclass
 from collections import defaultdict, deque
+from dotenv import load_dotenv
+load_dotenv()
 
 try:
     import jieba_fast.analyse as jieba_analyse
@@ -16,6 +18,7 @@ import time
 import random
 import re
 import atexit
+import os
 
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot.adapters.onebot.v11 import Message, MessageSegment
@@ -25,12 +28,17 @@ if plugin_config.use_rpc:
     from src.common.utils.rpc import MongoClient
 else:
     from pymongo import MongoClient
-try:
-    from src.common.utils.speech.text_to_speech import text_2_speech
+    
+TTS_SERVER = os.getenv('TTS_SERVER', 'false').lower() in ['true', '1', 't', 'y', 'yes']
+if TTS_SERVER:
     TTS_AVAIABLE = True
-except Exception as error:
-    print('TTS not available, error:', error)
-    TTS_AVAIABLE = False
+else:
+    try:
+        from src.common.utils.speech.text_to_speech import text_2_speech
+        TTS_AVAIABLE = True
+    except Exception as error:
+        print('TTS not available, error:', error)
+        TTS_AVAIABLE = False
 
 
 mongo_client = MongoClient(
