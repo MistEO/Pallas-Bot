@@ -83,14 +83,12 @@
 
 7. 安装并配置 NapCat
     
-    若使用 `NapCat` 作为 QQ 客户端，可重新支持了戳一戳功能 ~~目前就改了这个~~ 。具体部署方法参照 [NapCat](https://napneko.com/guide/start-install) 官方步骤。
-    在 NapCat 配置文件中使用反向 WebSocket 连接牛牛
+    若使用 `NapCat` 作为 QQ 客户端，可支持戳一戳功能。具体部署方法参照 [NapCat](https://napneko.github.io/) 官方步骤。
+    在 NapCat 配置文件中使用反向 WebSocket (NapCat作为WebSocket客户端角色) 连接牛牛
 
     ```bash
     ws://localhost:8080/onebot/v11/ws
     ```
-    
-    **注意！使用戳一戳功能需要用到 NapCat 自有 API，因此需要额外配置 [PacketServer](https://napneko.com/config/advanced#%E9%85%8D%E7%BD%AE-packetserver)**
 
 ## 启动 Pallas-Bot
 
