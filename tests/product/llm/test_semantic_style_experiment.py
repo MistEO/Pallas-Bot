@@ -160,3 +160,64 @@ async def test_settlement_counts_control_bucket_as_control(tmp_path, monkeypatch
     status = exp.experiment_status()
     assert status["control"] == {"settled": 1, "target_followup": 1}
     assert status["experiment"] == {}
+
+
+@pytest.mark.asyncio
+async def test_settlement_ignores_followups_after_window(monkeypatch) -> None:
+    """投递后 90 秒窗口外的消息不计入 target_followup / negative。"""
+    exp.record_semantic_exposure(
+        request_id="win",
+        bot_id=100,
+        group_id=42,
+        user_id=11,
+        bucket=1,
+        injection_types=[],
+        source_ids=[],
+        delivery_source="provider",
+        bot_message_id=501,
+        delivered_at=1000,
+    )
+
+    class Repo:
+        async def list_group_messages_after(self, *_args, **_kwargs):
+            return [
+                SimpleNamespace(message_id=1, user_id=99, plain_text="随便聊聊", raw_message="", time=1050),
+                SimpleNamespace(message_id=2, user_id=11, plain_text="想得美", raw_message="", time=2000),
+            ]
+
+    monkeypatch.setattr("pallas.core.foundation.db.make_message_repository", lambda: Repo())
+
+    assert await exp.settle_pending_semantic_exposures(now=1200) == 1
+    assert exp.experiment_status()["experiment"] == {"settled": 1}
+
+
+@pytest.mark.asyncio
+async def test_settlement_counts_followup_at_window_boundary(monkeypatch) -> None:
+    """恰好落在 delivered_at + 90s 的消息仍在窗口内。"""
+    exp.record_semantic_exposure(
+        request_id="edge",
+        bot_id=100,
+        group_id=42,
+        user_id=11,
+        bucket=1,
+        injection_types=[],
+        source_ids=[],
+        delivery_source="provider",
+        bot_message_id=501,
+        delivered_at=1000,
+    )
+
+    class Repo:
+        async def list_group_messages_after(self, *_args, **_kwargs):
+            return [
+                SimpleNamespace(message_id=1, user_id=11, plain_text="想得美", raw_message="", time=1090),
+            ]
+
+    monkeypatch.setattr("pallas.core.foundation.db.make_message_repository", lambda: Repo())
+
+    assert await exp.settle_pending_semantic_exposures(now=1200) == 1
+    assert exp.experiment_status()["experiment"] == {
+        "settled": 1,
+        "target_followup": 1,
+        "negative": 1,
+    }
