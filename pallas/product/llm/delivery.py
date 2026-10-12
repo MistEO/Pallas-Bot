@@ -845,25 +845,35 @@ async def deliver_llm_callback_success(
         delivery_latency_ms=max(0, int((time.monotonic() - delivery_started_at) * 1000)),
     )
     if text_delivered and should_append_llm_session(task) and learned_reply_text:
-        raw_group_id = task.get("group_id")
-        scope_group = int(raw_group_id) if raw_group_id is not None else None
-        speaker_id = int(task.get("user_id") or 0)
-        user_text = str(task.get("user_text") or "").strip()
-        if speaker_id:
-            if history_summary and history_keep_messages and can_write_runtime_state_summary():
-                await compact_user_llm_history_with_summary(
-                    int(bot_id),
-                    scope_group,
-                    speaker_id,
-                    history_summary,
-                    keep_messages=int(history_keep_messages),
-                )
-            if user_text:
-                await append_llm_message(int(bot_id), scope_group, speaker_id, "user", user_text)
-            await append_llm_message(int(bot_id), scope_group, speaker_id, "assistant", learned_reply_text)
-            from pallas.product.llm.memory.auto_episode import schedule_auto_save_group_episode
+        try:
+            raw_group_id = task.get("group_id")
+            scope_group = int(raw_group_id) if raw_group_id is not None else None
+            speaker_id = int(task.get("user_id") or 0)
+            user_text = str(task.get("user_text") or "").strip()
+            if speaker_id:
+                if history_summary and history_keep_messages and can_write_runtime_state_summary():
+                    await compact_user_llm_history_with_summary(
+                        int(bot_id),
+                        scope_group,
+                        speaker_id,
+                        history_summary,
+                        keep_messages=int(history_keep_messages),
+                    )
+                if user_text:
+                    await append_llm_message(int(bot_id), scope_group, speaker_id, "user", user_text)
+                await append_llm_message(int(bot_id), scope_group, speaker_id, "assistant", learned_reply_text)
+                from pallas.product.llm.memory.auto_episode import schedule_auto_save_group_episode
 
-            schedule_auto_save_group_episode(bot_id=int(bot_id), group_id=scope_group)
+                schedule_auto_save_group_episode(bot_id=int(bot_id), group_id=scope_group)
+        except Exception as exc:
+            log_rate_limited(
+                logger,
+                "warning",
+                "llm.delivery.session_history_append_failed",
+                "AI callback session history append skipped for task [{}], exception [{}]",
+                task_id,
+                type(exc).__name__,
+            )
     from pallas.product.llm.repeater_feedback import is_feedback_task_type
 
     if is_feedback_task_type(task_type) and learned_reply_text and text_delivered:
