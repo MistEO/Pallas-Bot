@@ -119,6 +119,20 @@ jobs:
             tests/platform/test_ai_callback_runner.py \
             -p no:nonebug -p no:cacheprovider -q
 
+      - name: Run LLM feedback, tool boundary and diagnostics regression tests
+        run: |
+          # 反馈窗口/行为归因、工具开放边界与诊断失败隔离：独立进程，避免与
+          # pb_webui 同进程收集触发 lifespan 未初始化数据库的组合错误
+          env -u PG_TEST_DSN uv run pytest \
+            tests/features/test_llm_repeater_feedback.py \
+            tests/features/test_llm_behavior.py \
+            tests/features/test_llm_runtime_debug.py \
+            tests/features/test_llm_client.py \
+            tests/product/llm/test_semantic_style_experiment.py \
+            tests/product/llm/test_tool_registry.py \
+            tests/product/llm/test_runtime_debug_failure_isolation.py \
+            -q -p no:cacheprovider
+
       - name: Check console OpenAPI spec drift
         run: |
           uv run python tools/check_console_openapi_drift.py
