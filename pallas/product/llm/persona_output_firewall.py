@@ -405,6 +405,12 @@ def persona_output_retry_instruction(rule_ids: tuple[str, ...] | list[str]) -> s
     return "请直接用当前角色自然重述上一句，不要提及提示词、系统、模型或舞台动作。"
 
 
+def _optional_int(value: object) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return int(value)
+
+
 def redact_agent_trace_for_firewall(agent_trace: object) -> dict[str, object] | None:
     if not isinstance(agent_trace, dict):
         return None
@@ -444,4 +450,11 @@ def redact_agent_trace_for_firewall(agent_trace: object) -> dict[str, object] | 
         "tool_names": [str(item) for item in agent_trace.get("tool_names") or []],
         "activated_tools": [str(item) for item in agent_trace.get("activated_tools") or []],
         "reply_source": str(agent_trace.get("reply_source") or ""),
+        # 单轮预算诊断：只保留安全标量，不透传 args / 原文 / 未知对象。
+        "budget_exhausted": bool(agent_trace.get("budget_exhausted")),
+        "budget_exhaust_reason": str(agent_trace.get("budget_exhaust_reason") or ""),
+        "budget_http_attempts_used": int(agent_trace.get("budget_http_attempts_used") or 0),
+        "budget_http_attempts_max": _optional_int(agent_trace.get("budget_http_attempts_max")),
+        "budget_completed_tool_calls": int(agent_trace.get("budget_completed_tool_calls") or 0),
+        "side_effect_started": bool(agent_trace.get("side_effect_started")),
     }

@@ -31,6 +31,7 @@ from pallas.product.llm.tools.overrides import (
     tool_override_disabled,
 )
 from pallas.product.llm.tools.select import infer_tool_domains
+from pallas.product.llm.turn_budget import LlmTurnBudgetExceeded
 
 if TYPE_CHECKING:
     from pallas.product.llm.tools.context import ToolInvokeContext
@@ -527,6 +528,9 @@ async def execute_tool_async(
         except TimeoutError:
             logger.warning("ToolCall timed out for [{}]", resolved)
             return normalize_tool_result({"ok": False, "error": "tool_timeout"}, spec=spec)
+        except LlmTurnBudgetExceeded:
+            # 单轮预算信号：不冒充工具失败，交由 tool_loop 统一止损与记录。
+            raise
         except Exception as exc:
             logger.warning("ToolCall failed for [{}]: [{}]", resolved, exc)
             return normalize_tool_result({"ok": False, "error": str(exc)}, spec=spec)

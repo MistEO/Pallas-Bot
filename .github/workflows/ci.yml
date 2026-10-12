@@ -133,6 +133,18 @@ jobs:
             tests/product/llm/test_runtime_debug_failure_isolation.py \
             -q -p no:cacheprovider
 
+      - name: Run LLM turn budget and propagation regression tests
+        run: |
+          # 单轮共享预算与关键传播（vision / history 显式传共享对象）：独立进程，
+          # 避免与 pb_webui 同进程收集触发 lifespan 未初始化数据库的组合错误
+          env -u PG_TEST_DSN uv run pytest \
+            tests/product/llm/test_turn_budget.py \
+            tests/product/llm/test_provider_turn_budget.py \
+            tests/product/llm/test_tool_loop_turn_budget.py \
+            tests/product/llm/test_vision_messages.py \
+            tests/product/llm/test_history_tool.py \
+            -p no:nonebug -p no:cacheprovider -q
+
       - name: Check console OpenAPI spec drift
         run: |
           uv run python tools/check_console_openapi_drift.py

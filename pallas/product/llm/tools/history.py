@@ -153,12 +153,14 @@ async def handle_recent_summary(arguments: dict[str, Any], context: ToolInvokeCo
                 "ok": True,
                 "result": {"summary": "最近消息较多，但暂时无法整理出明确话题。", "message_count": len(rows)},
             }
+        budget_kwargs = {"turn_budget": context.turn_budget} if context.turn_budget is not None else {}
         response = await complete_chat_message(
             [{"role": "system", "content": _RECENT_SUMMARY_SYSTEM}, {"role": "user", "content": transcript}],
             model="",
             options={"temperature": 0.2, "max_tokens": task_token_budget("memory_extract")},
             task="memory_tool_summary",
             cfg=cfg,
+            **budget_kwargs,
         )
         summary = sanitize_prompt_literal(str(response.get("content") or ""), max_len=240)
         if not summary:

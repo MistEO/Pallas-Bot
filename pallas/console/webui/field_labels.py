@@ -246,6 +246,8 @@ FIELD_LABELS: dict[str, str] = {
     "llm_tools_soft_recall_min_score": "软召回最低匹配分",
     "llm_tools_soft_recall_max_candidates": "软召回最多候选数",
     "llm_tools_max_rounds": "工具调用最多轮数",
+    "llm_chat_turn_timeout_sec": "单轮生成最长耗时（秒）",
+    "llm_chat_turn_max_http_attempts": "单轮最多模型请求次数",
     "llm_tools_blacklist": "工具黑名单",
     "llm_tools_desc_max_len": "工具描述最大长度",
     "llm_tools_history_daily_budget": "工具摘要每日调用上限",
