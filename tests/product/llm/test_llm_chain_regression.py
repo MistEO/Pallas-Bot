@@ -533,3 +533,161 @@ async def test_partial_delivery_through_kernel_callback_preserves_sent_bubble_on
     assert delivery_event["sent_bubble_count"] == 1
     assert delivery_event["total_bubble_count"] == 3
     assert await TaskManager.get_task(request_id) is None
+
+
+@pytest.mark.asyncio
+async def test_kernel_delivery_survives_session_history_write_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    stub_task_registry: None,
+) -> None:
+    from pallas.core.foundation.config import TaskManager
+    from pallas.core.platform.ai_callback import runner as callback_runner
+    from pallas.core.platform.ai_callback.delivery import DeliveryReceipt
+    from pallas.core.platform.shard.coord import ai_task_registry
+    from pallas.product.llm import delivery as llm_delivery
+    from pallas.product.llm import kernel_runner
+    from pallas.product.llm.tools import registry
+
+    side_effects = 0
+    provider_calls = 0
+    traces: list[dict] = []
+    events: list[dict] = []
+    messages: list[str] = []
+    request_id = "history-write-failure"
+    monkeypatch.setenv("PALLAS_DATA_DIR", str(tmp_path))
+
+    async def write_effect(_args, _context=None):
+        nonlocal side_effects
+        side_effects += 1
+        return {"ok": True, "result": {"summary": "written"}}
+
+    from pallas.product.llm.tools.reply import register_reply_tools
+
+    register_reply_tools()
+    register_tool(
+        LlmToolSpec(
+            name="demo.write",
+            description="写入测试副作用",
+            parameters={"type": "object", "properties": {}},
+            domains=frozenset({"demo"}),
+            handler=write_effect,
+            source=LlmToolSource.BUILTIN,
+            capabilities=frozenset({ToolCapability.SIDE_EFFECTING.value}),
+        )
+    )
+    monkeypatch.setattr(registry, "ensure_tools_loaded", lambda: None)
+
+    cfg = LlmConfig(
+        llm_chat_enabled=True,
+        llm_tools_enabled=True,
+        llm_persona_output_firewall={"enabled": False},
+        llm_reply_postprocess_enabled=False,
+    )
+
+    def active_config() -> LlmConfig:
+        return cfg
+
+    async def scope_enabled(_bot_id, _group_id):
+        return False
+
+    monkeypatch.setattr("pallas.product.llm.config.get_llm_config", active_config)
+    monkeypatch.setattr("pallas.product.llm.availability.get_llm_config", active_config)
+    monkeypatch.setattr("pallas.product.llm.availability.is_llm_plugin_globally_disabled", lambda: False)
+    monkeypatch.setattr("pallas.product.llm.availability.llm_plugin_disabled_for_scope", scope_enabled)
+
+    async def fake_provider(_messages, **_kwargs):
+        nonlocal provider_calls
+        provider_calls += 1
+        if provider_calls == 1:
+            return {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "write-1",
+                        "type": "function",
+                        "function": {"name": "demo__write", "arguments": "{}"},
+                    }
+                ],
+            }
+        if provider_calls == 2:
+            return {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "reply-1",
+                        "type": "function",
+                        "function": {"name": "chat__reply", "arguments": '{"text": "写好了"}'},
+                    }
+                ],
+            }
+        return {"role": "assistant", "content": ""}
+
+    async def sender(_bot, _group_id, text, **_kwargs):
+        messages.append(text)
+        return DeliveryReceipt(delivered=True, message_id=400 + len(messages))
+
+    async def failing_history(*_fields):
+        raise RuntimeError("session history store unavailable")
+
+    monkeypatch.setattr("pallas.product.llm.tool_loop.complete_chat_message", fake_provider)
+    monkeypatch.setattr(callback_runner, "get_bot", lambda _bot_id: SimpleNamespace(self_id="1"))
+    monkeypatch.setattr("pallas.core.platform.ai_callback.delivery.send_group_message_with_receipt", sender)
+    monkeypatch.setattr(llm_delivery, "get_llm_config", active_config)
+    monkeypatch.setattr(llm_delivery, "append_llm_message", failing_history)
+    monkeypatch.setattr(
+        "pallas.product.llm.memory.auto_episode.schedule_auto_save_group_episode", lambda **_kwargs: None
+    )
+    monkeypatch.setattr(llm_delivery, "record_turn_event", lambda **fields: events.append(fields))
+    monkeypatch.setattr(
+        "pallas.product.llm.runtime_debug.append_runtime_trace", lambda **kwargs: traces.append(kwargs["trace"])
+    )
+    logged: list[tuple] = []
+    monkeypatch.setattr(llm_delivery, "log_rate_limited", lambda *args, **_kwargs: logged.append(args))
+    monkeypatch.setattr(ai_task_registry, "register_ai_task", lambda *_args: None)
+    monkeypatch.setattr(ai_task_registry, "remove_ai_task", lambda *_args: None)
+
+    await TaskManager.add_task(
+        request_id,
+        {
+            "task_type": "llm_chat",
+            "bot_id": 1,
+            "group_id": 2,
+            "user_id": 3,
+            "user_text": "写一下",
+            "turn_id": "turn-history-failure",
+            "start_time": time.time(),
+        },
+    )
+
+    await kernel_runner.run_kernel_chat_job(
+        request_id,
+        system_prompt="sys",
+        messages=[{"role": "user", "content": "写一下"}],
+        metadata={
+            "task": "llm_chat",
+            "bot_id": 1,
+            "group_id": 2,
+            "user_id": 3,
+            "tools_enabled": True,
+            "tool_schemas": [{"type": "function", "function": {"name": "demo__write"}}],
+            "turn_id": "turn-history-failure",
+        },
+        cfg=cfg,
+    )
+
+    assert side_effects == 1
+    assert provider_calls == 3
+    status_traces = [trace for trace in traces if trace.get("status")]
+    assert status_traces
+    assert status_traces[-1]["status"] == "success"
+    delivery_event = next(event for event in events if event["stage"] == "delivery")
+    assert delivery_event["delivery_status"] == "sent"
+    assert delivery_event["sent_bubble_count"] == delivery_event["total_bubble_count"] == 1
+    assert messages == ["写好了"]
+    assert await TaskManager.get_task(request_id) is None
+    history_logs = [entry for entry in logged if len(entry) > 5 and entry[4] == request_id]
+    assert history_logs
+    assert history_logs[0][5] == "RuntimeError"

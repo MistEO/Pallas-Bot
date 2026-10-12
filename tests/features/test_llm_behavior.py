@@ -246,6 +246,43 @@ def test_infer_behavior_feedback_includes_derailed_evidence() -> None:
     assert payload["observed_turn_count"] == 1
 
 
+def test_infer_behavior_feedback_source_ignores_out_of_window_ambient() -> None:
+    """窗外 ambient 消息不得影响来源归因：来源只看观察窗内消息。"""
+    run = BehaviorRun(
+        request_id="req-window-src",
+        created_at=100,
+        scene=BehaviorScene.SMALLTALK,
+        reply_text="嗯。",
+    )
+    turns = [
+        type("Turn", (), {"role": "user", "content": "然后呢？", "created_at": 130})(),
+    ]
+    ambient_turns = [
+        type("Turn", (), {"role": "user", "content": "我十连又歪了", "created_at": 500})(),
+    ]
+    outcome, payload = infer_behavior_feedback(run=run, turns=turns, ambient_turns=ambient_turns, now=600)
+    assert outcome == BehaviorOutcome.ENGAGED
+    assert payload["source"] == "session"
+    assert payload["observed_turn_count"] == 1
+
+
+def test_infer_behavior_feedback_counts_out_of_window_session_as_outside_window() -> None:
+    """窗外 session 消息不计入窗口内计数，只保留 followup_outside_window 归因。"""
+    run = BehaviorRun(
+        request_id="req-window-session",
+        created_at=100,
+        scene=BehaviorScene.SMALLTALK,
+        reply_text="嗯。",
+    )
+    turns = [
+        type("Turn", (), {"role": "user", "content": "然后呢？", "created_at": 500})(),
+    ]
+    outcome, payload = infer_behavior_feedback(run=run, turns=turns, now=600)
+    assert outcome == BehaviorOutcome.NEUTRAL
+    assert payload["matched_signal"] == "followup_outside_window"
+    assert payload["observed_turn_count"] == 0
+
+
 def test_settle_behavior_run_outcome_persists_auto_feedback_payload(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("PALLAS_DATA_DIR", str(tmp_path))
     append_behavior_run(
