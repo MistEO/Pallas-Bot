@@ -10,6 +10,12 @@ import httpx
 from nonebot import logger
 
 from pallas.product.llm import provider_client as _repo
+from pallas.product.llm.turn_budget import (
+    LlmTurnBudget,
+    LlmTurnBudgetExceeded,
+    await_within_budget,
+    clamp_timeout_sec,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -306,6 +312,7 @@ async def complete_chat_message(
     | None = None,
     telemetry_context: dict[str, str] | None = None,
     exit_gate: Callable[[], Awaitable[None]] | None = None,
+    turn_budget: LlmTurnBudget | None = None,
 ) -> dict[str, Any]:
     c = cfg or _repo.get_llm_config()
     from pallas.product.llm.availability import llm_calls_enabled
@@ -318,6 +325,7 @@ async def complete_chat_message(
     opts = options if isinstance(options, dict) else {}
     method = str(request_method or opts.get("request_method") or "chat_completions").strip().lower()
     telemetry_kwargs = {"telemetry_context": telemetry_context} if telemetry_context is not None else {}
+    budget_kwargs = {"turn_budget": turn_budget} if turn_budget is not None else {}
 
     async def post_provider_chat(*args, **kwargs):
         if exit_gate is not None:
@@ -326,6 +334,8 @@ async def complete_chat_message(
             if exit_gate is not None:
                 kwargs["exit_gate"] = exit_gate
             result = await _repo._post_provider_chat(*args, **kwargs)
+        except LlmTurnBudgetExceeded:
+            raise
         except Exception:
             if exit_gate is not None:
                 await exit_gate()
@@ -349,6 +359,7 @@ async def complete_chat_message(
             task=task,
             provider_id=str(provider_id or ""),
             **telemetry_kwargs,
+            **budget_kwargs,
         )
 
     from pallas.product.llm.providers_store import resolve_endpoint_candidates_for_task
@@ -364,7 +375,12 @@ async def complete_chat_message(
             key_failed_over = False
             candidate_messages = messages
             if prepare_candidate_messages is not None:
-                candidate_messages = await prepare_candidate_messages(messages, endpoint, use_model)
+                candidate_messages = await await_within_budget(
+                    lambda endpoint=endpoint, use_model=use_model: prepare_candidate_messages(
+                        messages, endpoint, use_model
+                    ),
+                    turn_budget,
+                )
             for key_index, use_key in enumerate(keys):
                 try:
                     return await post_provider_chat(
@@ -379,6 +395,7 @@ async def complete_chat_message(
                         task=task,
                         provider_id=str(getattr(endpoint, "provider_id", "") or ""),
                         **telemetry_kwargs,
+                        **budget_kwargs,
                     )
                 except _repo.LlmProviderError as exc:
                     last_error = exc
@@ -423,6 +440,7 @@ async def complete_chat_message(
         task=task,
         provider_id="",
         **telemetry_kwargs,
+        **budget_kwargs,
     )
 
 
@@ -440,6 +458,7 @@ async def _post_provider_chat(
     provider_id: str = "",
     telemetry_context: dict[str, str] | None = None,
     exit_gate: Callable[[], Awaitable[None]] | None = None,
+    turn_budget: LlmTurnBudget | None = None,
 ) -> dict[str, Any]:
     exit_gate_errors: tuple[type[BaseException], ...] = ()
     if exit_gate is not None:
@@ -503,6 +522,7 @@ async def _post_provider_chat(
                 task=task,
                 provider_id=provider_id,
                 telemetry_context=telemetry_context,
+                turn_budget=turn_budget,
             )
         if method == "anthropic_messages":
             return await _repo._post_anthropic_messages(
@@ -516,6 +536,7 @@ async def _post_provider_chat(
                 task=task,
                 provider_id=provider_id,
                 telemetry_context=telemetry_context,
+                turn_budget=turn_budget,
             )
         if method == "ollama_chat":
             return await _repo._post_ollama_chat(
@@ -529,6 +550,7 @@ async def _post_provider_chat(
                 task=task,
                 provider_id=provider_id,
                 telemetry_context=telemetry_context,
+                turn_budget=turn_budget,
             )
         return await _repo._post_chat_completions(
             messages,
@@ -541,6 +563,7 @@ async def _post_provider_chat(
             task=task,
             provider_id=provider_id,
             telemetry_context=telemetry_context,
+            turn_budget=turn_budget,
         )
 
     resolved_method = _repo.resolve_request_method(request_method, base_url)
@@ -554,8 +577,10 @@ async def _post_provider_chat(
         attempt += 1
         attempt_started = time.monotonic()
         try:
-            result = await request(options_for_attempt)
+            result = await await_within_budget(lambda: request(options_for_attempt), turn_budget)
         except exit_gate_errors:
+            raise
+        except LlmTurnBudgetExceeded:
             raise
         except Exception as exc:
             if isinstance(exc, httpx.PoolTimeout):
@@ -594,6 +619,8 @@ async def _post_provider_chat(
         result = await request_attempt(use_options)
     except exit_gate_errors:
         raise
+    except LlmTurnBudgetExceeded:
+        raise
     except Exception as exc:
         if tools and requested_tool_choice == "required" and _required_tool_choice_is_incompatible(exc):
             _required_tool_choice_incompatible.add(cache_key)
@@ -601,6 +628,8 @@ async def _post_provider_chat(
             try:
                 result = await request_attempt(retry_options)
             except exit_gate_errors:
+                raise
+            except LlmTurnBudgetExceeded:
                 raise
             except Exception:
                 pass
@@ -656,15 +685,18 @@ async def _post_anthropic_messages(
     task: str = "llm_chat",
     provider_id: str = "",
     telemetry_context: dict[str, str] | None = None,
+    turn_budget: LlmTurnBudget | None = None,
 ) -> dict[str, Any]:
     model_name = str(model or "").strip()
     if not model_name:
         raise _repo.LlmProviderError("llm model not configured")
     url = _repo.anthropic_messages_url(base_url)
     payload = _repo.messages_to_anthropic_payload(messages, model=model_name, options=options, tools=tools)
-    timeout = httpx.Timeout(float(timeout_sec))
+    timeout = httpx.Timeout(clamp_timeout_sec(float(timeout_sec), turn_budget))
     headers = _repo.anthropic_auth_headers(api_key)
     client = await _repo.get_llm_shared_httpx_client()
+    if turn_budget is not None:
+        turn_budget.claim_http_attempt()
     response = await client.post(url, json=payload, headers=headers, timeout=timeout)
     if response.status_code != 200:
         logger.error(
@@ -704,15 +736,18 @@ async def _post_responses(
     task: str = "llm_chat",
     provider_id: str = "",
     telemetry_context: dict[str, str] | None = None,
+    turn_budget: LlmTurnBudget | None = None,
 ) -> dict[str, Any]:
     model_name = str(model or "").strip()
     if not model_name:
         raise _repo.LlmProviderError("llm model not configured")
     url = _repo.responses_url(base_url)
     payload = _repo.messages_to_responses_payload(messages, model=model_name, options=options, tools=tools)
-    timeout = httpx.Timeout(float(timeout_sec))
+    timeout = httpx.Timeout(clamp_timeout_sec(float(timeout_sec), turn_budget))
     headers = _repo.auth_headers(api_key)
     client = await _repo.get_llm_shared_httpx_client()
+    if turn_budget is not None:
+        turn_budget.claim_http_attempt()
     response = await client.post(url, json=payload, headers=headers, timeout=timeout)
     if response.status_code != 200:
         logger.error(
@@ -755,6 +790,7 @@ async def _post_chat_completions(
     task: str = "llm_chat",
     provider_id: str = "",
     telemetry_context: dict[str, str] | None = None,
+    turn_budget: LlmTurnBudget | None = None,
 ) -> dict[str, Any]:
     model_name = str(model or "").strip()
     if not model_name:
@@ -780,9 +816,11 @@ async def _post_chat_completions(
         payload["max_tokens"] = int(max_tokens)
     _repo.apply_model_effort_to_payload(payload, options, model=model_name)
 
-    timeout = httpx.Timeout(float(timeout_sec))
+    timeout = httpx.Timeout(clamp_timeout_sec(float(timeout_sec), turn_budget))
     headers = _repo.auth_headers(api_key)
     client = await _repo.get_llm_shared_httpx_client()
+    if turn_budget is not None:
+        turn_budget.claim_http_attempt()
     response = await client.post(url, json=payload, headers=headers, timeout=timeout)
     if response.status_code != 200:
         logger.error(
@@ -853,6 +891,7 @@ async def _post_ollama_chat(
     task: str = "llm_chat",
     provider_id: str = "",
     telemetry_context: dict[str, str] | None = None,
+    turn_budget: LlmTurnBudget | None = None,
 ) -> dict[str, Any]:
     """Ollama 原生 /api/chat：思考模型内容直接回填 message.content，无 reasoning 空壳问题。"""
     model_name = str(model or "").strip()
@@ -876,9 +915,11 @@ async def _post_ollama_chat(
     think = _ollama_think_value(options)
     if think is not None:
         payload["think"] = think
-    timeout = httpx.Timeout(float(timeout_sec))
+    timeout = httpx.Timeout(clamp_timeout_sec(float(timeout_sec), turn_budget))
     headers = _repo.auth_headers(api_key)
     client = await _repo.get_llm_shared_httpx_client()
+    if turn_budget is not None:
+        turn_budget.claim_http_attempt()
     response = await client.post(url, json=payload, headers=headers, timeout=timeout)
     if response.status_code != 200:
         logger.error(

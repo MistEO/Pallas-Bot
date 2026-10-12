@@ -441,6 +441,26 @@ class LlmWebuiConfig(BaseModel):
             "轮数含「模型想调工具 → 执行 → 再回复」；过大可能拖很久、费用高",
         ),
     )
+    llm_chat_turn_timeout_sec: float = Field(
+        default=60.0,
+        ge=1.0,
+        le=600.0,
+        description=field_help(
+            "一句普通闲聊最多生成多久（秒）",
+            "默认 60。超时后不再发起新的模型请求；动作未完成或结果不明时静默收尾",
+            "计时从内核开始生成算起，不含排队与前置上下文；不是整轮硬上限，工具收尾可略超",
+        ),
+    )
+    llm_chat_turn_max_http_attempts: int = Field(
+        default=6,
+        ge=1,
+        le=64,
+        description=field_help(
+            "一句普通闲聊最多真正请求模型几次",
+            "默认 6。换密钥、换提供方、required→auto 重试都算在内；用尽后不再发起新请求",
+            "只限制真正发起的请求数；到期前已开始的工具会执行完，未开始的动作不会被当作已完成",
+        ),
+    )
     llm_tools_blacklist: list[str] = Field(
         default_factory=list,
         description=field_help(
@@ -1265,6 +1285,8 @@ def get_llm_webui_config() -> LlmWebuiConfig:
         llm_tools_soft_recall_min_score=cfg.llm_tools_soft_recall_min_score,
         llm_tools_soft_recall_max_candidates=cfg.llm_tools_soft_recall_max_candidates,
         llm_tools_max_rounds=cfg.llm_tools_max_rounds,
+        llm_chat_turn_timeout_sec=cfg.llm_chat_turn_timeout_sec,
+        llm_chat_turn_max_http_attempts=cfg.llm_chat_turn_max_http_attempts,
         llm_tools_blacklist=list(cfg.llm_tools_blacklist or []),
         llm_tools_desc_max_len=cfg.llm_tools_desc_max_len,
         llm_tools_history_daily_budget=cfg.llm_tools_history_daily_budget,

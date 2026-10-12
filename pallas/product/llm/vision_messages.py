@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import re
 from io import BytesIO
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from nonebot import logger
@@ -23,6 +23,9 @@ from pallas.product.llm.vision_content import (
     extract_vision_message_payload,
     vision_plain_text,
 )
+
+if TYPE_CHECKING:
+    from pallas.product.llm.turn_budget import LlmTurnBudget
 
 _VISION_FETCH_TIMEOUT_SEC = 15.0
 _VISION_MAX_BYTES = 8_000_000
@@ -311,11 +314,13 @@ async def _run_vision_description(
     base_url: str | None,
     api_key: str | None,
     request_method: str | None = None,
+    turn_budget: LlmTurnBudget | None = None,
 ) -> str:
     from pallas.product.llm.provider_client import LlmProviderError, complete_chat_message
 
     if not model or not base_url:
         return f"[用户发送了 {urls_count} 张图片：看图模型未配置完整]"
+    budget_kwargs = {"turn_budget": turn_budget} if turn_budget is not None else {}
     try:
         message = await complete_chat_message(
             [
@@ -330,6 +335,7 @@ async def _run_vision_description(
             request_method=request_method,
             task="llm_chat",
             provider_id=provider_id,
+            **budget_kwargs,
         )
         text = str(message.get("content") or "").strip()
         if text:
@@ -383,6 +389,7 @@ async def describe_images_as_text(
     *,
     exclude_provider_id: str = "",
     context_text: str = "",
+    turn_budget: LlmTurnBudget | None = None,
 ) -> str:
     urls = vision_urls_from_metadata(metadata)
     if not urls:
@@ -407,6 +414,7 @@ async def describe_images_as_text(
             base_url=endpoint.base_url,
             api_key=endpoint.api_key,
             request_method=getattr(endpoint, "request_method", None),
+            turn_budget=turn_budget,
         )
 
     from pallas.product.llm.providers_store import (
@@ -425,6 +433,7 @@ async def describe_images_as_text(
         model=provider_task_model(helper, "llm_chat"),
         base_url=resolve_provider_base_url(helper),
         api_key=resolve_provider_api_key(helper),
+        turn_budget=turn_budget,
     )
 
 
@@ -508,6 +517,7 @@ async def prepare_messages_for_provider_capabilities(
     provider_row: dict[str, Any] | None,
     model: str = "",
     user_text: str = "",
+    turn_budget: LlmTurnBudget | None = None,
 ) -> list[dict[str, Any]]:
     """按 capabilities 注入多模态或转成文字描述。"""
     meta = metadata if isinstance(metadata, dict) else {}
@@ -558,7 +568,7 @@ async def prepare_messages_for_provider_capabilities(
 
     plain = vision_user_plain_text(metadata, user_text)
     pid = str((provider_row or {}).get("id") or "")
-    described = await describe_images_as_text(metadata, exclude_provider_id=pid)
+    described = await describe_images_as_text(metadata, exclude_provider_id=pid, turn_budget=turn_budget)
     merged = plain
     if described:
         merged = f"{plain}\n{described}".strip() if plain else described

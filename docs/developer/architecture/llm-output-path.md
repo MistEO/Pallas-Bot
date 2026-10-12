@@ -29,6 +29,8 @@ Repeater 回放入站消息时优先将 OneBot `original_message`（入站结构
 
 显式查询超过 3 秒且已经开始实际工具调用时，kernel 最多发送一次“我查一下。”进度气泡；发送前重新检查 live 开关。该气泡不写入会话历史、表达学习或最终答案上下文。
 
+普通 `llm_chat` 单轮生成共享一个预算对象（`pallas/product/llm/turn_budget.py`）：从 kernel 开始生成计时（deadline 锚在 job 起始，不在首次 provider 调用另起时钟），限制墙钟时长与真实 HTTP 尝试次数（`llm_chat_turn_timeout_sec`、`llm_chat_turn_max_http_attempts`）。候选准备、provider 补全、工具续轮、final、persona retry 与内联工具（如 `chat.recent_summary` 的工具内模型调用，经 `ToolInvokeContext` 运行期透传）都经同一对象计数，换密钥 / 换 provider / required→auto 不重置；provider 每个协议在真正 `client.post` 前领取一次并把 httpx 分阶段超时钳到剩余。预算耗尽时不再发起新请求：deadline 前已启动的工具允许正常收尾并保留结果，门禁或 provider 等待期间到期的工具不会被启动；只有当本 turn 动作全部成功完成且无截断时，才复用已取得的 `chat.reply`，否则诚实静默，persona firewall 不再触发重试。未开放 / 被拒 / 失败的动作，以及后台受理（queued、尚未真正执行）都不算完成，会保守地抑制既有完成话术；后台受理结果与既有 durable 续行机制保留，不被取消。该时限不是整轮硬墙钟上限，工具收尾与取消清理可以超过，不计入队列、前置上下文与投递；后台 durable 记忆等独立异步任务不继承该预算、也不被父轮停止取消。
+
 ## LLM 输出管线
 
 ![LLM 输出管线与表达数据粒度](/assets/llm-output-path.svg)

@@ -19,6 +19,7 @@ from pallas.product.llm.execution_budget import (
 from pallas.product.llm.governance import LlmChatGovernance
 from pallas.product.llm.models import ChatSubmitRequest, ChatSubmitResult
 from pallas.product.llm.tool_loop import complete_with_tool_loop
+from pallas.product.llm.turn_budget import LlmTurnBudgetExceeded
 
 if TYPE_CHECKING:
     from pallas.core.platform.observability import SlowPathTimer
@@ -92,6 +93,11 @@ async def run_kernel_chat_job(
 ) -> None:
     started = time.monotonic()
     task = str(metadata.get("task") or "llm_chat").strip() or "llm_chat"
+    turn_budget = None
+    if task == "llm_chat":
+        from pallas.product.llm.turn_budget import new_llm_chat_turn_budget
+
+        turn_budget = new_llm_chat_turn_budget(cfg, started_at=started)
     progress_started = asyncio.Event()
     progress_finished = asyncio.Event()
     progress_task: asyncio.Task[None] | None = None
@@ -216,6 +222,8 @@ async def run_kernel_chat_job(
         complete_kwargs: dict[str, Any] = {}
         if progress_task is not None:
             complete_kwargs["tool_call_started"] = progress_started
+        if turn_budget is not None:
+            complete_kwargs["turn_budget"] = turn_budget
         content, assistant_message = await complete_with_tool_loop(
             system_prompt=system_prompt,
             messages=messages,
@@ -267,7 +275,9 @@ async def run_kernel_chat_job(
         tool_loop_ran = (
             isinstance(initial_agent_trace, dict) and int(initial_agent_trace.get("tool_call_count") or 0) > 0
         )
-        if decision.action == "retry" and tool_loop_ran:
+        budget_exhausted = isinstance(initial_agent_trace, dict) and bool(initial_agent_trace.get("budget_exhausted"))
+        budget_spent = turn_budget is not None and (turn_budget.expired() or turn_budget.http_attempts_exhausted())
+        if decision.action == "retry" and (tool_loop_ran or budget_exhausted or budget_spent):
             decision = resolve_persona_output(
                 content,
                 policy=policy,
@@ -300,6 +310,7 @@ async def run_kernel_chat_job(
                 metadata={**metadata, "persona_output_retry": 1},
                 cfg=cfg,
                 exit_gate=ensure_exit_gate,
+                **complete_kwargs,
             )
             if gate_reason := await exit_gate_reason():
                 await record_exit_gate_skip(gate_reason)
@@ -367,6 +378,36 @@ async def run_kernel_chat_job(
         await deliver_llm_chat_result(request_id, **delivery_kwargs)
     except LlmChatExitGateError as exc:
         await record_exit_gate_skip(exc.reason, side_effect_started=exc.side_effect_started)
+    except LlmTurnBudgetExceeded as exc:
+        # 单轮预算耗尽（no-tools / early prepare 等逃逸点）：不伪成功、不投失败文案、不补发。
+        logger.warning(
+            "LLM kernel turn budget exhausted for request [{}], reason [{}], http attempts [{}/{}]",
+            request_id,
+            exc.reason,
+            getattr(turn_budget, "used_http_attempts", 0),
+            getattr(turn_budget, "max_http_attempts", None),
+        )
+        try:
+            from pallas.product.llm.runtime_debug import append_runtime_trace
+            from pallas.product.llm.turn_budget import budget_trace_fields
+
+            budget_fields = budget_trace_fields(turn_budget, reason=exc.reason)
+            append_runtime_trace(
+                request_id=request_id,
+                trace={"status": "budget_exhausted", "agent_trace": None, **budget_fields},
+            )
+        except Exception:
+            logger.debug("LLM kernel budget trace skipped for request [{}]", request_id)
+        try:
+            from pallas.product.llm.task_metrics import record_bot_llm_task
+
+            record_bot_llm_task(task, "turn_budget_exhausted")
+        except Exception:
+            logger.debug("LLM kernel budget metric skipped for request [{}]", request_id)
+        try:
+            await TaskManager.remove_task(request_id)
+        except Exception:
+            logger.debug("LLM task cleanup failed after turn budget exhausted for request [{}]", request_id)
     except Exception as exc:
         logger.exception("LLM kernel chat failed for request [{}]", request_id)
         try:

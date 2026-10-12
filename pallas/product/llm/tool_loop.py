@@ -11,6 +11,12 @@ from pallas.product.llm.event_observation import record_provider_prompt_hit
 from pallas.product.llm.provider_client import complete_chat_message
 from pallas.product.llm.tools.context import ToolInvokeContext
 from pallas.product.llm.tools.registry import execute_tool_async
+from pallas.product.llm.turn_budget import (
+    LlmTurnBudget,
+    LlmTurnBudgetExceeded,
+    await_within_budget,
+    budget_trace_fields,
+)
 from pallas.product.llm.turn_telemetry import telemetry_metadata
 
 if TYPE_CHECKING:
@@ -296,6 +302,7 @@ async def complete_with_tool_loop(
     cfg: LlmConfig | None = None,
     tool_call_started: Any | None = None,
     exit_gate: Callable[..., Awaitable[None]] | None = None,
+    turn_budget: LlmTurnBudget | None = None,
 ) -> tuple[str, dict[str, Any]]:
     c = cfg or get_llm_config()
     meta = metadata if isinstance(metadata, dict) else {}
@@ -313,6 +320,8 @@ async def complete_with_tool_loop(
         await check_exit_gate()
         if exit_gate is not None:
             kwargs["exit_gate"] = check_exit_gate
+        if turn_budget is not None:
+            kwargs["turn_budget"] = turn_budget
         result = await complete_chat_message(*args, **kwargs)
         await check_exit_gate()
         return result
@@ -340,15 +349,20 @@ async def complete_with_tool_loop(
             provider_row=row,
             model=candidate_model,
             user_text=user_text,
+            turn_budget=turn_budget,
         )
 
     if primary_endpoint is None:
-        working = await prepare_messages_for_provider_capabilities(
-            working,
-            metadata=meta,
-            provider_row=None,
-            model=model,
-            user_text=user_text,
+        working = await await_within_budget(
+            lambda: prepare_messages_for_provider_capabilities(
+                working,
+                metadata=meta,
+                provider_row=None,
+                model=model,
+                user_text=user_text,
+                turn_budget=turn_budget,
+            ),
+            turn_budget,
         )
         prepare_candidate = None
     else:
@@ -374,7 +388,7 @@ async def complete_with_tool_loop(
         method = provider_request_method(provider_row)
         if method:
             options["request_method"] = method
-    context = ToolInvokeContext.from_payload(meta)
+    context = ToolInvokeContext.from_payload(meta, turn_budget=turn_budget)
     from pallas.product.llm.tools.background import drain_background_tool_events
 
     background_events = drain_background_tool_events(context)
@@ -485,6 +499,11 @@ async def complete_with_tool_loop(
     query_call_counts: dict[str, int] = {}
     last_query_previews: dict[str, str] = {}
     force_final_answer = False
+    completed_tool_calls = 0
+    turn_action_untrusted = False
+    turn_truncated = False
+    turn_action_ambiguous = False
+    budget_stop_reason = "deadline_exceeded"
     final_answer_instruction = (
         "根据已经取得的工具结果直接回答当前问题；有依据就给结论，资料不足就明确说明不足；"
         "不要继续调用工具，也不要输出 PASS。"
@@ -492,20 +511,47 @@ async def complete_with_tool_loop(
 
     from pallas.product.llm.tools.reply import CHAT_REPLY_NAME, extract_chat_reply_text
 
+    def budget_allow_reply() -> bool:
+        """保守降级：本 turn 有未执行拒绝/失败 / 截断 / 结果不明时不复用既有 chat.reply。"""
+        return not (turn_action_untrusted or turn_truncated or turn_action_ambiguous)
+
+    def finish_without_llm(*, reason: str = "deadline_exceeded") -> tuple[str, dict[str, Any]]:
+        """预算耗尽时不再请求模型：只用可信的 chat.reply 或诚实沉默收尾。"""
+        if budget_allow_reply():
+            content, reply_source = resolve_visible_reply_after_tools(
+                freeform_content="",
+                reply_texts=reply_texts,
+                side_effect_ok=side_effect_ok,
+                tool_call_count=int(agent_trace.get("tool_call_count") or 0),
+            )
+        else:
+            content, reply_source = "", "budget_truncated"
+        agent_trace["status"] = "budget_exhausted"
+        agent_trace["reply_source"] = reply_source
+        agent_trace["final_stage"] = "budget_exhausted"
+        agent_trace["budget_completed_tool_calls"] = completed_tool_calls
+        agent_trace.update(budget_trace_fields(turn_budget, reason=reason, side_effect_started=side_effect_started))
+        assistant_message = {"role": "assistant", "content": content, "_agent_trace": agent_trace}
+        return content, assistant_message
+
     async def complete_final_answer(round_number: int) -> tuple[str, dict[str, Any]]:
         if not working or str(working[-1].get("content") or "") != final_answer_instruction:
             working.append({"role": "user", "content": final_answer_instruction})
         record_provider_prompt_hit(working)
-        final_message = await complete_active_chat_message(
-            working,
-            model=model,
-            options=dict(options),
-            tools=None,
-            cfg=c,
-            task=task,
-            prepare_candidate_messages=prepare_candidate,
-            **telemetry_kwargs,
-        )
+        try:
+            final_message = await complete_active_chat_message(
+                working,
+                model=model,
+                options=dict(options),
+                tools=None,
+                cfg=c,
+                task=task,
+                prepare_candidate_messages=prepare_candidate,
+                **telemetry_kwargs,
+            )
+        except LlmTurnBudgetExceeded as exc:
+            budget_stop_reason = exc.reason
+            return finish_without_llm(reason=budget_stop_reason)
         provider_trace = final_message.get("_provider_trace")
         if isinstance(provider_trace, dict):
             agent_trace["provider_calls"].append(provider_trace)
@@ -528,6 +574,9 @@ async def complete_with_tool_loop(
         return content, assistant_message
 
     for round_idx in range(max(2, max_rounds)):
+        if turn_budget is not None and (turn_budget.expired() or turn_budget.http_attempts_exhausted()):
+            budget_stop_reason = "deadline_exceeded" if turn_budget.expired() else "http_attempts_exhausted"
+            return finish_without_llm(reason=budget_stop_reason)
         if force_final_answer:
             return await complete_final_answer(round_idx + 1)
         round_options = dict(options)
@@ -539,16 +588,20 @@ async def complete_with_tool_loop(
         round_tool_schemas = copy.deepcopy(tool_schemas)
         round_offered_names = offered_tool_names(round_tool_schemas)
         record_provider_prompt_hit(working)
-        last_message = await complete_active_chat_message(
-            working,
-            model=model,
-            options=round_options,
-            tools=round_tool_schemas,
-            cfg=c,
-            task=task,
-            prepare_candidate_messages=prepare_candidate,
-            **telemetry_kwargs,
-        )
+        try:
+            last_message = await complete_active_chat_message(
+                working,
+                model=model,
+                options=round_options,
+                tools=round_tool_schemas,
+                cfg=c,
+                task=task,
+                prepare_candidate_messages=prepare_candidate,
+                **telemetry_kwargs,
+            )
+        except LlmTurnBudgetExceeded as exc:
+            budget_stop_reason = exc.reason
+            return finish_without_llm(reason=budget_stop_reason)
         provider_trace = last_message.get("_provider_trace")
         if isinstance(provider_trace, dict):
             agent_trace["provider_calls"].append(provider_trace)
@@ -593,6 +646,7 @@ async def complete_with_tool_loop(
             return content, assistant_message
 
         working.append(assistant_history_message(last_message))
+        budget_stop = False
         for call in tool_calls:
             if not isinstance(call, dict):
                 continue
@@ -600,6 +654,12 @@ async def complete_with_tool_loop(
             tool_name = str(fn.get("name") or call.get("name") or "").strip()
             if not tool_name:
                 continue
+            # 工具开始前只按 deadline 止损；HTTP 次数用尽不阻止已提出的合法工具。
+            if turn_budget is not None and turn_budget.expired():
+                turn_truncated = True
+                budget_stop_reason = "deadline_exceeded"
+                budget_stop = True
+                break
             from pallas.product.llm.tools.registry import from_provider_tool_name
 
             resolved_name = from_provider_tool_name(tool_name)
@@ -630,19 +690,34 @@ async def complete_with_tool_loop(
                 force_final_answer = True
             else:
                 tool_call_signatures.add(call_signature)
-                agent_trace["tool_call_count"] = int(agent_trace.get("tool_call_count") or 0) + 1
-                if is_query:
-                    query_call_counts[resolved_name] = query_count + 1
-                if is_query and tool_call_started is not None:
-                    tool_call_started.set()
                 execute_kwargs = {"context": context}
                 if run_in_background:
                     execute_kwargs["background"] = True
                 await check_exit_gate()
+                # 门禁 await 期间可能已过 deadline：真正执行前再查一次，未启动即 0 调用。
+                if turn_budget is not None and turn_budget.expired():
+                    turn_truncated = True
+                    budget_stop_reason = "deadline_exceeded"
+                    budget_stop = True
+                    break
+                # 到这里才算真实启动：计数、进度与副作用标记都反映真实执行。
+                agent_trace["tool_call_count"] = int(agent_trace.get("tool_call_count") or 0) + 1
+                if is_query:
+                    query_call_counts[resolved_name] = query_count + 1
+                    if tool_call_started is not None:
+                        tool_call_started.set()
                 if is_side_effect:
                     side_effect_started = True
-                tool_result = await execute_tool_async(resolved_name, args, **execute_kwargs)
+                try:
+                    tool_result = await execute_tool_async(resolved_name, args, **execute_kwargs)
+                except LlmTurnBudgetExceeded as exc:
+                    # 工具内部独立模型调用耗尽预算：结果不明，保守止损，不撤销已发生的副作用。
+                    turn_action_ambiguous = True
+                    budget_stop_reason = exc.reason
+                    budget_stop = True
+                    break
                 await check_exit_gate()
+                completed_tool_calls += 1
             result_dict = tool_result if isinstance(tool_result, dict) else {"ok": True, "result": tool_result}
             summary = summarize_tool_result(result_dict)
             round_trace["calls"].append({
@@ -676,6 +751,9 @@ async def complete_with_tool_loop(
                     extracted = extract_chat_reply_text(result_dict)
                     if extracted is not None:
                         reply_texts.append(extracted)
+                elif is_side_effect and run_in_background:
+                    # 后台受理 ≠ 动作完成：保守标记，不用 side_effect_ok / 成功计数声称完成。
+                    turn_action_ambiguous = True
                 elif is_side_effect:
                     side_effect_ok = True
                     agent_trace["successful_side_effect_call_count"] = (
@@ -692,6 +770,9 @@ async def complete_with_tool_loop(
                         chat_reply_injected = True
             else:
                 record_bot_llm_task(task, "tool_call_fail")
+                # 未执行（未开放 / duplicate / query 预算拒绝）与真实失败都不再可信；
+                # 但不伪计失败执行数，也不改 duplicate / query 计数原语义。
+                turn_action_untrusted = True
                 if not blocked_reason and not not_offered:
                     agent_trace["failed_tool_call_count"] = int(agent_trace.get("failed_tool_call_count") or 0) + 1
                     if is_query:
@@ -733,9 +814,18 @@ async def complete_with_tool_loop(
                     if name not in agent_trace["activated_tools"]:
                         agent_trace["activated_tools"].append(name)
         agent_trace["rounds"].append(round_trace)
+        if budget_stop:
+            return finish_without_llm(reason=budget_stop_reason)
+        # 每批完整结果记录后、final / max-rounds 出口前统一检查预算，避免耗尽仍续轮。
+        if turn_budget is not None and (turn_budget.expired() or turn_budget.http_attempts_exhausted()):
+            budget_stop_reason = "deadline_exceeded" if turn_budget.expired() else "http_attempts_exhausted"
+            return finish_without_llm(reason=budget_stop_reason)
         if force_final_answer:
             return await complete_final_answer(round_idx + 2)
 
+    if turn_budget is not None and (turn_budget.expired() or turn_budget.http_attempts_exhausted()):
+        budget_stop_reason = "deadline_exceeded" if turn_budget.expired() else "http_attempts_exhausted"
+        return finish_without_llm(reason=budget_stop_reason)
     freeform = str(last_message.get("content", "") or "").strip()
     if social_tool_required and not social_tool_succeeded:
         content = "群内信息暂时查不了，稍后再试。"

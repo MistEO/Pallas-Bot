@@ -310,6 +310,8 @@ def _llm_section() -> WebuiEnvSection:
             "llm_tools_soft_recall_min_score": "LLM_TOOLS_SOFT_RECALL_MIN_SCORE",
             "llm_tools_soft_recall_max_candidates": "LLM_TOOLS_SOFT_RECALL_MAX_CANDIDATES",
             "llm_tools_max_rounds": "LLM_TOOLS_MAX_ROUNDS",
+            "llm_chat_turn_timeout_sec": "LLM_CHAT_TURN_TIMEOUT_SEC",
+            "llm_chat_turn_max_http_attempts": "LLM_CHAT_TURN_MAX_HTTP_ATTEMPTS",
             "llm_tools_blacklist": "LLM_TOOLS_BLACKLIST",
             "llm_tools_desc_max_len": "LLM_TOOLS_DESC_MAX_LEN",
             "llm_tools_history_daily_budget": "LLM_TOOLS_HISTORY_DAILY_BUDGET",

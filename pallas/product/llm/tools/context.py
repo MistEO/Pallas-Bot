@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pallas.product.llm.turn_budget import LlmTurnBudget
 
 
 @dataclass(frozen=True)
@@ -14,9 +17,11 @@ class ToolInvokeContext:
     request_id: str = ""
     source_segments: tuple[dict[str, Any], ...] = ()
     approved_tools: frozenset[str] = frozenset()
+    # 纯运行期对象：只在本轮内联工具执行时注入，不入 payload / 序列化 / compare / repr。
+    turn_budget: LlmTurnBudget | None = field(default=None, compare=False, repr=False)
 
     @classmethod
-    def from_payload(cls, payload: dict) -> ToolInvokeContext | None:
+    def from_payload(cls, payload: dict, *, turn_budget: LlmTurnBudget | None = None) -> ToolInvokeContext | None:
         bot_raw = payload.get("bot_id")
         user_raw = payload.get("user_id")
         if bot_raw is None or user_raw is None:
@@ -40,6 +45,7 @@ class ToolInvokeContext:
             request_id=request_id,
             source_segments=source_segments,
             approved_tools=approved_tools,
+            turn_budget=turn_budget,
         )
 
     def is_tool_approved(self, name: str) -> bool:
