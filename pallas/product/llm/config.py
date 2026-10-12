@@ -203,6 +203,8 @@ class LlmConfig(BaseModel):
     unified_del_session_endpoint: str = Field(default="/api/v1/chat/completions/session")
     user_message_max_len: int = Field(default=4000, ge=64, le=16000)
     chat_timeout_sec: float = Field(default=30.0, ge=1.0, le=300.0)
+    llm_chat_turn_timeout_sec: float = Field(default=60.0, ge=1.0, le=600.0)
+    llm_chat_turn_max_http_attempts: int = Field(default=6, ge=1, le=64)
     llm_session_enabled: bool = Field(default=True)
     llm_session_user_window: int = Field(default=18, ge=1, le=200)
     llm_session_user_storage_window: int = Field(default=200, ge=1, le=1000)
@@ -459,6 +461,8 @@ def get_llm_config() -> LlmConfig:
             ),
             user_message_max_len=_env_int("LLM_USER_MESSAGE_MAX_LEN", 4000),
             chat_timeout_sec=_env_float("LLM_CHAT_TIMEOUT_SEC", 30.0),
+            llm_chat_turn_timeout_sec=_env_float("LLM_CHAT_TURN_TIMEOUT_SEC", 60.0),
+            llm_chat_turn_max_http_attempts=_env_int("LLM_CHAT_TURN_MAX_HTTP_ATTEMPTS", 6),
             llm_session_enabled=_env_bool("LLM_SESSION_ENABLED", True),
             llm_session_user_window=_env_int("LLM_SESSION_USER_WINDOW", 18),
             llm_session_user_storage_window=_env_int("LLM_SESSION_USER_STORAGE_WINDOW", 200),
