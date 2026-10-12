@@ -356,7 +356,11 @@ async def settle_pending_semantic_exposures(*, now: int | None = None) -> int:
         human_followups = 0
         from pallas.product.llm.sender_identity import is_peer_bot
 
+        window_end = delivered_at + _OUTCOME_WINDOW_SEC
         for message in followups:
+            message_time = int(getattr(message, "time", 0) or 0)
+            if message_time > window_end:
+                break
             user_id = int(getattr(message, "user_id", 0) or 0)
             if user_id <= 0 or user_id == bot_id or is_peer_bot(user_id):
                 continue

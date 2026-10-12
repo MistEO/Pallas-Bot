@@ -196,6 +196,145 @@ async def test_run_ai_callback_skips_summary_writeback_when_policy_disabled(
     compact.assert_not_awaited()
 
 
+def _session_history_task(**overrides) -> dict:
+    task = {
+        "bot_id": "111",
+        "group_id": 222,
+        "user_id": 333,
+        "task_type": LLM_CHAT_TASK_TYPE,
+        "user_text": "牛牛在吗",
+        "behavior_scene": "banter",
+    }
+    task.update(overrides)
+    return task
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure_point", ["compact", "user", "assistant", "auto_episode"])
+async def test_run_ai_callback_degrades_when_session_history_write_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    failure_point: str,
+) -> None:
+    bot = MagicMock()
+    bot.call_api = AsyncMock(return_value={"message_id": 12})
+    monkeypatch.setattr(ai_callback_runner, "get_bot", lambda _bot_id: bot)
+    claim = AsyncMock(return_value=_session_history_task())
+    monkeypatch.setattr(ai_callback_runner.TaskManager, "claim_task", claim)
+
+    appends: list[tuple] = []
+
+    async def track_append(bot_id, group_id, user_id, role, content):
+        appends.append((role, content))
+        if failure_point == role:
+            raise RuntimeError(f"{role} history store failed")
+        return True
+
+    monkeypatch.setattr(llm_delivery, "append_llm_message", track_append)
+    monkeypatch.setattr(llm_delivery, "can_write_runtime_state_summary", lambda: True)
+
+    async def track_compact(*_args, **_kwargs):
+        if failure_point == "compact":
+            raise RuntimeError("compact history store failed")
+        return True
+
+    monkeypatch.setattr(llm_delivery, "compact_user_llm_history_with_summary", track_compact)
+
+    def track_episode(**_kwargs) -> None:
+        if failure_point == "auto_episode":
+            raise RuntimeError("episode store failed")
+
+    monkeypatch.setattr("pallas.product.llm.memory.auto_episode.schedule_auto_save_group_episode", track_episode)
+
+    logged: list[tuple] = []
+    monkeypatch.setattr(llm_delivery, "log_rate_limited", lambda *args, **_kwargs: logged.append(args))
+
+    behavior_runs: list[object] = []
+    monkeypatch.setattr(llm_delivery, "append_behavior_run", lambda run: behavior_runs.append(run))
+
+    result = await ai_callback_runner.run_ai_callback(
+        "task-history-fail",
+        status="success",
+        text="在的。",
+        history_summary="此前聊过银灰",
+        history_keep_messages=8,
+    )
+
+    assert result == {"message": "ok"}
+    bot.call_api.assert_awaited_once()
+    claim.assert_awaited_once()
+    assert len(behavior_runs) == 1
+
+    roles = [role for role, _content in appends]
+    if failure_point == "compact":
+        assert roles == []
+    elif failure_point == "user":
+        assert roles == ["user"]
+    else:
+        assert roles == ["user", "assistant"]
+
+    assert logged, "session history failure should be logged"
+    _logger, level, _key, _msg, task_id, exc_name = logged[0]
+    assert level == "warning"
+    assert task_id == "task-history-fail"
+    assert exc_name == "RuntimeError"
+    joined = " ".join(str(part) for part in logged[0])
+    assert "牛牛在吗" not in joined
+    assert "在的" not in joined
+    assert "history store failed" not in joined
+
+
+@pytest.mark.asyncio
+async def test_run_ai_callback_propagates_cancellation_from_session_history(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import asyncio
+
+    bot = MagicMock()
+    bot.call_api = AsyncMock(return_value=None)
+    monkeypatch.setattr(ai_callback_runner, "get_bot", lambda _bot_id: bot)
+    monkeypatch.setattr(
+        ai_callback_runner.TaskManager,
+        "claim_task",
+        AsyncMock(return_value=_session_history_task()),
+    )
+    monkeypatch.setattr(llm_delivery, "can_write_runtime_state_summary", lambda: True)
+
+    async def cancelled_append(*_args, **_kwargs):
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(llm_delivery, "append_llm_message", cancelled_append)
+
+    with pytest.raises(asyncio.CancelledError):
+        await ai_callback_runner.run_ai_callback("task-history-cancel", status="success", text="在的。")
+
+    bot.call_api.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_run_ai_callback_send_failure_does_not_append_session_history(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bot = MagicMock()
+    bot.call_api = AsyncMock(return_value=None)
+    monkeypatch.setattr(ai_callback_runner, "get_bot", lambda _bot_id: bot)
+    monkeypatch.setattr(
+        ai_callback_runner.TaskManager,
+        "claim_task",
+        AsyncMock(return_value=_session_history_task()),
+    )
+    monkeypatch.setattr(
+        "pallas.core.platform.ai_callback.delivery.send_group_message_with_receipt",
+        AsyncMock(return_value=type("Receipt", (), {"delivered": False, "message_id": None})()),
+    )
+    append = AsyncMock(return_value=True)
+    monkeypatch.setattr(llm_delivery, "append_llm_message", append)
+
+    result = await ai_callback_runner.run_ai_callback("task-send-fail", status="success", text="在的。")
+
+    assert result == {"message": "failed"}
+    append.assert_not_awaited()
+
+
 @pytest.mark.asyncio
 async def test_run_ai_callback_records_llm_route_metrics(monkeypatch: pytest.MonkeyPatch) -> None:
     from pallas.product.llm.task_metrics import clear_llm_task_metrics_for_tests, llm_task_metrics_snapshot

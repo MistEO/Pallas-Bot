@@ -171,3 +171,67 @@ def test_execute_tool_async_normalizes_non_ok_dict(monkeypatch: pytest.MonkeyPat
     assert result["ok"] is True
     assert result["result"] == {"value": "hi"}
     assert result["source"] == "builtin"
+
+
+def test_execute_tool_async_rejects_blacklisted_tool(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_tool_runtime(monkeypatch)
+    monkeypatch.setattr(
+        registry,
+        "get_llm_config",
+        lambda: SimpleNamespace(
+            llm_tools_enabled=True,
+            llm_tools_blacklist=["test.echo"],
+            llm_tools_desc_max_len=120,
+            llm_tools_selective=False,
+            llm_tools_max_rounds=4,
+        ),
+    )
+    registry.clear_tool_registry()
+    called: list[int] = []
+
+    async def handler(_args, _ctx):
+        called.append(1)
+        return {"value": "should not run"}
+
+    registry.register_tool(
+        registry.LlmToolSpec(
+            name="test.echo",
+            description="echo",
+            parameters={"type": "object"},
+            domains=frozenset({"test"}),
+            handler=handler,
+        )
+    )
+
+    result = asyncio.run(registry.execute_tool_async("test.echo", {}))
+
+    assert called == []
+    assert result["ok"] is False
+    assert result["error"] == "tool_not_eligible"
+
+
+def test_execute_tool_async_rejects_override_disabled_tool(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_tool_runtime(monkeypatch)
+    monkeypatch.setattr(registry, "tool_override_disabled", lambda name: name == "test.echo")
+    registry.clear_tool_registry()
+    called: list[int] = []
+
+    async def handler(_args, _ctx):
+        called.append(1)
+        return {"value": "should not run"}
+
+    registry.register_tool(
+        registry.LlmToolSpec(
+            name="test.echo",
+            description="echo",
+            parameters={"type": "object"},
+            domains=frozenset({"test"}),
+            handler=handler,
+        )
+    )
+
+    result = asyncio.run(registry.execute_tool_async("test.echo", {}))
+
+    assert called == []
+    assert result["ok"] is False
+    assert result["error"] == "tool_not_eligible"

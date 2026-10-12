@@ -610,6 +610,38 @@ async def test_delete_llm_chat_session_unified(monkeypatch: pytest.MonkeyPatch) 
 
 
 @pytest.mark.asyncio
+async def test_submit_chat_task_schedules_kernel_when_snapshot_persistence_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    submit_kernel = AsyncMock(return_value=ChatSubmitResult(task_id="task-snap-fail", status="processing", ok=True))
+    monkeypatch.setattr("pallas.product.llm.kernel_runner.submit_kernel_llm_chat_task", submit_kernel)
+    monkeypatch.setattr("pallas.product.llm.client.is_llm_session_store_available", lambda: False)
+
+    def broken_snapshot_path():
+        raise OSError("snapshot path unavailable")
+
+    monkeypatch.setattr("pallas.product.llm.runtime_debug.request_snapshot_path", broken_snapshot_path)
+
+    result = await submit_chat_task(
+        ChatSubmitRequest(
+            request_id="req-snap-fail",
+            session_id="sess-snap-fail",
+            user_text="你好",
+            system_prompt="system",
+            bot_id=10001,
+            group_id=20002,
+            user_id=30003,
+        ),
+        cfg=LlmConfig(use_unified_chat_api=True, llm_chat_enabled=True, llm_governance_enabled=False),
+    )
+
+    assert result.ok is True
+    assert submit_kernel.await_count == 1
+    metadata = submit_kernel.await_args.kwargs["metadata"]
+    assert metadata["runtime_debug"]["request_snapshot_id"].startswith("reqsnap_")
+
+
+@pytest.mark.asyncio
 async def test_submit_chat_task_rejects_when_llm_chat_disabled() -> None:
     cfg = LlmConfig(llm_chat_enabled=False)
     result = await submit_chat_task(

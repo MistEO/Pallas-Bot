@@ -10,6 +10,9 @@ import uuid
 from pathlib import Path  # noqa: TC003
 from typing import Any
 
+from nonebot import logger
+
+from pallas.core.foundation.logging import log_rate_limited
 from pallas.core.foundation.paths import plugin_data_dir
 
 _RETIRED_PERSONA_DEBUG_SECTION_RE = re.compile(
@@ -142,45 +145,65 @@ def append_request_snapshot(
     metadata: dict[str, Any],
 ) -> str:
     snapshot_id = f"reqsnap_{uuid.uuid4().hex[:16]}"
-    stage_inputs = build_stage_inputs(
-        system_prompt=system_prompt,
-        messages=messages,
-        metadata=metadata,
-    )
-    row = {
-        "request_snapshot_id": snapshot_id,
-        "request_id": request_id,
-        "created_at": int(time.time()),
-        "task": task,
-        "system_prompt": system_prompt,
-        "messages": messages,
-        "agent_stage_plan": list(metadata.get("agent_stage_plan") or []),
-        "stage_inputs": stage_inputs,
-        "tool_catalog": metadata.get("tool_catalog") or {},
-        "persona_shaping": stage_inputs["generate"]["persona_shaping"],
-        "metadata_subset": {
-            "task": metadata.get("task"),
-            "mode": metadata.get("mode"),
-            "bot_id": metadata.get("bot_id"),
-            "group_id": metadata.get("group_id"),
-            "user_id": metadata.get("user_id"),
-            "persona_shaping_active": metadata.get("persona_shaping_active"),
-        },
-    }
-    with request_snapshot_path().open("a", encoding="utf-8") as f:
-        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    try:
+        stage_inputs = build_stage_inputs(
+            system_prompt=system_prompt,
+            messages=messages,
+            metadata=metadata,
+        )
+        row = {
+            "request_snapshot_id": snapshot_id,
+            "request_id": request_id,
+            "created_at": int(time.time()),
+            "task": task,
+            "system_prompt": system_prompt,
+            "messages": messages,
+            "agent_stage_plan": list(metadata.get("agent_stage_plan") or []),
+            "stage_inputs": stage_inputs,
+            "tool_catalog": metadata.get("tool_catalog") or {},
+            "persona_shaping": stage_inputs["generate"]["persona_shaping"],
+            "metadata_subset": {
+                "task": metadata.get("task"),
+                "mode": metadata.get("mode"),
+                "bot_id": metadata.get("bot_id"),
+                "group_id": metadata.get("group_id"),
+                "user_id": metadata.get("user_id"),
+                "persona_shaping_active": metadata.get("persona_shaping_active"),
+            },
+        }
+        with request_snapshot_path().open("a", encoding="utf-8") as f:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    except Exception as exc:
+        log_rate_limited(
+            logger,
+            "warning",
+            "llm_runtime_debug_snapshot",
+            "LLM runtime debug snapshot skipped for request [{}], exception [{}]",
+            request_id,
+            type(exc).__name__,
+        )
     return snapshot_id
 
 
 def append_runtime_trace(*, request_id: str, trace: dict[str, Any]) -> None:
-    row = {
-        "request_id": request_id,
-        "request_snapshot_id": trace.get("request_snapshot_id"),
-        "created_at": int(time.time()),
-        "trace": trace,
-    }
-    with runtime_trace_path().open("a", encoding="utf-8") as f:
-        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    try:
+        row = {
+            "request_id": request_id,
+            "request_snapshot_id": trace.get("request_snapshot_id"),
+            "created_at": int(time.time()),
+            "trace": trace,
+        }
+        with runtime_trace_path().open("a", encoding="utf-8") as f:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    except Exception as exc:
+        log_rate_limited(
+            logger,
+            "warning",
+            "llm_runtime_debug_trace",
+            "LLM runtime debug trace skipped for request [{}], exception [{}]",
+            request_id,
+            type(exc).__name__,
+        )
 
 
 def _tool_names_from_catalog(tools: list[Any]) -> list[str]:

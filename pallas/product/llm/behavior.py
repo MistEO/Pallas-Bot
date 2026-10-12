@@ -395,9 +395,7 @@ def infer_behavior_feedback(
         if str(getattr(item, "role", "")).strip() == "user"
         and int(getattr(item, "created_at", 0) or 0) > int(run.created_at)
     ]
-    session_later_turn_count = len(later_user_turns)
-    later_user_turns.extend(ambient_later_turns)
-    if not later_user_turns:
+    if not later_user_turns and not ambient_later_turns:
         if int(now) - int(run.created_at) >= max(20, int(window_sec)):
             return BehaviorOutcome.IGNORED, {
                 "source": "timeout",
@@ -406,23 +404,28 @@ def infer_behavior_feedback(
                 "observed_turn_count": 0,
             }
         return None, {}
-    later_user_turns.sort(key=lambda item: int(getattr(item, "created_at", 0) or 0))
-    window_turns = [
-        item
-        for item in later_user_turns
-        if int(getattr(item, "created_at", 0) or 0) - int(run.created_at) <= max(20, int(window_sec))
-    ][:3]
+    window_limit = max(20, int(window_sec))
+
+    def within_window(item: object) -> bool:
+        return int(getattr(item, "created_at", 0) or 0) - int(run.created_at) <= window_limit
+
+    window_session_turns = [item for item in later_user_turns if within_window(item)]
+    window_ambient_turns = [item for item in ambient_later_turns if within_window(item)]
+    window_turns = sorted(
+        window_session_turns + window_ambient_turns,
+        key=lambda item: int(getattr(item, "created_at", 0) or 0),
+    )[:3]
     if not window_turns:
         return BehaviorOutcome.NEUTRAL, {
-            "source": "mixed" if ambient_later_turns and session_later_turn_count else "session",
+            "source": "mixed" if window_ambient_turns and window_session_turns else "session",
             "matched_signal": "followup_outside_window",
             "matched_tokens": [],
             "observed_turn_count": 0,
         }
     merged = " ".join(str(getattr(item, "content", "") or "").strip() for item in window_turns)
-    if ambient_later_turns and session_later_turn_count:
+    if window_ambient_turns and window_session_turns:
         source = "mixed"
-    elif ambient_later_turns:
+    elif window_ambient_turns:
         source = "ambient"
     else:
         source = "session"
@@ -450,12 +453,7 @@ def infer_behavior_feedback(
             "matched_tokens": matched,
             "observed_turn_count": len(window_turns),
         }
-    if ambient_later_turns and not [
-        item
-        for item in turns
-        if str(getattr(item, "role", "")).strip() == "user"
-        and int(getattr(item, "created_at", 0) or 0) > int(run.created_at)
-    ]:
+    if window_ambient_turns and not window_session_turns:
         return BehaviorOutcome.IGNORED, {
             "source": "ambient",
             "matched_signal": "ambient_continued_without_pickup",
