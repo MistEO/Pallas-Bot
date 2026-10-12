@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 from typing import TYPE_CHECKING, Any
 
@@ -58,6 +59,23 @@ def tool_names_from_schemas(schemas: list[Any]) -> list[str]:
         if name and name not in names:
             names.append(name)
     return names[:24]
+
+
+def offered_tool_names(schemas: list[Any]) -> set[str]:
+    """本轮开放集合的 registry 名（兼容 provider 名与 registry 名两种写法，不截断）。"""
+    from pallas.product.llm.tools.registry import from_provider_tool_name
+
+    names: set[str] = set()
+    for item in schemas:
+        if not isinstance(item, dict):
+            continue
+        fn = item.get("function") if isinstance(item.get("function"), dict) else {}
+        raw = str(fn.get("name") or item.get("name") or "").strip()
+        if not raw:
+            continue
+        names.add(raw)
+        names.add(from_provider_tool_name(raw))
+    return names
 
 
 def _activate_names_from_tool_result(tool_name: str, result: dict[str, Any]) -> list[str]:
@@ -517,12 +535,15 @@ async def complete_with_tool_loop(
             round_options["tool_choice"] = "required"
             # DeepSeek thinking 模式不支持 tool_choice=required
             round_options["model_effort"] = "disable"
+        # provider 请求前冻结独立快照：等待期间外部改写 metadata schema 不影响本次请求与开放集合
+        round_tool_schemas = copy.deepcopy(tool_schemas)
+        round_offered_names = offered_tool_names(round_tool_schemas)
         record_provider_prompt_hit(working)
         last_message = await complete_active_chat_message(
             working,
             model=model,
             options=round_options,
-            tools=tool_schemas,
+            tools=round_tool_schemas,
             cfg=c,
             task=task,
             prepare_candidate_messages=prepare_candidate,
@@ -601,7 +622,10 @@ async def complete_with_tool_loop(
                 agent_trace["query_budget_blocked"] = int(agent_trace.get("query_budget_blocked") or 0) + 1
             background_names = {str(name).strip() for name in (meta.get("background_tool_names") or [])}
             run_in_background = resolved_name in background_names
-            if blocked_reason:
+            not_offered = resolved_name not in round_offered_names
+            if not_offered:
+                tool_result = {"ok": False, "error": "tool_not_offered"}
+            elif blocked_reason:
                 tool_result = {"ok": False, "error": blocked_reason}
                 force_final_answer = True
             else:
@@ -668,7 +692,7 @@ async def complete_with_tool_loop(
                         chat_reply_injected = True
             else:
                 record_bot_llm_task(task, "tool_call_fail")
-                if not blocked_reason:
+                if not blocked_reason and not not_offered:
                     agent_trace["failed_tool_call_count"] = int(agent_trace.get("failed_tool_call_count") or 0) + 1
                     if is_query:
                         agent_trace["query_tool_failed_count"] = (

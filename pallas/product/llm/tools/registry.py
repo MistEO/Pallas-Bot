@@ -216,26 +216,27 @@ def normalize_tool_result(raw: Any, *, spec: LlmToolSpec | None = None) -> dict[
     return envelope.model_dump(mode="json")
 
 
+def tool_spec_is_eligible(spec: LlmToolSpec) -> bool:
+    """单条 tool 的全局准入：总开关、override 禁用、黑名单、方舟 KB 开关。"""
+    cfg = get_llm_config()
+    if not cfg.llm_tools_enabled:
+        return False
+    if tool_override_disabled(spec.name):
+        return False
+    blacklist = {item.strip().lower() for item in cfg.llm_tools_blacklist if item.strip()}
+    if blacklist and (spec.name.lower() in blacklist or spec.domains.intersection(blacklist)):
+        return False
+    if "arknights" in spec.domains and not get_arknights_kb_config().arknights_kb_enabled:
+        return False
+    return True
+
+
 def iter_eligible_tool_specs(*, domains: frozenset[str] | None = None) -> tuple[LlmToolSpec, ...]:
     cfg = get_llm_config()
     if not cfg.llm_tools_enabled:
         return ()
     ensure_tools_loaded()
-    kb = get_arknights_kb_config()
-    blacklist = {item.strip().lower() for item in cfg.llm_tools_blacklist if item.strip()}
-    items: list[LlmToolSpec] = []
-    for spec in iter_registered_tools(domains=domains):
-        if tool_override_disabled(spec.name):
-            continue
-        if blacklist:
-            if spec.name.lower() in blacklist:
-                continue
-            if spec.domains.intersection(blacklist):
-                continue
-        if "arknights" in spec.domains and not kb.arknights_kb_enabled:
-            continue
-        items.append(spec)
-    return tuple(items)
+    return tuple(spec for spec in iter_registered_tools(domains=domains) if tool_spec_is_eligible(spec))
 
 
 def catalog_entry_for_spec(spec: LlmToolSpec) -> ToolCatalogEntry:
@@ -466,6 +467,9 @@ async def execute_tool_async(
     for spec in _REGISTRY:
         if spec.name != resolved:
             continue
+        if not tool_spec_is_eligible(spec):
+            logger.info("ToolCall rejected ineligible tool [{}]", resolved)
+            return normalize_tool_result({"ok": False, "error": "tool_not_eligible"}, spec=spec)
         if spec.approval_required and (context is None or not context.is_tool_approved(spec.name)):
             return normalize_tool_result({"ok": False, "error": "approval_required"}, spec=spec)
         if background:
