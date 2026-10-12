@@ -285,7 +285,18 @@ def build_feedback_bias_snapshot_data(
         limit=max(1, int(limit)),
     )
     now = int(time.time())
-    rows = [item for item in all_rows if item.eligible_for_bias]
+    from pallas.product.llm.injection_feedback import rejected_entry_ids
+
+    rejected = rejected_entry_ids()
+    rows = [
+        item
+        for item in all_rows
+        if item.eligible_for_bias
+        and (
+            str(item.corrected_reply_text or "").strip()
+            or (int(item.bot_id), int(item.group_id), str(item.entry_id)) not in rejected
+        )
+    ]
     weighted = weighted_reply_counter(rows, active_scene=behavior_scene, now=now)
     top_replies = [text for text, _ in weighted.most_common(3)]
     scene_counter = Counter(

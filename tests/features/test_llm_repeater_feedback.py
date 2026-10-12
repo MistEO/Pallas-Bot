@@ -1319,3 +1319,257 @@ def test_feedback_retention_protects_corrected_ineligible_and_strong(tmp_path, m
     }
     archived = {item.request_id for item in mod._iter_feedback_entries(mod.feedback_archive_path())}
     assert archived == {"old-plain"}
+
+
+def test_group_feedback_bias_snapshot_excludes_explicitly_rejected_reply(tmp_path, monkeypatch) -> None:
+    """明确负反馈（negative outcome）的回复不再进入偏置池，未评价的条目不受影响。"""
+    monkeypatch.setenv("PALLAS_DATA_DIR", str(tmp_path))
+    from pallas.product.llm.injection_feedback import apply_negative_outcome
+
+    append_feedback_entry(
+        build_feedback_entry(
+            bot_id=10001,
+            group_id=123,
+            user_id=456,
+            request_id="req-rejected",
+            user_text="你又来这套",
+            reply_text="这句被拒了。",
+            behavior_scene="banter",
+        )
+    )
+    append_feedback_entry(
+        build_feedback_entry(
+            bot_id=10001,
+            group_id=123,
+            user_id=457,
+            request_id="req-kept",
+            user_text="你继续说",
+            reply_text="这句留着。",
+            behavior_scene="banter",
+        )
+    )
+    result = apply_negative_outcome(
+        outcome_id="req-rejected:not-allowed",
+        bot_id=10001,
+        group_id=123,
+        reply_text="这句被拒了。",
+        injection_snapshot={},
+    )
+    assert result.applied is True
+
+    snap = group_feedback_bias_snapshot(group_id=123, limit=50)
+
+    assert snap["count"] == 1
+    assert snap["top_replies"] == ["这句留着。"]
+
+
+def test_group_feedback_bias_snapshot_rejection_scoped_by_group_and_reversible(tmp_path, monkeypatch) -> None:
+    """负反馈按 bot/group 隔离，撤销后回复重新进入偏置池。"""
+    monkeypatch.setenv("PALLAS_DATA_DIR", str(tmp_path))
+    from pallas.product.llm.injection_feedback import apply_negative_outcome, undo_negative_outcome
+
+    for group_id, request_id in ((123, "req-g1"), (999, "req-g2")):
+        append_feedback_entry(
+            build_feedback_entry(
+                bot_id=10001,
+                group_id=group_id,
+                user_id=456,
+                request_id=request_id,
+                user_text="随便聊聊",
+                reply_text="同样的话。",
+                behavior_scene="banter",
+            )
+        )
+    apply_negative_outcome(
+        outcome_id="req-g1:not-allowed",
+        bot_id=10001,
+        group_id=123,
+        reply_text="同样的话。",
+        injection_snapshot={},
+    )
+
+    assert group_feedback_bias_snapshot(bot_id=10001, group_id=123, limit=50)["count"] == 0
+    assert group_feedback_bias_snapshot(bot_id=10001, group_id=999, limit=50)["count"] == 1
+
+    assert undo_negative_outcome(outcome_id="req-g1:not-allowed", bot_id=10001, group_id=123)
+    assert group_feedback_bias_snapshot(bot_id=10001, group_id=123, limit=50)["count"] == 1
+
+
+def test_group_feedback_bias_snapshot_same_reply_other_entry_not_filtered(tmp_path, monkeypatch) -> None:
+    """同群同文不同 entry：只排除被拒 entry，未评价的同文 entry 保留。"""
+    monkeypatch.setenv("PALLAS_DATA_DIR", str(tmp_path))
+    from pallas.product.llm.injection_feedback import apply_negative_outcome
+
+    for request_id, user_id in (("req-a", 456), ("req-b", 457)):
+        append_feedback_entry(
+            build_feedback_entry(
+                bot_id=10001,
+                group_id=123,
+                user_id=user_id,
+                request_id=request_id,
+                user_text="随便聊聊",
+                reply_text="同样的话。",
+                behavior_scene="banter",
+            )
+        )
+    apply_negative_outcome(
+        outcome_id="req-a:not-allowed",
+        bot_id=10001,
+        group_id=123,
+        reply_text="同样的话。",
+        injection_snapshot={},
+    )
+
+    snap = group_feedback_bias_snapshot(bot_id=10001, group_id=123, limit=50)
+
+    assert snap["count"] == 1
+    assert snap["top_replies"] == ["同样的话。"]
+
+
+def test_group_feedback_bias_snapshot_rejection_scoped_by_bot(tmp_path, monkeypatch) -> None:
+    """同群同文跨 bot 隔离：只排除被拒 bot 的 entry。"""
+    monkeypatch.setenv("PALLAS_DATA_DIR", str(tmp_path))
+    from pallas.product.llm.injection_feedback import apply_negative_outcome
+
+    for bot_id, request_id in ((10001, "req-bot-a"), (20002, "req-bot-b")):
+        append_feedback_entry(
+            build_feedback_entry(
+                bot_id=bot_id,
+                group_id=123,
+                user_id=456,
+                request_id=request_id,
+                user_text="随便聊聊",
+                reply_text="同样的话。",
+                behavior_scene="banter",
+            )
+        )
+    apply_negative_outcome(
+        outcome_id="req-bot-a:not-allowed",
+        bot_id=10001,
+        group_id=123,
+        reply_text="同样的话。",
+        injection_snapshot={},
+    )
+
+    assert group_feedback_bias_snapshot(bot_id=10001, group_id=123, limit=50)["count"] == 0
+    assert group_feedback_bias_snapshot(bot_id=20002, group_id=123, limit=50)["count"] == 1
+
+
+def test_group_feedback_bias_snapshot_correction_overrides_rejection(tmp_path, monkeypatch) -> None:
+    """人工校正优先恢复；清除校正后重新受拒。"""
+    monkeypatch.setenv("PALLAS_DATA_DIR", str(tmp_path))
+    from pallas.product.llm.injection_feedback import apply_negative_outcome
+    from pallas.product.llm.repeater_feedback import (
+        clear_feedback_entry_correction,
+        set_feedback_entry_correction,
+    )
+
+    append_feedback_entry(
+        build_feedback_entry(
+            bot_id=10001,
+            group_id=123,
+            user_id=456,
+            request_id="req-corr",
+            user_text="随便聊聊",
+            reply_text="这句被拒了。",
+            behavior_scene="banter",
+        )
+    )
+    apply_negative_outcome(
+        outcome_id="req-corr:not-allowed",
+        bot_id=10001,
+        group_id=123,
+        reply_text="这句被拒了。",
+        injection_snapshot={},
+    )
+    assert group_feedback_bias_snapshot(bot_id=10001, group_id=123, limit=50)["count"] == 0
+
+    set_feedback_entry_correction(entry_id="req-corr", bot_id=10001, group_id=123, corrected_reply_text="改成这句。")
+    corrected = group_feedback_bias_snapshot(bot_id=10001, group_id=123, limit=50)
+    assert corrected["count"] == 1
+    assert corrected["top_replies"] == ["改成这句。"]
+
+    clear_feedback_entry_correction(entry_id="req-corr", bot_id=10001, group_id=123)
+    assert group_feedback_bias_snapshot(bot_id=10001, group_id=123, limit=50)["count"] == 0
+
+
+def test_group_feedback_bias_snapshot_correction_text_collision_kept(tmp_path, monkeypatch) -> None:
+    """被拒 entry 的正文与另一条已校正 entry 的正文相同时，校正条目不被误伤。"""
+    monkeypatch.setenv("PALLAS_DATA_DIR", str(tmp_path))
+    from pallas.product.llm.injection_feedback import apply_negative_outcome
+    from pallas.product.llm.repeater_feedback import set_feedback_entry_correction
+
+    append_feedback_entry(
+        build_feedback_entry(
+            bot_id=10001,
+            group_id=123,
+            user_id=456,
+            request_id="req-rejected-text",
+            user_text="随便聊聊",
+            reply_text="冲突文本。",
+            behavior_scene="banter",
+        )
+    )
+    append_feedback_entry(
+        build_feedback_entry(
+            bot_id=10001,
+            group_id=123,
+            user_id=457,
+            request_id="req-corrected",
+            user_text="继续聊",
+            reply_text="原句。",
+            behavior_scene="banter",
+        )
+    )
+    apply_negative_outcome(
+        outcome_id="req-rejected-text:not-allowed",
+        bot_id=10001,
+        group_id=123,
+        reply_text="冲突文本。",
+        injection_snapshot={},
+    )
+    set_feedback_entry_correction(
+        entry_id="req-corrected",
+        bot_id=10001,
+        group_id=123,
+        corrected_reply_text="冲突文本。",
+    )
+
+    snap = group_feedback_bias_snapshot(bot_id=10001, group_id=123, limit=50)
+
+    assert snap["count"] == 1
+    assert snap["top_replies"] == ["冲突文本。"]
+
+
+def test_group_feedback_bias_snapshot_long_reply_preview_collision_kept(tmp_path, monkeypatch) -> None:
+    """长回复截断后前 120 字相同的两条 entry，只有被拒 entry 被排除。"""
+    monkeypatch.setenv("PALLAS_DATA_DIR", str(tmp_path))
+    from pallas.product.llm.injection_feedback import apply_negative_outcome
+
+    shared_preview = "这是一段很长的回复内容" * 12
+    assert len(shared_preview) >= 120
+    shared_preview = shared_preview[:120]
+    for request_id, user_id in (("req-long-a", 456), ("req-long-b", 457)):
+        append_feedback_entry(
+            build_feedback_entry(
+                bot_id=10001,
+                group_id=123,
+                user_id=user_id,
+                request_id=request_id,
+                user_text="随便聊聊",
+                reply_text=shared_preview,
+                behavior_scene="banter",
+            )
+        )
+    apply_negative_outcome(
+        outcome_id="req-long-a:not-allowed",
+        bot_id=10001,
+        group_id=123,
+        reply_text=shared_preview,
+        injection_snapshot={},
+    )
+
+    snap = group_feedback_bias_snapshot(bot_id=10001, group_id=123, limit=50)
+
+    assert snap["count"] == 1
+    assert snap["top_replies"] == [shared_preview]

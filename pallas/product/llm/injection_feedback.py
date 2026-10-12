@@ -680,6 +680,32 @@ def _ambient_blacklist_from_rows(rows: list[dict[str, Any]], bot_id: int, group_
     return phrases
 
 
+_NEGATIVE_OUTCOME_SUFFIX = ":not-allowed"
+
+
+def rejected_entry_ids() -> set[tuple[int, int, str]]:
+    """未撤销负反馈 outcome 对应的 (bot_id, group_id, entry_id) 集合。
+
+    outcome_id 约定为 ``{entry_id}:not-allowed``；仅接受该格式，避免把无法映射到
+    具体条目的历史 outcome 误当作负反馈。
+    """
+    keys: set[tuple[int, int, str]] = set()
+    for row in _load_outcomes():
+        if row.get("undo"):
+            continue
+        outcome_id = str(row.get("outcome_id") or "")
+        if not outcome_id.endswith(_NEGATIVE_OUTCOME_SUFFIX):
+            continue
+        entry_id = outcome_id[: -len(_NEGATIVE_OUTCOME_SUFFIX)]
+        if not entry_id:
+            continue
+        try:
+            keys.add((int(row.get("bot_id") or 0), int(row.get("group_id") or 0), entry_id))
+        except (TypeError, ValueError):
+            continue
+    return keys
+
+
 def _turn_text(turn: Any) -> str:
     if isinstance(turn, dict):
         for key in ("content", "text", "plain_text"):
