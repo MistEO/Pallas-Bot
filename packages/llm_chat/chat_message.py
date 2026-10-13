@@ -1336,6 +1336,7 @@ async def prepare_and_submit_llm_chat_turn(
             cfg=llm_cfg,
             allow_persistent_memory=include_persistent_history,
             group_timeline=group_timeline,
+            recent_user_turns=recent_turns,
         )
         pre_submit_context_durations_ms["direct_context"] = int((time.perf_counter() - direct_context_started) * 1000)
         for stage, duration in getattr(assembled_context, "stage_durations_ms", {}).items():

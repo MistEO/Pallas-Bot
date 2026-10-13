@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pallas.product.llm.knowledge.inject import enrich_system_with_knowledge_sources
 from pallas.product.llm.memory import (
@@ -13,6 +13,11 @@ from pallas.product.llm.memory import (
     enrich_system_with_relationship_context,
 )
 from pallas.product.llm.memory.inject import PersonFactsInjectionResult, RelationshipInjectionResult
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from pallas.product.llm.session_models import LlmChatTurn
 
 
 @dataclass(frozen=True)
@@ -45,6 +50,7 @@ async def assemble_direct_chat_context(
     cfg: Any,
     allow_persistent_memory: bool = True,
     group_timeline: str = "",
+    recent_user_turns: Sequence[LlmChatTurn] | None = None,
 ) -> ChatContextBundle:
     """Retrieve each context source without deciding prompt order or layout."""
 
@@ -67,6 +73,7 @@ async def assemble_direct_chat_context(
         user_id=user_id,
         query_text=query_text,
         cfg=cfg,
+        recent_user_turns=recent_user_turns,
     )
     stage_durations_ms["knowledge"] = int((time.perf_counter() - started) * 1000)
     if allow_persistent_memory and group_id is not None and user_id:
