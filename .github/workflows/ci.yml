@@ -145,6 +145,14 @@ jobs:
             tests/product/llm/test_history_tool.py \
             -p no:nonebug -p no:cacheprovider -q
 
+      - name: Run invite knowledge carry regression tests
+        run: |
+          # 邀群知识承接：独立进程，静态读取插件元数据与知识 backend，不接真实 LLM 或 DB
+          env -u PG_TEST_DSN uv run pytest \
+            tests/features/test_invite_knowledge_carry.py \
+            tests/features/test_persona_knowledge_eval_context.py \
+            -p no:nonebug -p no:cacheprovider -q
+
       - name: Check console OpenAPI spec drift
         run: |
           uv run python tools/check_console_openapi_drift.py
