@@ -153,6 +153,14 @@ jobs:
             tests/features/test_persona_knowledge_eval_context.py \
             -p no:nonebug -p no:cacheprovider -q
 
+      - name: Run semantic label reliability regression tests
+        run: |
+          # 语义标注可靠性：独立进程，mock provider / 预算 / 持久化，不接真实 LLM 或 DB
+          env -u PG_TEST_DSN uv run pytest \
+            tests/product/llm/test_repeater_semantic_style.py \
+            tests/product/llm/test_group_insight_processor.py \
+            -p no:nonebug -p no:cacheprovider -q
+
       - name: Check console OpenAPI spec drift
         run: |
           uv run python tools/check_console_openapi_drift.py

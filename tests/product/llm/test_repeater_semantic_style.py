@@ -20,6 +20,17 @@ from pallas.product.llm.repeater_semantic_style import (
 )
 
 
+@pytest.fixture(autouse=True)
+def semantic_style_treatment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """非分桶主题测试固定 treatment：不依赖真实 group-day 对照组，避免日期相关的随机红。
+
+    分桶本身由 test_semantic_style_experiment.py 覆盖；显式对照组测试仍会自行覆写为 True。
+    """
+    from pallas.product.llm import semantic_style_experiment as experiment
+
+    monkeypatch.setattr(experiment, "semantic_style_in_control", lambda *_args, **_kwargs: False)
+
+
 @pytest.mark.parametrize(
     "sample",
     [
