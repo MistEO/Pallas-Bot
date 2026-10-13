@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from pallas.product.llm.config import LlmConfig, get_llm_config
 from pallas.product.llm.kernel.memory_governance import can_read_generic_knowledge
-from pallas.product.llm.knowledge.models import KnowledgeInjectionResult
+from pallas.product.llm.knowledge.models import KnowledgeInjectionResult, RetrievedKnowledgeChunk
 from pallas.product.llm.knowledge.registry import retrieve_from_knowledge_sources
 from pallas.product.persona.prompt_guard import sanitize_prompt_block
 
@@ -24,10 +24,16 @@ _KNOWLEDGE_QUERY_RE = re.compile(
     re.IGNORECASE,
 )
 
-# 明确问「邀请牛牛/你进群」类运营问题：本体即可作为检索 query
+# 明确指向本 Bot（牛牛/帕拉斯/你）的入群 / 邀请 / 加好友操作；不认他人、纯陈述或无对象入群，
+# 也不认「入群后改昵称 / 改配置」这类后续管理（`(?!之?以?后)`）
+_BOT_REF = r"(?:牛牛|帕拉斯|你)"
 _INVITE_GATE_RE = re.compile(
-    r"(拉(?:牛牛|你|它)?进群|进群|加群|入群|"
-    r"来(?:我们|我)(?:的)?群|加(?:牛牛|你|它)(?:个)?好友|好友申请|群邀请)"
+    r"(?:"
+    r"(?:拉|邀请|请|让|帮|带|加)" + _BOT_REF + r"(?:进|来|加|入)(?:我们|我)?(?:的)?群(?!之?以?后)"
+    r"|" + _BOT_REF + r"(?:能|可以|能不能|可不可以|愿意)(?:来|进|加|入)(?:我们|我)?(?:的)?群(?!之?以?后)"
+    r"|" + _BOT_REF + r"(?:来|进|加|入)(?:我们|我)(?:的)?群(?!之?以?后)"
+    r"|加" + _BOT_REF + r"(?:个|为|一下)?好友"
+    r")"
 )
 
 # 仅承接「邀请/入群」语境的严格短追问；锚定开头，避免「你对我有什么要求」误命中
@@ -36,7 +42,9 @@ _INVITE_FOLLOWUP_RE = re.compile(
     r"(?:"
     r"有(?:啥|什么|哪些)?(?:要求|条件)?"
     r"|啥(?:要求|条件)|什么(?:要求|条件)|要(?:啥|什么)(?:要求|条件)"
-    r"|(?:什么|啥)时候(?:同意|通过|批准|加|来|进)?|多久|多长"
+    r"|(?:什么|啥)时候(?:能|会|可以|才)?(?:同意|通过|批准|加|来|进)?"
+    r"|多久(?:能|会|可以|才)?(?:同意|通过|批准|加|来|进)?"
+    r"|多长(?:时间)?"
     r"|收到(?:邀请)?(?:了|没|没有)?(?:吗)?|有(?:没有)?收到(?:邀请)?"
     r"|同意(?:了|没)?(?:吗)?|批准(?:了|没)?(?:吗)?|通过(?:了|没)?(?:吗)?"
     r"|能(?:来|加|进)?(?:吗)?|可以(?:吗)?|可不可以|能不能|行(?:吗|不)?|成(?:吗)?"
@@ -52,6 +60,13 @@ _OTHER_FUNCTION_RE = re.compile(r"(清空|重置|配置|设置|绑定|登录|开
 _INVITE_HISTORY_MAX_TURNS = 2
 _INVITE_HISTORY_MAX_CHARS = 60
 _INVITE_HISTORY_MAX_AGE_SEC = 600
+
+# 合成摘要回合（session_store 写入的【此前对话摘要】）只带写入时序，混入窗口即整窗拒绝
+_SESSION_SUMMARY_MARK = "【此前对话摘要】"
+
+# 明确邀请本牛知识块的稳定标识：非邀请语境下不注入该 chunk
+_INVITE_FAQ_SOURCE_ID = "llm_chat.faq"
+_INVITE_FAQ_TITLE = "邀请牛牛进群"
 
 
 def looks_like_knowledge_query(text: str) -> bool:
@@ -74,30 +89,50 @@ def looks_like_invite_followup(text: str) -> bool:
     return bool(_INVITE_FOLLOWUP_RE.match(body))
 
 
-def trusted_recent_user_turns(
+def is_invite_faq_chunk(item: RetrievedKnowledgeChunk) -> bool:
+    """识别「邀请牛牛进群」知识块：source_id + title 稳定标识。"""
+    return item.source_id == _INVITE_FAQ_SOURCE_ID and item.title == _INVITE_FAQ_TITLE
+
+
+def recent_same_user_turns(
     turns: Sequence[LlmChatTurn] | None,
     *,
     user_id: int,
-    now: int,
 ) -> list[LlmChatTurn]:
-    """只取最近、短、且新鲜的同用户 user 回合；排除 assistant 与未来时间戳。"""
+    """最近 ≤2 条同用户 user 回合（按写入顺序）；只取可见窗口，不查库、不跨用户。"""
     if not turns:
         return []
     user_turns = [turn for turn in turns if turn.role == "user" and turn.user_id == user_id]
-    picked: list[LlmChatTurn] = []
-    for turn in reversed(user_turns[-_INVITE_HISTORY_MAX_TURNS:]):
+    return user_turns[-_INVITE_HISTORY_MAX_TURNS:]
+
+
+def trusted_window_invite_anchor(
+    window: Sequence[LlmChatTurn],
+    *,
+    now: int,
+) -> str | None:
+    """窗口整体可信且含明确 Bot 邀请时返回该邀请文本；任一障碍即整窗拒绝，不倒退另找。"""
+    anchor = ""
+    for turn in window:
         content = str(getattr(turn, "content", "") or "").strip()
         if not content or len(content) > _INVITE_HISTORY_MAX_CHARS:
-            break
+            return None
+        if _SESSION_SUMMARY_MARK in content:
+            return None
         try:
             created_at = int(getattr(turn, "created_at", 0) or 0)
         except (TypeError, ValueError):
-            break
+            return None
         age = int(now) - created_at
         if created_at <= 0 or age < 0 or age > _INVITE_HISTORY_MAX_AGE_SEC:
-            break
-        picked.append(turn)
-    return picked
+            return None
+        if looks_like_invite_topic(content):
+            anchor = content
+            continue
+        if looks_like_invite_followup(content):
+            continue
+        return None
+    return anchor or None
 
 
 def resolve_knowledge_query(
@@ -107,23 +142,20 @@ def resolve_knowledge_query(
     user_id: int = 0,
     now: int | None = None,
 ) -> tuple[str, bool]:
-    """返回 (resolved_query, carried)：仅在严格含糊的邀请追问且有可信同用户邀请语境时承接。"""
+    """返回 (resolved_query, carried)：仅在严格含糊的邀请追问、且可见同用户窗口整体可信时承接。"""
     body = str(query_text or "").strip()
     if looks_like_invite_topic(body):
         return body, False
     if not looks_like_invite_followup(body):
         return body, False
     current = int(now) if now is not None else int(time.time())
-    for turn in trusted_recent_user_turns(recent_user_turns, user_id=user_id, now=current):
-        content = str(getattr(turn, "content", "") or "").strip()
-        if looks_like_invite_topic(content):
-            return f"{content} {body}".strip(), True
-        if looks_like_invite_followup(content):
-            # 最近同用户自身也只是短追问，继续向前承接
-            continue
-        # 最近同用户已换题，不承接
-        break
-    return body, False
+    window = recent_same_user_turns(recent_user_turns, user_id=user_id)
+    # ponytail: 已存会话只有写入时序，混合窗口（旧邀请与换题/合成摘要交错）一律不承接；
+    # 有真实入站时戳后再增强。
+    anchor = trusted_window_invite_anchor(window, now=current)
+    if anchor is None:
+        return body, False
+    return f"{anchor} {body}".strip(), True
 
 
 async def enrich_system_with_knowledge_sources(
@@ -163,6 +195,9 @@ async def enrich_system_with_knowledge_sources(
         user_id=user_id,
         cfg=c,
     )
+    if not (carried or looks_like_invite_topic(resolved_query)):
+        # 明确邀请本牛知识块只在明确邀请语境或可信承接时注入；其它 FAQ / 知识源不受影响
+        hits = [item for item in hits if not is_invite_faq_chunk(item)]
     max_chunk_len = c.llm_knowledge_content_max_len
     rendered_hits = [item for item in hits if sanitize_prompt_block(item.content, max_len=max_chunk_len)]
     trace = {

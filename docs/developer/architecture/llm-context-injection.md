@@ -110,7 +110,12 @@
 `assemble_direct_chat_context`（`assembler/context.py`）只负责检索，不决定拼装顺序：
 
 1. `enrich_system_with_memory_context`：记忆检索（群记忆、事件、IP 知识、教导，按各自块出现）。
-2. `enrich_system_with_knowledge_sources`：知识源检索。检索 query 由当前句与**有界同用户近期历史**解析（`resolve_knowledge_query`）：仅当当前句是「邀请牛牛进群」类严格短追问、且最近少量同用户回合确有邀请语境时，才把该语境并入 query，且 gate 与检索共用同一 resolved query；只读调用方已传入的最近回合（≤2 条、每条 ≤60 字、600s 内、同 bot×群×用户），不查库、不跨用户；命中时 `knowledge_retrieval_trace` 记 `context_carry=true`。知识块只作参考，不授权任何审批动作。
+2. `enrich_system_with_knowledge_sources`：知识源检索，gate 与检索共用同一 resolved query（`looks_like_knowledge_query`）。
+   - **当前句是明确指向本牛的邀群 / 邀请 / 加好友操作**（`looks_like_invite_topic`）：直接用原 query 检索，不承接历史。
+   - **当前句是严格短追问**（`looks_like_invite_followup`）时，才用 `resolve_knowledge_query` 承接：仅当最近 ≤2 条同 bot×群×用户 `user` 回合（每条 ≤60 字、600s 内）整体新鲜短有效且含明确邀请，才并入邀请语境；换题、无效时间、过长或合成摘要（【此前对话摘要】）任一出现即整窗 fail-close，不倒退另找。命中记 `context_carry=true`。
+   - 仅「邀请牛牛进群」这一 chunk 在非邀请语境下被过滤，其它 FAQ / 知识源照常检索。
+   - 保守软启发式：只缓解可见混合窗口，不保证更早未落盘入站的严格顺序；知识块只作参考，不授权任何审批动作。
+   - 作用域仅清醒 `llm_chat`：醉酒轮无本源会话历史，独立 preview 探测不载入实时用户历史，二者均不在承接范围内。
 3. 群聊且用户有效时：`enrich_system_with_relationship_context`（关系便签；`include_fallback` 取决于本轮是否允许持久记忆）。
 4. 允许持久记忆时：`enrich_system_with_person_facts` + `recall_mid_term_block`。
 

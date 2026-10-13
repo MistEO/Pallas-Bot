@@ -11,6 +11,7 @@ from pallas.product.llm.config import LlmConfig
 from pallas.product.llm.knowledge.inject import (
     enrich_system_with_knowledge_sources,
     looks_like_invite_followup,
+    looks_like_invite_topic,
     looks_like_knowledge_query,
     resolve_knowledge_query,
 )
@@ -62,7 +63,15 @@ def _cfg(**overrides) -> LlmConfig:
 
 @pytest.mark.parametrize(
     "query",
-    ["怎么邀请牛牛进群", "牛牛能来我们群吗", "进群要什么条件"],
+    [
+        "怎么邀请牛牛进群",
+        "牛牛能来我们群吗",
+        "拉牛牛进群",
+        "邀请牛牛进我们群",
+        "加牛牛好友",
+        "你进我们群吗",
+        "我已经邀请牛牛进群了，要等多久",
+    ],
 )
 def test_explicit_invite_questions_gate(query: str) -> None:
     assert looks_like_knowledge_query(query)
@@ -71,7 +80,15 @@ def test_explicit_invite_questions_gate(query: str) -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "query",
-    ["怎么邀请牛牛进群", "牛牛能来我们群吗", "进群要什么条件"],
+    [
+        "怎么邀请牛牛进群",
+        "牛牛能来我们群吗",
+        "拉牛牛进群",
+        "邀请牛牛进我们群",
+        "加牛牛好友",
+        "你进我们群吗",
+        "我已经邀请牛牛进群了，要等多久",
+    ],
 )
 async def test_explicit_invite_questions_hit_real_faq_at_default_threshold(
     query: str,
@@ -362,3 +379,216 @@ async def test_real_knowledge_reaches_chat_prompt_through_history(
     assert "【相关知识参考" in prompt
     assert "普通群友想拉牛牛进群" in prompt
     assert context.knowledge_retrieval_trace.get("context_carry") is True
+
+
+# --- 收窄明确邀请对象：他人 / 纯陈述 / 无对象入群 / 其它功能不触发邀请知识 ---
+
+
+def test_objectless_or_other_subject_invite_not_recognized() -> None:
+    for query in [
+        "今天小王进群了",
+        "我朋友想加群",
+        "进群后怎么改昵称",
+        "如何处理别人的好友申请",
+        "牛牛进群后怎么改昵称",
+        "进群要什么条件",
+        "牛牛进群了，欢迎一下",
+        "邀请牛牛进群后怎么改昵称",
+        "牛牛进群以后怎么改昵称",
+    ]:
+        assert not looks_like_invite_topic(query)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "query",
+    [
+        "今天小王进群了",
+        "我朋友想加群",
+        "进群后怎么改昵称",
+        "如何处理别人的好友申请",
+        "牛牛进群后怎么改昵称",
+        "牛牛进群了，欢迎一下",
+        "邀请牛牛进群后怎么改昵称",
+        "牛牛进群以后怎么改昵称",
+    ],
+)
+async def test_non_bot_invite_never_injects_invite_chunk(
+    query: str,
+    real_llm_chat_faq: KnowledgeSourceDecl,
+) -> None:
+    result = await enrich_system_with_knowledge_sources(
+        "你是牛牛。",
+        bot_id=1,
+        group_id=2,
+        user_id=7,
+        query_text=query,
+        cfg=_cfg(),
+    )
+    assert "普通群友想拉牛牛进群" not in result.system_prompt
+    assert all(chunk["title"] != "邀请牛牛进群" for chunk in result.trace.get("chunks", []))
+    assert result.trace.get("context_carry") is None
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "牛牛进群后怎么改昵称",
+        "如何处理别人的好友申请",
+        "牛牛进群了，欢迎一下",
+        "邀请牛牛进群后怎么改昵称",
+        "牛牛进群以后怎么改昵称",
+    ],
+)
+def test_invite_chunk_retrievable_but_filtered_from_injection(
+    query: str,
+    real_llm_chat_faq: KnowledgeSourceDecl,
+) -> None:
+    """原始检索确实命中该 chunk（score ≥ 默认 12），证明是注入侧过滤而非检索未命中。"""
+    raw = retrieve_from_knowledge_sources(query, bot_id=1, group_id=2, user_id=7, cfg=_cfg())
+    assert any(item.title == "邀请牛牛进群" for item in raw)
+
+
+@pytest.mark.asyncio
+async def test_other_faq_chunks_still_injected(real_llm_chat_faq: KnowledgeSourceDecl) -> None:
+    result = await enrich_system_with_knowledge_sources(
+        "你是牛牛。",
+        bot_id=1,
+        group_id=2,
+        user_id=7,
+        query_text="怎么清空聊天记录",
+        cfg=_cfg(),
+    )
+    assert "llm_chat.faq" in result.trace["sources"]
+    titles = {chunk["title"] for chunk in result.trace["chunks"]}
+    assert "清空本轮记录" in titles
+    assert "邀请牛牛进群" not in titles
+    assert "普通群友想拉牛牛进群" not in result.system_prompt
+    assert "clear" in result.system_prompt
+
+
+# --- 保守承接：可见同用户窗口整体可信且含明确邀请，任一障碍即整窗拒绝 ---
+
+
+@pytest.mark.parametrize(
+    "history",
+    [
+        [_invite_turn(age=30), _invite_turn(age=10, text="考试报名怎么弄")],
+        [_invite_turn(age=30, text="考试报名怎么弄"), _invite_turn(age=10)],
+    ],
+)
+def test_mixed_window_rejects_carry_in_both_append_orders(history: list[LlmChatTurn]) -> None:
+    assert resolve_knowledge_query("有啥要求吗", recent_user_turns=history, user_id=7, now=NOW) == ("有啥要求吗", False)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "history",
+    [
+        [_invite_turn(age=30), _invite_turn(age=10, text="考试报名怎么弄")],
+        [_invite_turn(age=30, text="考试报名怎么弄"), _invite_turn(age=10)],
+    ],
+)
+async def test_mixed_window_enrich_does_not_carry(
+    history: list[LlmChatTurn],
+    real_llm_chat_faq: KnowledgeSourceDecl,
+) -> None:
+    result = await enrich_system_with_knowledge_sources(
+        "你是牛牛。",
+        bot_id=1,
+        group_id=2,
+        user_id=7,
+        query_text="有啥要求吗",
+        cfg=_cfg(),
+        recent_user_turns=history,
+    )
+    assert result.trace.get("context_carry") is None
+    assert "普通群友想拉牛牛进群" not in result.system_prompt
+
+
+_SUMMARY_TURN_TEXT = "【此前对话摘要】\n用户想邀请牛牛进群并问了要求"
+
+
+def _summary_turn(*, user_id: int = 7, age: int = 30) -> LlmChatTurn:
+    return LlmChatTurn(role="user", content=_SUMMARY_TURN_TEXT, user_id=user_id, created_at=NOW - age)
+
+
+@pytest.mark.parametrize(
+    "history",
+    [
+        [_summary_turn()],
+        [_invite_turn(age=30), _summary_turn(age=10)],
+        [_summary_turn(age=30), _invite_turn(age=10)],
+        [_invite_turn(age=40), _summary_turn(age=20), _invite_turn(age=10)],
+    ],
+)
+def test_synthetic_summary_in_window_rejects_carry(history: list[LlmChatTurn]) -> None:
+    assert resolve_knowledge_query("有啥要求吗", recent_user_turns=history, user_id=7, now=NOW) == ("有啥要求吗", False)
+
+
+def test_synthetic_summary_outside_last_two_not_scanned() -> None:
+    # 摘要（更早）不在最近两条同用户 user 窗口内，不参与判定，仍按新鲜邀请承接
+    history = [_summary_turn(age=40), _invite_turn(age=20, text="有啥要求吗"), _invite_turn(age=10)]
+    assert resolve_knowledge_query("收到了吗", recent_user_turns=history, user_id=7, now=NOW) == (
+        "我想邀请牛牛进群 收到了吗",
+        True,
+    )
+
+
+# --- 审批时限类短追问 ---
+
+
+@pytest.mark.parametrize("query", ["多久能同意", "多久会通过", "什么时候能批准"])
+def test_approval_time_followup_recognized(query: str) -> None:
+    assert looks_like_invite_followup(query)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("query", ["多久能同意", "多久会通过", "什么时候能批准"])
+async def test_approval_time_followup_carries_and_hits_chunk(
+    query: str,
+    real_llm_chat_faq: KnowledgeSourceDecl,
+) -> None:
+    result = await enrich_system_with_knowledge_sources(
+        "你是牛牛。",
+        bot_id=1,
+        group_id=2,
+        user_id=7,
+        query_text=query,
+        cfg=_cfg(),
+        recent_user_turns=[_invite_turn()],
+    )
+    assert result.trace.get("context_carry") is True
+    assert "普通群友想拉牛牛进群" in result.system_prompt
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("query", ["多久能同意", "什么时候能批准"])
+async def test_approval_time_followup_without_history_no_injection(
+    query: str,
+    real_llm_chat_faq: KnowledgeSourceDecl,
+) -> None:
+    result = await enrich_system_with_knowledge_sources(
+        "你是牛牛。",
+        bot_id=1,
+        group_id=2,
+        user_id=7,
+        query_text=query,
+        cfg=_cfg(),
+        recent_user_turns=[],
+    )
+    assert result.trace.get("context_carry") is None
+    assert result.trace["hit_count"] == 0
+    assert result.system_prompt == "你是牛牛。"
+
+
+@pytest.mark.parametrize(
+    "history",
+    [
+        [_invite_turn(age=999)],
+        [_invite_turn(user_id=9)],
+        [_invite_turn(age=30), _invite_turn(age=10, text="考试报名怎么弄")],
+    ],
+)
+def test_approval_time_followup_rejects_untrusted_history(history: list[LlmChatTurn]) -> None:
+    assert resolve_knowledge_query("多久能同意", recent_user_turns=history, user_id=7, now=NOW) == ("多久能同意", False)
