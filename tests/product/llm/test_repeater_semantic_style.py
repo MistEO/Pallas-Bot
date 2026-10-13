@@ -1847,7 +1847,8 @@ def test_parse_label_extracts_behavior_strategy() -> None:
     from pallas.product.llm.repeater_semantic_style import _parse_label_response
 
     label, strategy = _parse_label_response(
-        '{"interaction_actions":["tease"],"intensity":"soft","behavior_strategy":{'
+        '{"is_reply_pair":true,"transferable":true,'
+        '"interaction_actions":["tease"],"intensity":"soft","behavior_strategy":{'
         '"scene":"对方吐槽工作压力","action":"先短句接住情绪，再问一句具体的事",'
         '"outcome":"对方愿意多讲","learning_type":"observed"}}'
     )
@@ -1864,12 +1865,29 @@ def test_parse_label_extracts_behavior_strategy() -> None:
 def test_parse_label_response_skips_missing_strategy() -> None:
     from pallas.product.llm.repeater_semantic_style import _parse_label_response
 
-    label, strategy = _parse_label_response('{"intensity":"neutral"}')
+    parsed = _parse_label_response('{"is_reply_pair":true,"transferable":true,"intensity":"neutral"}')
+    assert parsed is not None
+    label, strategy = parsed
     assert label.intensity == "neutral"
     assert strategy is None
 
-    label, strategy = _parse_label_response("not json")
-    assert strategy is None
+
+def test_parse_label_response_rejects_invalid_as_unresolved() -> None:
+    from pallas.product.llm.repeater_semantic_style import _parse_label_response
+
+    # 非法 JSON / 非对象 / 缺必需布尔 / 类型错误都是 unresolved(None)，不回落默认负标签
+    assert _parse_label_response("not json") is None
+    assert _parse_label_response("[{}]") is None
+    assert _parse_label_response("{}") is None
+    assert _parse_label_response('{"is_reply_pair":true}') is None
+    assert _parse_label_response('{"is_reply_pair":"true","transferable":true}') is None
+    assert _parse_label_response('{"is_reply_pair":1,"transferable":0}') is None
+
+    # 合法显式 false/false 仍是有效负判断
+    negative = _parse_label_response('{"is_reply_pair":false,"transferable":false}')
+    assert negative is not None
+    assert negative[0].is_reply_pair is False
+    assert negative[0].transferable is False
 
 
 def test_behavior_strategy_pooling_with_self_reflection(tmp_path, monkeypatch) -> None:
@@ -2451,8 +2469,8 @@ async def test_label_semantic_style_batch_falls_back_for_missing_when_incomplete
         content = str(messages[0]["content"])
         if content.startswith("判断 2 组"):  # 批量请求
             calls.append("batch")
-            # 只返回 1 项 → 仅缺失下标回退单对
-            return {"content": '[{"is_reply_pair": true}]'}
+            # 只返回 1 项（合法）→ 仅缺失下标回退单对
+            return {"content": '[{"is_reply_pair": true, "transferable": true}]'}
         calls.append("single")
         return {"content": '{"is_reply_pair": true, "transferable": true, "intensity": "soft"}'}
 
@@ -2482,7 +2500,7 @@ async def test_label_semantic_style_batch_keeps_failed_fallbacks_unprocessed(
     async def fake_complete(messages, *, model=None, options=None, cfg=None, task=None):
         return {"content": "not json"}
 
-    async def fake_retry(*, trigger_text, reply_text, pair_relation):
+    async def fake_retry(*, trigger_text, reply_text, pair_relation, once_only=False):
         return None
 
     monkeypatch.setattr("pallas.product.llm.provider_client.complete_chat_message", fake_complete)
@@ -2537,6 +2555,403 @@ async def test_label_semantic_style_batch_accepts_incomplete_labels_when_len_mat
     assert len(results) == 2
     assert results[0][0].is_reply_pair is False
     assert results[1][0].is_reply_pair is False
+
+
+@pytest.mark.asyncio
+async def test_batch_fatal_auth_stops_without_single_rescue(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pallas.product.llm import repeater_semantic_style as mod
+    from pallas.product.llm.provider_client import LlmProviderError
+
+    calls: list[str] = []
+    claims: list[int] = []
+
+    async def fake_complete(messages, *, model=None, options=None, cfg=None, task=None):
+        calls.append("batch")
+        raise LlmProviderError("unauthorized body", status=401)
+
+    monkeypatch.setattr("pallas.product.llm.provider_client.complete_chat_message", fake_complete)
+    monkeypatch.setattr(
+        "pallas.product.llm.config.get_llm_config",
+        lambda: SimpleNamespace(llm_model="test-model"),
+    )
+    monkeypatch.setattr(mod, "claim_semantic_label_budget", lambda n=1: claims.append(n) or True)
+
+    results = await mod.label_semantic_style_batch_with_llm(
+        [("前句1", "接话1", "adjacent"), ("前句2", "接话2", "adjacent")], max_batch=2
+    )
+
+    # 最终 401：终止本批，不逐条救援；只预占 1 次预算。
+    assert results == []
+    assert calls == ["batch"]
+    assert claims == [1]
+
+
+@pytest.mark.asyncio
+async def test_batch_fatal_in_fallback_keeps_parsed_and_stops(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pallas.product.llm import repeater_semantic_style as mod
+    from pallas.product.llm.provider_client import LlmProviderError
+
+    calls: list[str] = []
+
+    async def fake_complete(messages, *, model=None, options=None, cfg=None, task=None):
+        content = str(messages[0]["content"])
+        if content.startswith("判断 2 组"):
+            calls.append("batch")
+            # 只返回 1 项合法 → 缺失下标回退单条
+            return {"content": '[{"is_reply_pair": true, "transferable": true}]'}
+        calls.append("single")
+        raise LlmProviderError("forbidden body", status=403)
+
+    monkeypatch.setattr("pallas.product.llm.provider_client.complete_chat_message", fake_complete)
+    monkeypatch.setattr(
+        "pallas.product.llm.config.get_llm_config",
+        lambda: SimpleNamespace(llm_model="test-model"),
+    )
+    monkeypatch.setattr(mod, "claim_semantic_label_budget", lambda n=1: True)
+
+    # 3 对、批大小 2：第 2 个 chunk 不应再被请求
+    results = await mod.label_semantic_style_batch_with_llm(
+        [("前句1", "接话1", "adjacent"), ("前句2", "接话2", "adjacent"), ("前句3", "接话3", "adjacent")],
+        max_batch=2,
+    )
+
+    assert calls == ["batch", "single"]
+    assert len(results) == 2
+    assert results[0][0].is_reply_pair is True  # 已解析槽保留原位
+    assert results[1] is None
+
+
+@pytest.mark.asyncio
+async def test_batch_token_limit_falls_back_once_per_item(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pallas.product.llm import repeater_semantic_style as mod
+    from pallas.product.llm.provider_client import LlmProviderError
+
+    calls: list[str] = []
+
+    async def fake_complete(messages, *, model=None, options=None, cfg=None, task=None):
+        content = str(messages[0]["content"])
+        if content.startswith("判断 2 组"):
+            calls.append("batch")
+            raise LlmProviderError("provider response incomplete", failure_class="incomplete_token_limit")
+        calls.append("single")
+        raise LlmProviderError("provider response incomplete", failure_class="incomplete_token_limit")
+
+    monkeypatch.setattr("pallas.product.llm.provider_client.complete_chat_message", fake_complete)
+    monkeypatch.setattr(
+        "pallas.product.llm.config.get_llm_config",
+        lambda: SimpleNamespace(llm_model="test-model"),
+    )
+    monkeypatch.setattr(mod, "SEMANTIC_STYLE_LABEL_MAX_RETRIES", 2)
+    monkeypatch.setattr(mod, "claim_semantic_label_budget", lambda n=1: True)
+
+    results = await mod.label_semantic_style_batch_with_llm(
+        [("前句1", "接话1", "adjacent"), ("前句2", "接话2", "adjacent")], max_batch=2
+    )
+
+    # token-limit 拆成单条各 1 次；单条再遇同类不 3 连重试。
+    assert calls == ["batch", "single", "single"]
+    assert results == [None, None]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("single_kind", ["status_503", "plain_incomplete"])
+async def test_batch_token_limit_fallback_single_once_even_on_retryable(
+    monkeypatch: pytest.MonkeyPatch, single_kind: str
+) -> None:
+    from pallas.product.llm import repeater_semantic_style as mod
+    from pallas.product.llm.provider_client import LlmProviderError
+
+    monkeypatch.setattr(mod, "semantic_style_label_concurrency_limit", lambda: 1)
+    monkeypatch.setattr(mod, "_semantic_style_label_sem", None)
+    monkeypatch.setattr(mod, "_semantic_style_label_sem_limit", None)
+
+    calls: list[str] = []
+    claims: list[int] = []
+
+    def single_error() -> Exception:
+        if single_kind == "status_503":
+            return LlmProviderError("upstream", status=503)
+        return LlmProviderError("provider response incomplete", failure_class="incomplete")
+
+    async def fake_complete(messages, *, model=None, options=None, cfg=None, task=None):
+        content = str(messages[0]["content"])
+        if content.startswith("判断 2 组"):
+            calls.append("batch")
+            raise LlmProviderError("provider response incomplete", failure_class="incomplete_token_limit")
+        calls.append("single")
+        raise single_error()
+
+    monkeypatch.setattr("pallas.product.llm.provider_client.complete_chat_message", fake_complete)
+    monkeypatch.setattr(
+        "pallas.product.llm.config.get_llm_config",
+        lambda: SimpleNamespace(llm_model="test-model"),
+    )
+    monkeypatch.setattr(mod, "SEMANTIC_STYLE_LABEL_MAX_RETRIES", 2)
+    monkeypatch.setattr(mod, "claim_semantic_label_budget", lambda n=1: claims.append(n) or True)
+
+    results = await mod.label_semantic_style_batch_with_llm(
+        [("前句1", "接话1", "adjacent"), ("前句2", "接话2", "adjacent")], max_batch=2
+    )
+
+    # typed token-limit 后的单条即便变 503 / 普通 incomplete 也只 1 次：2 对共 3 次调用 / 预占
+    assert calls == ["batch", "single", "single"]
+    assert claims == [1, 1, 1]
+    assert results == [None, None]
+    assert mod.semantic_style_label_sem()._value == 1
+
+
+@pytest.mark.asyncio
+async def test_batch_token_limit_once_only_resets_for_next_chunk(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pallas.product.llm import repeater_semantic_style as mod
+    from pallas.product.llm.provider_client import LlmProviderError
+
+    calls: list[str] = []
+    batch_seen = {"n": 0}
+
+    async def fake_complete(messages, *, model=None, options=None, cfg=None, task=None):
+        content = str(messages[0]["content"])
+        if content.startswith("判断 2 组"):
+            batch_seen["n"] += 1
+            if batch_seen["n"] == 1:
+                calls.append("batch_token_limit")
+                raise LlmProviderError("provider response incomplete", failure_class="incomplete_token_limit")
+            calls.append("batch_503")
+            raise LlmProviderError("upstream", status=503)
+        calls.append("single_503")
+        raise LlmProviderError("upstream", status=503)
+
+    monkeypatch.setattr("pallas.product.llm.provider_client.complete_chat_message", fake_complete)
+    monkeypatch.setattr(
+        "pallas.product.llm.config.get_llm_config",
+        lambda: SimpleNamespace(llm_model="test-model"),
+    )
+    monkeypatch.setattr(mod, "SEMANTIC_STYLE_LABEL_MAX_RETRIES", 2)
+    monkeypatch.setattr(mod, "claim_semantic_label_budget", lambda n=1: True)
+
+    results = await mod.label_semantic_style_batch_with_llm(
+        [
+            ("前句1", "接话1", "adjacent"),
+            ("前句2", "接话2", "adjacent"),
+            ("前句3", "接话3", "adjacent"),
+            ("前句4", "接话4", "adjacent"),
+        ],
+        max_batch=2,
+    )
+
+    # 第 1 chunk typed token-limit → 单条各 1；第 2 chunk 普通 transient 复位为默认最多 3。
+    assert calls == ["batch_token_limit", "single_503", "single_503", "batch_503"] + ["single_503"] * 6
+    assert results == [None, None, None, None]
+
+
+@pytest.mark.asyncio
+async def test_batch_fallback_fatal_preserves_later_valid_slot(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pallas.product.llm import repeater_semantic_style as mod
+    from pallas.product.llm.provider_client import LlmProviderError
+
+    async def fake_complete(messages, *, model=None, options=None, cfg=None, task=None):
+        content = str(messages[0]["content"])
+        if content.startswith("判断 3 组"):
+            # 中间项非法 → 仅该下标回退；两侧有效槽原位保留
+            return {
+                "content": (
+                    '[{"is_reply_pair": true, "transferable": true}, {}, {"is_reply_pair": true, "transferable": true}]'
+                )
+            }
+        raise LlmProviderError("forbidden", status=403)
+
+    monkeypatch.setattr("pallas.product.llm.provider_client.complete_chat_message", fake_complete)
+    monkeypatch.setattr(
+        "pallas.product.llm.config.get_llm_config",
+        lambda: SimpleNamespace(llm_model="test-model"),
+    )
+    monkeypatch.setattr(mod, "claim_semantic_label_budget", lambda n=1: True)
+
+    results = await mod.label_semantic_style_batch_with_llm(
+        [("前句1", "接话1", "adjacent"), ("前句2", "接话2", "adjacent"), ("前句3", "接话3", "adjacent")],
+        max_batch=3,
+    )
+
+    assert len(results) == 3
+    assert results[0][0].is_reply_pair is True
+    assert results[1] is None
+    assert results[2][0].is_reply_pair is True  # fallback fatal 后位 valid 槽保留
+
+
+@pytest.mark.asyncio
+async def test_batch_budget_exhausted_preserves_parsed_slot(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pallas.product.llm import repeater_semantic_style as mod
+
+    claim_calls = {"n": 0}
+
+    def fake_claim(n: int = 1) -> bool:
+        claim_calls["n"] += 1
+        return claim_calls["n"] == 1  # 批量预占成功，单条回退预算已耗尽
+
+    async def fake_complete(messages, *, model=None, options=None, cfg=None, task=None):
+        content = str(messages[0]["content"])
+        if content.startswith("判断 2 组"):
+            return {"content": '[{"is_reply_pair": true, "transferable": true}]'}  # 短返回 → 缺失下标回退
+        return {"content": '{"is_reply_pair": true, "transferable": true}'}
+
+    monkeypatch.setattr("pallas.product.llm.provider_client.complete_chat_message", fake_complete)
+    monkeypatch.setattr(
+        "pallas.product.llm.config.get_llm_config",
+        lambda: SimpleNamespace(llm_model="test-model"),
+    )
+    monkeypatch.setattr(mod, "claim_semantic_label_budget", fake_claim)
+
+    results = await mod.label_semantic_style_batch_with_llm(
+        [("前句1", "接话1", "adjacent"), ("前句2", "接话2", "adjacent")], max_batch=2
+    )
+
+    # 预算中途拒绝：已解析槽保留原位，未判下标 None，不虚退额度
+    assert results[0][0].is_reply_pair is True
+    assert results[1] is None
+    assert claim_calls["n"] == 2
+
+
+@pytest.mark.asyncio
+async def test_single_retryable_limited_to_three_attempts(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pallas.product.llm import repeater_semantic_style as mod
+    from pallas.product.llm.provider_client import LlmProviderError
+
+    calls: list[str] = []
+    claims: list[int] = []
+
+    async def fake_complete(messages, *, model=None, options=None, cfg=None, task=None):
+        calls.append("single")
+        raise LlmProviderError("upstream 503", status=503)
+
+    monkeypatch.setattr("pallas.product.llm.provider_client.complete_chat_message", fake_complete)
+    monkeypatch.setattr(
+        "pallas.product.llm.config.get_llm_config",
+        lambda: SimpleNamespace(llm_model="test-model"),
+    )
+    monkeypatch.setattr(mod, "SEMANTIC_STYLE_LABEL_MAX_RETRIES", 2)
+    monkeypatch.setattr(mod, "claim_semantic_label_budget", lambda n=1: claims.append(n) or True)
+
+    result = await mod.label_semantic_style_with_retry(trigger_text="前句", reply_text="接话")
+
+    assert result is None
+    assert calls == ["single", "single", "single"]
+    assert claims == [1, 1, 1]
+
+
+@pytest.mark.asyncio
+async def test_batch_budget_rejected_makes_no_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pallas.product.llm import repeater_semantic_style as mod
+
+    calls: list[str] = []
+
+    async def fake_complete(messages, *, model=None, options=None, cfg=None, task=None):
+        calls.append("batch")
+        return {"content": "[]"}
+
+    monkeypatch.setattr("pallas.product.llm.provider_client.complete_chat_message", fake_complete)
+    monkeypatch.setattr(
+        "pallas.product.llm.config.get_llm_config",
+        lambda: SimpleNamespace(llm_model="test-model"),
+    )
+    monkeypatch.setattr(mod, "claim_semantic_label_budget", lambda n=1: False)
+
+    results = await mod.label_semantic_style_batch_with_llm([("前句", "接话", "adjacent")])
+
+    assert results == []
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_batch_middle_invalid_slot_falls_back_in_place(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pallas.product.llm import repeater_semantic_style as mod
+
+    calls: list[str] = []
+
+    async def fake_complete(messages, *, model=None, options=None, cfg=None, task=None):
+        content = str(messages[0]["content"])
+        if content.startswith("判断 3 组"):
+            calls.append("batch")
+            # 中间项非法({}) → 仅该下标回退；两侧有效槽原位保留、不重标
+            return {
+                "content": (
+                    '[{"is_reply_pair": true, "transferable": true}, {},'
+                    ' {"is_reply_pair": false, "transferable": false}]'
+                )
+            }
+        calls.append("single")
+        return {"content": '{"is_reply_pair": true, "transferable": true, "intensity": "soft"}'}
+
+    monkeypatch.setattr("pallas.product.llm.provider_client.complete_chat_message", fake_complete)
+    monkeypatch.setattr(
+        "pallas.product.llm.config.get_llm_config",
+        lambda: SimpleNamespace(llm_model="test-model"),
+    )
+    monkeypatch.setattr(mod, "claim_semantic_label_budget", lambda n=1: True)
+
+    results = await mod.label_semantic_style_batch_with_llm(
+        [("前句1", "接话1", "adjacent"), ("前句2", "接话2", "adjacent"), ("前句3", "接话3", "adjacent")],
+        max_batch=3,
+    )
+
+    assert calls == ["batch", "single"]
+    assert results[0][0].is_reply_pair is True
+    assert results[1][0].is_reply_pair is True
+    assert results[2][0].is_reply_pair is False
+
+
+@pytest.mark.asyncio
+async def test_single_invalid_output_is_unresolved_without_retry(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pallas.product.llm import repeater_semantic_style as mod
+
+    calls: list[str] = []
+
+    async def fake_complete(messages, *, model=None, options=None, cfg=None, task=None):
+        calls.append("single")
+        return {"content": "not json"}
+
+    monkeypatch.setattr("pallas.product.llm.provider_client.complete_chat_message", fake_complete)
+    monkeypatch.setattr(
+        "pallas.product.llm.config.get_llm_config",
+        lambda: SimpleNamespace(llm_model="test-model"),
+    )
+
+    result = await mod.label_semantic_style_with_llm(trigger_text="前句", reply_text="接话")
+
+    assert result is None
+    assert calls == ["single"]
+
+
+@pytest.mark.asyncio
+async def test_batch_fallback_cancel_propagates_and_releases_gate(monkeypatch: pytest.MonkeyPatch) -> None:
+    import asyncio
+
+    from pallas.product.llm import repeater_semantic_style as mod
+
+    monkeypatch.setattr(mod, "semantic_style_label_concurrency_limit", lambda: 1)
+    monkeypatch.setattr(mod, "_semantic_style_label_sem", None)
+    monkeypatch.setattr(mod, "_semantic_style_label_sem_limit", None)
+    monkeypatch.setattr(
+        "pallas.product.llm.config.get_llm_config",
+        lambda: SimpleNamespace(llm_model="test-model"),
+    )
+    monkeypatch.setattr(mod, "claim_semantic_label_budget", lambda n=1: True)
+
+    single_started = asyncio.Event()
+
+    async def fake_complete(messages, *, model=None, options=None, cfg=None, task=None):
+        content = str(messages[0]["content"])
+        if content.startswith("判断 1 组"):
+            return {"content": "[]"}  # 批量空 → 触发单条 fallback
+        single_started.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr("pallas.product.llm.provider_client.complete_chat_message", fake_complete)
+
+    task = asyncio.create_task(mod.label_semantic_style_batch_with_llm([("前句", "接话", "adjacent")]))
+    await single_started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert mod.semantic_style_label_sem()._value == 1
 
 
 def test_merge_bot_reply_only_teaches_behavior_strategy(tmp_path, monkeypatch) -> None:

@@ -173,6 +173,9 @@ async def _produce_semantic_profile(payload: dict[str, Any]) -> None:
     if all(item is None for item in labeled):
         return
     attempted = pairs[: len(labeled)]
+    # 仅当本轮所有候选都已判定（长度一致且无 None）才推进游标；有未判项时
+    # 不 mark，避免跨过未判候选。代价：明确负标签下轮可能重标并再消耗预算。
+    complete = len(labeled) == len(pairs) and all(item is not None for item in labeled)
 
     accepted: list[SemanticStyleExample] = []
     accepted_ids: set[str] = set()
@@ -187,8 +190,6 @@ async def _produce_semantic_profile(payload: dict[str, Any]) -> None:
         created_at,
         is_bot_reply,
     ), labeled_item in zip(attempted, labeled, strict=True):
-        # 失败对也计入游标推进：单对回退路径已内置重试，滞留旧窗只会让
-        # 下一轮 sweep 对同一窗口原样重发；全部失败时才保留游标待下轮。
         max_processed_key = max(max_processed_key, (int(created_at), int(message_id)))
         if labeled_item is None:
             continue
@@ -235,6 +236,8 @@ async def _produce_semantic_profile(payload: dict[str, Any]) -> None:
             group_id,
             bot_id,
         )
+    if not complete:
+        return
     final_processed_key = max([max_processed_key, *(key for key in rejected_keys if key <= max_processed_key)])
     mark_semantic_style_group_processed(
         bot_id=bot_id,
