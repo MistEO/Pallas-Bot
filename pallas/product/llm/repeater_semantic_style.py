@@ -410,12 +410,14 @@ def labeled_semantic_style_reply_ids(bot_id: int, group_id: int) -> set[int]:
     """已落库语义样本的接话 message_id 集合（TTL 内存索引），供入 LLM 前去重过滤。
 
     example_id 格式为 ``{group_id}:{message_id}:{bot_id}``，message_id 可能为负
-    （新版本 QQ），取中间段解析。重读 examples.jsonl 后重建，避免漏掉并发落库的样本。
+    （新版本 QQ），取中间段解析。重读 examples.jsonl 后重建；同进程写盘成功会立即
+    失效索引，下一次读取按新文件重建（跨进程 warm 索引仍受 5 秒 TTL 约束）。
     """
     now = time.time()
     global _labeled_ids_index_built_at
     with _semantic_data_thread_lock:
-        if now - _labeled_ids_index_built_at > _LABELED_IDS_INDEX_TTL_SEC:
+        # built_at==0.0 是写盘失效 sentinel：即使 now 很小（测试冻结时钟）也必须重建
+        if _labeled_ids_index_built_at == 0.0 or now - _labeled_ids_index_built_at > _LABELED_IDS_INDEX_TTL_SEC:
             index: dict[tuple[int, int], set[int]] = {}
             for example in _load_semantic_style_examples(semantic_style_examples_path()):
                 if example.annotation_source != "llm_v2":
@@ -431,7 +433,8 @@ def labeled_semantic_style_reply_ids(bot_id: int, group_id: int) -> set[int]:
             _labeled_ids_index.clear()
             _labeled_ids_index.update(index)
             _labeled_ids_index_built_at = now
-    return _labeled_ids_index.get((int(bot_id), int(group_id)), set())
+        # 锁内返回副本：外部修改不回写索引，也避免与写盘失效交错。
+        return set(_labeled_ids_index.get((int(bot_id), int(group_id)), set()))
 
 
 def get_semantic_style_group_cursor(bot_id: int, group_id: int) -> tuple[int, int]:
@@ -1853,13 +1856,19 @@ def load_examples_with_legacy_migration_locked() -> list[SemanticStyleExample]:
 
 
 def _write_semantic_style_examples(path: Path, examples: list[SemanticStyleExample]) -> None:
+    global _labeled_ids_index_built_at
     tmp = path.with_suffix(".jsonl.tmp")
     payload = "".join(
         json.dumps(example.model_dump(mode="json"), ensure_ascii=False, separators=(",", ":")) + "\n"
         for example in examples
     )
     tmp.write_text(payload, encoding="utf-8")
-    tmp.replace(path)
+    # 落盘成功后再失效同进程 ID 索引，下一次读取立即按新文件重建；写盘失败不失效，
+    # 索引保持旧文件状态。复用现 RLock，避免与 rebuild 交错成旧覆盖。
+    with _semantic_data_thread_lock:
+        tmp.replace(path)
+        _labeled_ids_index.clear()
+        _labeled_ids_index_built_at = 0.0
 
 
 def _apply_legacy_rhythm_statistics(
@@ -2604,20 +2613,53 @@ def append_cached_semantic_style_block(system_prompt: str, style_anchor: str, re
     return f"{base}\n\n{block}".strip() if base and block else (block or base)
 
 
-def _parse_label_response(content: str) -> tuple[SemanticStyleLabel, BehaviorStrategy | None]:
+_FATAL_PROVIDER_STATUSES = frozenset({401, 403})
+_TOKEN_LIMIT_FAILURE_CLASS = "incomplete_token_limit"
+
+
+def provider_exception_kind(exc: BaseException) -> str:
+    """按 status / failure_class 分类 provider 异常；不读取 str(exc) 正文。"""
+    from pallas.product.llm.provider_client import LlmProviderError
+
+    if isinstance(exc, LlmProviderError):
+        if exc.status in _FATAL_PROVIDER_STATUSES:
+            return "fatal_auth"
+        if exc.failure_class == _TOKEN_LIMIT_FAILURE_CLASS:
+            return "token_limit"
+    return "retryable"
+
+
+def provider_failure_log_args(exc: BaseException) -> tuple[str, str, str, str]:
+    """异常的安全日志字段：分类、HTTP 状态、failure_class、异常类型；不含 body / prompt / 响应正文。"""
+    from pallas.product.llm.provider_client import LlmProviderError
+
+    status = ""
+    failure_class = ""
+    if isinstance(exc, LlmProviderError):
+        status = str(exc.status) if exc.status is not None else ""
+        failure_class = str(exc.failure_class or "")
+    return provider_exception_kind(exc), status, failure_class, type(exc).__name__
+
+
+def has_required_bools(raw: dict[str, Any]) -> bool:
+    return isinstance(raw.get("is_reply_pair"), bool) and isinstance(raw.get("transferable"), bool)
+
+
+def _parse_label_response(content: str) -> tuple[SemanticStyleLabel, BehaviorStrategy | None] | None:
+    """解析单条标注输出；非法 JSON / 非对象 / 缺必需布尔 / 类型错误均为 unresolved(None)。"""
     text = _JSON_FENCE_RE.sub("", str(content or "").strip()).strip()
     try:
         raw = json.loads(text)
     except json.JSONDecodeError:
-        return parse_semantic_style_label({}), None
-    if not isinstance(raw, dict):
-        return parse_semantic_style_label({}), None
+        return None
+    if not isinstance(raw, dict) or not has_required_bools(raw):
+        return None
     return parse_semantic_style_label(raw), parse_behavior_strategy(raw.get("behavior_strategy"))
 
 
 async def label_semantic_style_with_llm(
     *, trigger_text: str, reply_text: str, pair_relation: Literal["quoted", "adjacent"] = "adjacent"
-) -> tuple[SemanticStyleLabel, BehaviorStrategy | None]:
+) -> tuple[SemanticStyleLabel, BehaviorStrategy | None] | None:
     from pallas.product.llm.config import get_llm_config
     from pallas.product.llm.provider_client import complete_chat_message
 
@@ -2719,9 +2761,14 @@ async def maybe_label_semantic_style_visual(payload: dict[str, Any]) -> Semantic
 
 
 async def label_semantic_style_with_retry(
-    *, trigger_text: str, reply_text: str, pair_relation: Literal["quoted", "adjacent"] = "adjacent"
+    *,
+    trigger_text: str,
+    reply_text: str,
+    pair_relation: Literal["quoted", "adjacent"] = "adjacent",
+    once_only: bool = False,
 ) -> tuple[SemanticStyleLabel, BehaviorStrategy | None] | None:
-    for retry_index in range(SEMANTIC_STYLE_LABEL_MAX_RETRIES + 1):
+    attempts = 1 if once_only else SEMANTIC_STYLE_LABEL_MAX_RETRIES + 1
+    for retry_index in range(attempts):
         if not claim_semantic_label_budget():
             return None
         try:
@@ -2731,10 +2778,21 @@ async def label_semantic_style_with_retry(
                 pair_relation=pair_relation,
             )
         except Exception as exc:
-            if retry_index >= SEMANTIC_STYLE_LABEL_MAX_RETRIES:
-                logger.warning("repeater semantic style label dropped after retries: {}", exc)
+            kind = provider_exception_kind(exc)
+            if kind == "fatal_auth":
+                # 认证类最终失败：窄透传给 batch 终止剩余语义请求，不在单条层吞成 None
+                raise
+            if kind == "token_limit" or retry_index >= attempts - 1:
+                logger.warning(
+                    "Repeater semantic style label dropped: kind [{}], status [{}], failure [{}], exception [{}]",
+                    *provider_failure_log_args(exc),
+                )
                 return None
-            logger.debug("Repeater semantic style label retry [{}] failed: [{}]", retry_index + 1, exc)
+            logger.debug(
+                "Repeater semantic style label retry [{}] failed: kind [{}], status [{}], failure [{}], exception [{}]",
+                retry_index + 1,
+                *provider_failure_log_args(exc),
+            )
     return None
 
 
@@ -2746,8 +2804,9 @@ async def label_semantic_style_batch_with_llm(
     """一次 LLM 提交批量标注多个「前句→接话」对，逐项返回标签。
 
     参照 gsuid 后台管线的「一次输出 JSON 数组」范式，显著降低语义风格采集的
-    LLM 提交次数。批量解析缺项时仅对缺失下标回退单对接口
-    ``label_semantic_style_with_retry``，已解析项按位置保留。
+    LLM 提交次数。批量解析为 None/缺尾的下标才回退单对接口
+    ``label_semantic_style_with_retry``，已解析项按位置保留、不重标。
+    最终认证失败（401/403）终止本批剩余请求，不逐条救援。
     """
     from pallas.product.llm.config import get_llm_config
     from pallas.product.llm.provider_client import complete_chat_message
@@ -2774,6 +2833,7 @@ async def label_semantic_style_batch_with_llm(
                 prompt = _label_semantic_style_batch_prompt(len(chunk)) + "\n\n" + "\n\n".join(prompt_items)
                 if not claim_semantic_label_budget():
                     return results
+                once_only_fallback = False
                 try:
                     response = await complete_chat_message(
                         [{"role": "user", "content": prompt}],
@@ -2785,24 +2845,41 @@ async def label_semantic_style_batch_with_llm(
                     )
                     parsed = _parse_label_batch_response(str(response.get("content") or ""), len(chunk))
                 except Exception as exc:
-                    logger.warning("repeater semantic style batch label failed: {}", exc)
-                    parsed = []
-                if len(parsed) == len(chunk):
-                    results.extend(parsed)
-                    continue
-                # 批量解析不完整（缺项/异常）时，仅对缺失下标逐对回退单对标注；
-                # 已解析出的项按位置直接保留，避免整批重标放大调用量。
-                logger.debug(
-                    "Repeater semantic style batch incomplete ([{}]/[{}]); falling back for missing",
-                    len(parsed),
-                    len(chunk),
-                )
-                results.extend(parsed)
-                for item in chunk[len(parsed) :]:
-                    fallback = await label_semantic_style_with_retry(
-                        trigger_text=item[0], reply_text=item[1], pair_relation=item[2]
+                    logger.warning(
+                        "Repeater semantic style batch failed: kind [{}], status [{}], failure [{}], exc [{}]",
+                        *provider_failure_log_args(exc),
                     )
-                    results.append(fallback)
+                    if provider_exception_kind(exc) == "fatal_auth":
+                        # 认证类最终失败：终止本批剩余语义请求，不逐条救援
+                        return results
+                    # 仅本 chunk 的 typed token-limit 回退降为单条一次；下一 chunk 复位
+                    once_only_fallback = provider_exception_kind(exc) == "token_limit"
+                    parsed = []
+                # None / 尾缺下标逐对回退；已解析项按原位置保留，不整批重标。
+                slots: list[tuple[SemanticStyleLabel, BehaviorStrategy | None] | None] = list(parsed) + [None] * (
+                    len(chunk) - len(parsed)
+                )
+                for index in range(len(slots)):
+                    if slots[index] is not None:
+                        continue
+                    try:
+                        slots[index] = await label_semantic_style_with_retry(
+                            trigger_text=chunk[index][0],
+                            reply_text=chunk[index][1],
+                            pair_relation=chunk[index][2],
+                            once_only=once_only_fallback,
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "Repeater semantic style fallback stopped: kind [{}], status [{}], failure [{}], exc [{}]",
+                            *provider_failure_log_args(exc),
+                        )
+                        if provider_exception_kind(exc) == "fatal_auth":
+                            # fallback 中认证类失败：保留已取得槽，停止后续槽 / chunk
+                            results.extend(slots)
+                            return results
+                        raise
+                results.extend(slots)
             return results
         finally:
             log_rate_limited(
@@ -2828,8 +2905,11 @@ def _label_semantic_style_batch_prompt(count: int) -> str:
 def _parse_label_batch_response(
     content: str,
     expected: int,
-) -> list[tuple[SemanticStyleLabel, BehaviorStrategy | None]]:
-    """解析批量标注响应为逐项 (label, strategy)；缺项或非法用空标签补齐到 len(响应)。"""
+) -> list[tuple[SemanticStyleLabel, BehaviorStrategy | None] | None]:
+    """解析批量响应为逐项结果；非法 / 缺字段项为 None（unresolved），非数组整体失败返回空表。
+
+    短数组原位保留为前缀，多余项截断到 ``expected``。
+    """
     text = _JSON_FENCE_RE.sub("", str(content or "").strip()).strip()
     try:
         raw = json.loads(text)
@@ -2837,13 +2917,12 @@ def _parse_label_batch_response(
         return []
     if not isinstance(raw, list):
         return []
-    results: list[tuple[SemanticStyleLabel, BehaviorStrategy | None]] = []
+    results: list[tuple[SemanticStyleLabel, BehaviorStrategy | None] | None] = []
     for item in raw:
-        if not isinstance(item, dict):
-            results.append((SemanticStyleLabel(), None))
+        if not isinstance(item, dict) or not has_required_bools(item):
+            results.append(None)
             continue
-        label, strategy = parse_semantic_style_label(item), parse_behavior_strategy(item.get("behavior_strategy"))
-        results.append((label, strategy))
+        results.append((parse_semantic_style_label(item), parse_behavior_strategy(item.get("behavior_strategy"))))
     return results[:expected]
 
 

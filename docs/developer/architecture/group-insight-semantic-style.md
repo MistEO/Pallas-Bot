@@ -86,6 +86,7 @@ work aux 消费 `group.insight` 后，按该 `(bot_id, group_id)` 的持久化�
 - 每页最多 32 条消息
 - 按 `message_id` 去重
 - 排除当前 Bot 和协作 Bot，建立真人消息序列
+- 已落库样本的接话 `message_id` 在排名后、24 上限截断前剔除（只按 reply 端过滤，不按 trigger），避免已标注的头部占满窗口后整批空转
 - 每个 job 最多产生 `_MAX_PAIRS_PER_JOB=24` 个候选对
 
 候选对有两种关系：
@@ -137,7 +138,7 @@ work aux 消费 `group.insight` 后，按该 `(bot_id, group_id)` 的持久化�
 - `transferable`：脱离临时人名、局部梗和临时事实后是否仍可复用
 - 接话动作、语义关系、强度、表达形式
 
-只有 `is_reply_pair=true` 且 `transferable=true` 的结果才写入语义样本。完整标注完成后，才推进该群的持久化游标。
+只有 `is_reply_pair=true` 且 `transferable=true` 的结果才写入语义样本；非法 JSON、缺必需布尔字段或类型错误解析为未判（None），不算负标签、也不写样本。显式 `false/false` 是有效负判断，可正常推进。仅当本轮所有候选都已判定（长度一致且无未判项）才推进该群的持久化游标。
 
 送标注前先做确定性清洗：纯媒体 trigger、机器人菜单/欢迎话术、CQ 原码、URL、长数字与内部 token 元数据在本地直接跳过，不消耗预算，也不进入样本。
 
@@ -147,9 +148,9 @@ work aux 消费 `group.insight` 后，按该 `(bot_id, group_id)` 的持久化�
 data/pb_webui/repeater_semantic_style/semantic_style_label_budget.json
 ```
 
-预算按实际 LLM 请求计数：一次 8 对批量请求算 1 次；批量失败后的每一次单对 retry 也单独占用 1 次。请求发起前在进程锁和跨进程文件锁内原子预占，避免多个 work worker 同时通过检查。
+预算按「语义层标注调用」预占，非 provider 内部 POST 硬限：一次批量请求算 1 次，逐条回退的每一次单条调用各占 1 次（provider 内部 key / endpoint failover 的多次 POST 不计入）。请求发起前在进程锁和跨进程文件锁内原子预占，避免多个 work worker 同时通过检查。
 
-达到预算时，任务软跳过：不报失败、不推进游标，下一轮继续处理。LLM 请求失败或 fallback 失败时同样不推进游标，避免候选被错误标记为已完成。
+达到预算时，任务软跳过：不报失败、不推进游标，下一轮继续处理。请求失败按类型回退：最终 401/403 终止本批剩余请求、不逐条救援；`incomplete_token_limit` 拆成单条各尝试 1 次（同类不再重复）；unknown / transient 保留有限单条重试（最多 3 次）。本轮存在未判项（解析 None 或短返回）时，先落盘已成功且符合接受条件的子集，但不推进游标，未判候选下轮重标——明确负标签不落盘，游标停滞时可能重复消费预算。
 
 游标文件位于：
 
@@ -168,7 +169,7 @@ data/pb_webui/repeater_semantic_style/examples.jsonl
 data/pb_webui/repeater_semantic_style/profiles.json
 ```
 
-落盘过程使用进程锁和跨进程文件锁，并按 `example_id` 去重。写入样本后会重建 profile；缓存进程启动时加载，之后按周期刷新。
+落盘过程使用进程锁和跨进程文件锁，并按 `example_id` 去重。写入样本后会重建 profile；缓存进程启动时加载，之后按周期刷新。入 LLM 前用已落库接话 ID 的 TTL 内存索引去重：同进程写盘成功会立即失效该索引、下一次读取按新文件重建；跨进程 warm 索引仍受既有 5 秒 TTL 约束（已在途请求不保证 exactly-once）。
 
 每个 example 按 `pair_kind` 区分两类来源：
 

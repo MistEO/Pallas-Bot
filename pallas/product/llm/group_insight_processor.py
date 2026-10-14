@@ -123,18 +123,21 @@ async def _produce_semantic_profile(payload: dict[str, Any]) -> None:
 
     cursor_time, cursor_message_id = get_semantic_style_group_cursor(bot_id=bot_id, group_id=group_id)
     known_bots = await _known_bots_in_group(group_id)
+    # 已落库样本的接话 ID 快照在重建前取，交给重建在 limit 截断前剔除；否则已标注的
+    # 头部占满候选窗口会让整批空转、后续候选被挡。
+    labeled_ids = labeled_semantic_style_reply_ids(bot_id=bot_id, group_id=group_id)
     pairs = await _rebuild_pairs_from_messages(
         bot_id=bot_id,
         group_id=group_id,
         after_time=cursor_time,
         after_message_id=cursor_message_id,
         known_bots=known_bots,
+        excluded_reply_ids=labeled_ids,
     )
     if not pairs:
         return
 
-    # 跳过已落库样本的接话、已处理过的旧窗口，避免同一批消息反复送 LLM 标注。
-    labeled_ids = labeled_semantic_style_reply_ids(bot_id=bot_id, group_id=group_id)
+    # 窄防线：重建已在 cap 前按 reply_id 过滤，这里只兜底、不改变候选规模。
     pairs = [pair for pair in pairs if pair[5] not in labeled_ids]
     if not pairs:
         return
@@ -173,6 +176,9 @@ async def _produce_semantic_profile(payload: dict[str, Any]) -> None:
     if all(item is None for item in labeled):
         return
     attempted = pairs[: len(labeled)]
+    # 仅当本轮所有候选都已判定（长度一致且无 None）才推进游标；有未判项时
+    # 不 mark，避免跨过未判候选。代价：明确负标签下轮可能重标并再消耗预算。
+    complete = len(labeled) == len(pairs) and all(item is not None for item in labeled)
 
     accepted: list[SemanticStyleExample] = []
     accepted_ids: set[str] = set()
@@ -187,8 +193,6 @@ async def _produce_semantic_profile(payload: dict[str, Any]) -> None:
         created_at,
         is_bot_reply,
     ), labeled_item in zip(attempted, labeled, strict=True):
-        # 失败对也计入游标推进：单对回退路径已内置重试，滞留旧窗只会让
-        # 下一轮 sweep 对同一窗口原样重发；全部失败时才保留游标待下轮。
         max_processed_key = max(max_processed_key, (int(created_at), int(message_id)))
         if labeled_item is None:
             continue
@@ -235,6 +239,8 @@ async def _produce_semantic_profile(payload: dict[str, Any]) -> None:
             group_id,
             bot_id,
         )
+    if not complete:
+        return
     final_processed_key = max([max_processed_key, *(key for key in rejected_keys if key <= max_processed_key)])
     mark_semantic_style_group_processed(
         bot_id=bot_id,
@@ -414,6 +420,7 @@ async def _rebuild_pairs_from_messages(
     after_time: int = 0,
     after_message_id: int | None = None,
     known_bots: set[int] | None = None,
+    excluded_reply_ids: set[int] | None = None,
 ) -> list[tuple[str, str, str, int, int, int, int, bool]]:
     """从 message 表重建「前句→接话」对，返回 (trigger, reply, relation, t_uid, r_uid, mid, created_at, is_bot_reply)。
 
@@ -423,6 +430,10 @@ async def _rebuild_pairs_from_messages(
 
     分页与 ``after_time``/``after_message_id`` 边界都按 ``(time, message_id)`` 复合
     比较，同秒内消息不会被秒级游标跳过；仅传 ``after_time`` 时视为整秒已处理。
+
+    ``excluded_reply_ids`` 为已落库样本的接话 message_id 集合：排名完成后、``limit``
+    截断之前按 reply 端剔除，避免已标注的头部把候选窗口挤满后整批空转；默认 None
+    保持原有行为。
 
     ``is_bot_reply`` 标记接话端是否为 bot（自身或协作 bot）：真人接话进入 direct_pairs，
     bot 自我接话只沉淀 behavior_strategy（self_reflection），不污染群表达指导。
@@ -576,6 +587,10 @@ async def _rebuild_pairs_from_messages(
     ranked_adjacent = [(_adjacent_rank(pair), pair) for pair in adjacent_pairs]
     ranked_adjacent.sort(key=lambda item: (-item[0][0], -item[0][1]))
     pairs.extend(pair for _, pair in ranked_adjacent)
+    # 已落库样本在排名后、limit 截断前按 reply 端剔除：避免已标注的头部把候选
+    # 窗口占满后 caller 整批空转，同时不改变 quoted 优先与 adjacent 热度/相似度排序。
+    if excluded_reply_ids:
+        pairs = [pair for pair in pairs if pair[5] not in excluded_reply_ids]
     return pairs[:limit]
 
 

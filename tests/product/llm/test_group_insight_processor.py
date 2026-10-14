@@ -647,7 +647,7 @@ def test_text_replaces_cq_media_with_placeholder() -> None:
 
 
 @pytest.mark.asyncio
-async def test_produce_semantic_profile_partial_failure_persists_and_advances(monkeypatch) -> None:
+async def test_produce_semantic_profile_partial_failure_persists_without_advancing(monkeypatch) -> None:
     from pallas.product.llm import group_insight_processor as mod
     from pallas.product.llm import repeater_semantic_style as sem
 
@@ -698,10 +698,9 @@ async def test_produce_semantic_profile_partial_failure_persists_and_advances(mo
 
     await mod._produce_semantic_profile({"bot_id": 1, "group_id": 7})
 
-    # 部分失败（第 2 对失败）也落盘成功子集，并把游标推进过全部已尝试对；
-    # 全部失败才保留游标待下轮，避免个别失败对卡住整窗反复重发。
+    # 部分失败（第 2 对 None）仍落盘成功子集，但因存在未判项不推进游标，避免跨过未判候选。
     assert [item.example_id for item in persisted] == ["7:101:1", "7:103:1"]
-    assert marked == [(1, 7, 1200, 103)]
+    assert marked == []
     assert len(timing) == 1
     assert "preparation" in timing[0][0].lower()
     assert len(timing[0][1]) == 1
@@ -750,6 +749,162 @@ async def test_produce_semantic_profile_all_failed_keeps_cursor(monkeypatch) -> 
 
     assert persisted == []
     assert marked == []
+
+
+@pytest.mark.asyncio
+async def test_produce_semantic_profile_short_return_persists_prefix_without_advance(monkeypatch) -> None:
+    from pallas.product.llm import group_insight_processor as mod
+    from pallas.product.llm import repeater_semantic_style as sem
+
+    pairs = [
+        ("前句1", "接话1", "adjacent", 11, 12, 101, 1000, False),
+        ("前句2", "接话2", "adjacent", 13, 14, 102, 1100, False),
+        ("前句3", "接话3", "adjacent", 15, 16, 103, 1200, False),
+    ]
+    good_label = sem.SemanticStyleLabel(is_reply_pair=True, transferable=True)
+    persisted: list[sem.SemanticStyleExample] = []
+    marked: list[tuple[int, int, int, int]] = []
+
+    async def fake_rebuild(**kwargs):
+        return pairs
+
+    class _EmptyRepo:
+        async def find_recent_in_group(self, *args, **kwargs):
+            return []
+
+    monkeypatch.setattr(mod, "_known_bots_in_group", lambda group_id: _async_set())
+    monkeypatch.setattr(mod, "_rebuild_pairs_from_messages", fake_rebuild)
+    monkeypatch.setattr(mod, "make_message_repository", lambda: _EmptyRepo())
+    monkeypatch.setattr(sem, "semantic_style_collection_enabled", lambda *, bot_id, group_id: True)
+    monkeypatch.setattr(sem, "semantic_label_budget_ok", lambda: True)
+    monkeypatch.setattr(sem, "get_semantic_style_group_cursor", lambda *, bot_id, group_id: (0, 0))
+    monkeypatch.setattr(sem, "labeled_semantic_style_reply_ids", lambda bot_id, group_id: set())
+    monkeypatch.setattr(sem, "is_human_semantic_style_pair", lambda **kwargs: True)
+    monkeypatch.setattr(sem, "persist_semantic_style_examples", persisted.extend)
+
+    # 预算中途耗尽：只尝试 1 项（短返回）
+    async def fake_batch(items):
+        return [(good_label, None)]
+
+    monkeypatch.setattr(sem, "label_semantic_style_batch_with_llm", fake_batch)
+
+    def fake_mark(*, bot_id, group_id, processed_at, processed_message_id=0):
+        marked.append((bot_id, group_id, processed_at, processed_message_id))
+
+    monkeypatch.setattr(sem, "mark_semantic_style_group_processed", fake_mark)
+
+    await mod._produce_semantic_profile({"bot_id": 1, "group_id": 7})
+
+    # 短返回：只落盘已尝试前缀，未判候选不跨过，不推进游标。
+    assert [item.example_id for item in persisted] == ["7:101:1"]
+    assert marked == []
+
+
+@pytest.mark.asyncio
+async def test_produce_semantic_profile_complete_negative_advances_without_persist(monkeypatch) -> None:
+    from pallas.product.llm import group_insight_processor as mod
+    from pallas.product.llm import repeater_semantic_style as sem
+
+    pairs = [
+        ("前句1", "接话1", "adjacent", 11, 12, 101, 1000, False),
+        ("前句2", "接话2", "adjacent", 13, 14, 102, 1100, False),
+    ]
+    negative = sem.SemanticStyleLabel(is_reply_pair=False, transferable=False)
+    persisted: list[sem.SemanticStyleExample] = []
+    marked: list[tuple[int, int, int, int]] = []
+
+    async def fake_rebuild(**kwargs):
+        return pairs
+
+    class _EmptyRepo:
+        async def find_recent_in_group(self, *args, **kwargs):
+            return []
+
+    monkeypatch.setattr(mod, "_known_bots_in_group", lambda group_id: _async_set())
+    monkeypatch.setattr(mod, "_rebuild_pairs_from_messages", fake_rebuild)
+    monkeypatch.setattr(mod, "make_message_repository", lambda: _EmptyRepo())
+    monkeypatch.setattr(sem, "semantic_style_collection_enabled", lambda *, bot_id, group_id: True)
+    monkeypatch.setattr(sem, "semantic_label_budget_ok", lambda: True)
+    monkeypatch.setattr(sem, "get_semantic_style_group_cursor", lambda *, bot_id, group_id: (0, 0))
+    monkeypatch.setattr(sem, "labeled_semantic_style_reply_ids", lambda bot_id, group_id: set())
+    monkeypatch.setattr(sem, "persist_semantic_style_examples", persisted.extend)
+
+    # 完整、无 None，但全部为明确负标签：不落盘但可推进游标。
+    async def fake_batch(items):
+        return [(negative, None), (negative, None)]
+
+    monkeypatch.setattr(sem, "label_semantic_style_batch_with_llm", fake_batch)
+
+    def fake_mark(*, bot_id, group_id, processed_at, processed_message_id=0):
+        marked.append((bot_id, group_id, processed_at, processed_message_id))
+
+    monkeypatch.setattr(sem, "mark_semantic_style_group_processed", fake_mark)
+
+    await mod._produce_semantic_profile({"bot_id": 1, "group_id": 7})
+
+    assert persisted == []
+    assert marked == [(1, 7, 1100, 102)]
+
+
+@pytest.mark.asyncio
+async def test_produce_semantic_profile_backfills_past_labeled_head_window(monkeypatch) -> None:
+    """首窗 24 条接话已落库时，仍能在 cap 之前剔除并回填后续候选；不按 trigger 误排。"""
+    from pallas.product.llm import group_insight_processor as mod
+    from pallas.product.llm import repeater_semantic_style as sem
+
+    def text(index: int) -> str:
+        # 两字互不包含、bigram 不重叠 → adjacent 相似度恒 0，排序稳定保持时间序
+        return f"{chr(0x4E00 + index)}{chr(0x5100 + index)}"
+
+    repo = _DummyMessageRepo([_msg(i, 11, text(i), time=1000 + i) for i in range(1, 61)])
+    accepted_head = set(range(2, 26))  # 首窗 reply2..25 已落盘
+    good_label = sem.SemanticStyleLabel(is_reply_pair=True, transferable=True)
+    received: list[tuple[str, str, str]] = []
+
+    async def fake_known_bots(group_id):
+        return set()
+
+    async def fake_protocol(**kwargs):
+        return None
+
+    async def fake_heat(**kwargs):
+        return {}
+
+    async def fake_batch(items):
+        received.extend(items)
+        return [(good_label, None) for _ in items]
+
+    monkeypatch.setattr(mod, "_known_bots_in_group", fake_known_bots)
+    monkeypatch.setattr(mod, "_collect_protocol_observations", fake_protocol)
+    monkeypatch.setattr(mod, "make_message_repository", lambda: repo)
+    monkeypatch.setattr(mod, "_repeater_answer_heat", fake_heat)
+    monkeypatch.setattr(sem, "semantic_style_collection_enabled", lambda *, bot_id, group_id: True)
+
+    async def fake_collection_allowed(*, bot_id, group_id):
+        return True
+
+    monkeypatch.setattr(sem, "semantic_style_collection_allowed", fake_collection_allowed)
+    monkeypatch.setattr(sem, "semantic_label_budget_ok", lambda: True)
+    monkeypatch.setattr(sem, "get_semantic_style_group_cursor", lambda *, bot_id, group_id: (0, 0))
+    monkeypatch.setattr(sem, "labeled_semantic_style_reply_ids", lambda bot_id, group_id: set(accepted_head))
+    monkeypatch.setattr(sem, "label_semantic_style_batch_with_llm", fake_batch)
+    monkeypatch.setattr(sem, "is_human_semantic_style_pair", lambda **kwargs: True)
+    monkeypatch.setattr(sem, "persist_semantic_style_examples", lambda examples: None)
+
+    def fake_mark(*, bot_id, group_id, processed_at, processed_message_id=0):
+        return None
+
+    monkeypatch.setattr(sem, "mark_semantic_style_group_processed", fake_mark)
+
+    await mod._produce_semantic_profile({"bot_id": 1, "group_id": 7})
+
+    replies = [reply for _trigger, reply, _relation in received]
+    assert len(received) == 24
+    assert text(26) in replies
+    assert text(25) not in replies
+    # reply26 的 trigger 是 msg25（其接话端已被标注），只按 reply_id 过滤，不误排
+    reply26 = next(item for item in received if item[1] == text(26))
+    assert reply26[0] == text(25)
 
 
 @pytest.mark.asyncio
