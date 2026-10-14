@@ -410,48 +410,171 @@ def test_parse_label_accepts_only_annotation_axes() -> None:
     }
 
 
-def test_labeled_semantic_style_reply_ids_indexes_exported_reply_ids(tmp_path, monkeypatch) -> None:
+@pytest.mark.parametrize("clock", [0.0, 1.0, 5.0, 5.001, 1_700_000_000.0])
+def test_labeled_semantic_style_reply_ids_refresh_immediately_after_write(tmp_path, monkeypatch, clock) -> None:
+    from pallas.product.llm import repeater_semantic_style as mod
+
+    monkeypatch.setenv("PALLAS_DATA_DIR", str(tmp_path))
+    # 冻结模块时钟：写盘失效 sentinel 必须在 now 极小（0/1/5）时也立即重建，而非等 5 秒
+    monkeypatch.setattr(mod.time, "time", lambda: clock)
+    mod.clear_semantic_style_cache_for_tests()
+    # 隔离参数化之间的模块级 ID 索引状态（测试专用重置）
+    mod._labeled_ids_index.clear()
+    mod._labeled_ids_index_built_at = 0.0
+    # 先 warm 空索引：写盘成功后必须同一时钟立即可见，不依赖 5s TTL、不 sleep。
+    assert mod.labeled_semantic_style_reply_ids(100, 42) == set()
+
+    def example(*, example_id, bot_id, group_id, created_at, annotation_source="llm_v2"):
+        return mod.SemanticStyleExample(
+            example_id=example_id,
+            created_at=created_at,
+            bot_id=bot_id,
+            group_id=group_id,
+            scene="group_chat",
+            trigger_text="前句",
+            reply_text="接话",
+            label=mod.parse_semantic_style_label({"is_reply_pair": True, "transferable": True}),
+            source_kind="human_pair",
+            trigger_user_id=11,
+            reply_user_id=12,
+            annotation_source=annotation_source,
+        )
+
+    mod.persist_semantic_style_examples([
+        example(example_id="42:101:100", bot_id=100, group_id=42, created_at=100),
+        example(example_id="42:-5:100", bot_id=100, group_id=42, created_at=200),
+        example(example_id="43:101:100", bot_id=100, group_id=43, created_at=300),  # 同 MID 不同群
+        example(example_id="42:101:200", bot_id=200, group_id=42, created_at=400),  # 同 MID 不同 bot
+        example(
+            example_id="42:999:100",
+            bot_id=100,
+            group_id=42,
+            created_at=500,
+            annotation_source="legacy_persisted_v1",  # legacy 不计入
+        ),
+    ])
+
+    assert mod.labeled_semantic_style_reply_ids(100, 42) == {101, -5}
+    assert mod.labeled_semantic_style_reply_ids(100, 43) == {101}
+    assert mod.labeled_semantic_style_reply_ids(200, 42) == {101}
+    assert mod.labeled_semantic_style_reply_ids(100, 99) == set()
+
+    # 返回副本：外部修改不污染索引
+    leaked = mod.labeled_semantic_style_reply_ids(100, 42)
+    leaked.add(424242)
+    assert mod.labeled_semantic_style_reply_ids(100, 42) == {101, -5}
+
+
+def test_labeled_ids_index_drops_ids_after_clear_and_prune(tmp_path, monkeypatch) -> None:
+    import time
+
     from pallas.product.llm import repeater_semantic_style as mod
 
     monkeypatch.setenv("PALLAS_DATA_DIR", str(tmp_path))
     mod.clear_semantic_style_cache_for_tests()
-    mod.persist_semantic_style_example(
-        mod.SemanticStyleExample(
-            example_id="42:101:100",
+
+    def example(*, example_id, created_at):
+        return mod.SemanticStyleExample(
+            example_id=example_id,
+            created_at=created_at,
+            bot_id=100,
+            group_id=42,
+            scene="group_chat",
+            trigger_text="前句",
+            reply_text="接话",
+            label=mod.parse_semantic_style_label({"is_reply_pair": True, "transferable": True}),
+            source_kind="human_pair",
+            trigger_user_id=11,
+            reply_user_id=12,
+            annotation_source="llm_v2",
+        )
+
+    mod.persist_semantic_style_examples([example(example_id="42:101:100", created_at=100)])
+    assert mod.labeled_semantic_style_reply_ids(100, 42) == {101}
+
+    mod.clear_semantic_style_data(bot_id=100, group_id=42)
+    assert mod.labeled_semantic_style_reply_ids(100, 42) == set()
+
+    now = int(time.time())
+    mod.persist_semantic_style_examples([
+        example(example_id="42:301:100", created_at=now - mod.SEMANTIC_STYLE_RETENTION_SEC - 10)
+    ])
+    assert mod.labeled_semantic_style_reply_ids(100, 42) == {301}
+
+    mod.prune_semantic_style_examples(now=now)
+    assert mod.labeled_semantic_style_reply_ids(100, 42) == set()
+
+
+def test_labeled_ids_index_keeps_old_ids_when_write_fails(tmp_path, monkeypatch) -> None:
+    import pathlib
+
+    from pallas.product.llm import repeater_semantic_style as mod
+
+    monkeypatch.setenv("PALLAS_DATA_DIR", str(tmp_path))
+    mod.clear_semantic_style_cache_for_tests()
+
+    def example(example_id):
+        return mod.SemanticStyleExample(
+            example_id=example_id,
             created_at=100,
             bot_id=100,
             group_id=42,
             scene="group_chat",
-            trigger_text="前句1",
-            reply_text="接话1",
-            label=mod.parse_semantic_style_label({"reuse": "direct"}),
+            trigger_text="前句",
+            reply_text="接话",
+            label=mod.parse_semantic_style_label({"is_reply_pair": True, "transferable": True}),
             source_kind="human_pair",
             trigger_user_id=11,
             reply_user_id=12,
             annotation_source="llm_v2",
         )
-    )
-    mod.persist_semantic_style_example(
-        mod.SemanticStyleExample(
-            example_id="42:-5:100",
-            created_at=200,
-            bot_id=100,
-            group_id=42,
-            scene="group_chat",
-            trigger_text="前句2",
-            reply_text="接话2",
-            label=mod.parse_semantic_style_label({"reuse": "direct"}),
-            source_kind="human_pair",
-            trigger_user_id=11,
-            reply_user_id=12,
-            annotation_source="llm_v2",
-        )
-    )
-    # force index rebuild despite 5s TTL
-    mod._labeled_ids_index_built_at = 0.0
 
-    assert mod.labeled_semantic_style_reply_ids(100, 42) == {101, -5}
-    assert mod.labeled_semantic_style_reply_ids(100, 99) == set()
+    mod.persist_semantic_style_examples([example("42:101:100")])
+    assert mod.labeled_semantic_style_reply_ids(100, 42) == {101}
+
+    examples_path = mod.semantic_style_examples_path()
+    real_replace = pathlib.Path.replace
+
+    def failing_replace(self, target):
+        if str(target) == str(examples_path):
+            raise OSError("simulated replace failure")
+        return real_replace(self, target)
+
+    monkeypatch.setattr(pathlib.Path, "replace", failing_replace)
+
+    with pytest.raises(OSError, match="simulated replace failure"):
+        mod.persist_semantic_style_example(example("42:202:100"))
+
+    # 写盘失败：新 ID 不加入，索引仍指向旧文件内容
+    assert mod.labeled_semantic_style_reply_ids(100, 42) == {101}
+
+
+def test_labeled_ids_write_and_rebuild_share_thread_lock(tmp_path, monkeypatch) -> None:
+    import threading
+
+    from pallas.product.llm import repeater_semantic_style as mod
+
+    monkeypatch.setenv("PALLAS_DATA_DIR", str(tmp_path))
+    mod.clear_semantic_style_cache_for_tests()
+    path = mod.semantic_style_examples_path()
+
+    entered = threading.Event()
+
+    def writer():
+        mod._write_semantic_style_examples(path, [])
+        entered.set()
+
+    lock = mod._semantic_data_thread_lock
+    lock.acquire()
+    try:
+        thread = threading.Thread(target=writer)
+        thread.start()
+        # 主线程持有共享 RLock 时 writer 必须等待：证明写盘失效与 rebuild 同一把锁
+        assert entered.wait(0.2) is False
+    finally:
+        lock.release()
+    assert entered.wait(2.0) is True
+    thread.join()
 
 
 def test_semantic_style_group_cursor_advances_monotonically_but_not_backwards(tmp_path, monkeypatch) -> None:

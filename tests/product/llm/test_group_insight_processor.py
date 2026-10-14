@@ -847,6 +847,67 @@ async def test_produce_semantic_profile_complete_negative_advances_without_persi
 
 
 @pytest.mark.asyncio
+async def test_produce_semantic_profile_backfills_past_labeled_head_window(monkeypatch) -> None:
+    """首窗 24 条接话已落库时，仍能在 cap 之前剔除并回填后续候选；不按 trigger 误排。"""
+    from pallas.product.llm import group_insight_processor as mod
+    from pallas.product.llm import repeater_semantic_style as sem
+
+    def text(index: int) -> str:
+        # 两字互不包含、bigram 不重叠 → adjacent 相似度恒 0，排序稳定保持时间序
+        return f"{chr(0x4E00 + index)}{chr(0x5100 + index)}"
+
+    repo = _DummyMessageRepo([_msg(i, 11, text(i), time=1000 + i) for i in range(1, 61)])
+    accepted_head = set(range(2, 26))  # 首窗 reply2..25 已落盘
+    good_label = sem.SemanticStyleLabel(is_reply_pair=True, transferable=True)
+    received: list[tuple[str, str, str]] = []
+
+    async def fake_known_bots(group_id):
+        return set()
+
+    async def fake_protocol(**kwargs):
+        return None
+
+    async def fake_heat(**kwargs):
+        return {}
+
+    async def fake_batch(items):
+        received.extend(items)
+        return [(good_label, None) for _ in items]
+
+    monkeypatch.setattr(mod, "_known_bots_in_group", fake_known_bots)
+    monkeypatch.setattr(mod, "_collect_protocol_observations", fake_protocol)
+    monkeypatch.setattr(mod, "make_message_repository", lambda: repo)
+    monkeypatch.setattr(mod, "_repeater_answer_heat", fake_heat)
+    monkeypatch.setattr(sem, "semantic_style_collection_enabled", lambda *, bot_id, group_id: True)
+
+    async def fake_collection_allowed(*, bot_id, group_id):
+        return True
+
+    monkeypatch.setattr(sem, "semantic_style_collection_allowed", fake_collection_allowed)
+    monkeypatch.setattr(sem, "semantic_label_budget_ok", lambda: True)
+    monkeypatch.setattr(sem, "get_semantic_style_group_cursor", lambda *, bot_id, group_id: (0, 0))
+    monkeypatch.setattr(sem, "labeled_semantic_style_reply_ids", lambda bot_id, group_id: set(accepted_head))
+    monkeypatch.setattr(sem, "label_semantic_style_batch_with_llm", fake_batch)
+    monkeypatch.setattr(sem, "is_human_semantic_style_pair", lambda **kwargs: True)
+    monkeypatch.setattr(sem, "persist_semantic_style_examples", lambda examples: None)
+
+    def fake_mark(*, bot_id, group_id, processed_at, processed_message_id=0):
+        return None
+
+    monkeypatch.setattr(sem, "mark_semantic_style_group_processed", fake_mark)
+
+    await mod._produce_semantic_profile({"bot_id": 1, "group_id": 7})
+
+    replies = [reply for _trigger, reply, _relation in received]
+    assert len(received) == 24
+    assert text(26) in replies
+    assert text(25) not in replies
+    # reply26 的 trigger 是 msg25（其接话端已被标注），只按 reply_id 过滤，不误排
+    reply26 = next(item for item in received if item[1] == text(26))
+    assert reply26[0] == text(25)
+
+
+@pytest.mark.asyncio
 async def test_collect_protocol_observations_requires_bot_trigger(monkeypatch) -> None:
     """真人 A 发「请回复「X」」、真人 B 引用回复，不得积累为 Bot 协议证据。"""
     from pallas.product.llm import group_insight_processor as mod

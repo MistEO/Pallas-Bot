@@ -410,12 +410,14 @@ def labeled_semantic_style_reply_ids(bot_id: int, group_id: int) -> set[int]:
     """已落库语义样本的接话 message_id 集合（TTL 内存索引），供入 LLM 前去重过滤。
 
     example_id 格式为 ``{group_id}:{message_id}:{bot_id}``，message_id 可能为负
-    （新版本 QQ），取中间段解析。重读 examples.jsonl 后重建，避免漏掉并发落库的样本。
+    （新版本 QQ），取中间段解析。重读 examples.jsonl 后重建；同进程写盘成功会立即
+    失效索引，下一次读取按新文件重建（跨进程 warm 索引仍受 5 秒 TTL 约束）。
     """
     now = time.time()
     global _labeled_ids_index_built_at
     with _semantic_data_thread_lock:
-        if now - _labeled_ids_index_built_at > _LABELED_IDS_INDEX_TTL_SEC:
+        # built_at==0.0 是写盘失效 sentinel：即使 now 很小（测试冻结时钟）也必须重建
+        if _labeled_ids_index_built_at == 0.0 or now - _labeled_ids_index_built_at > _LABELED_IDS_INDEX_TTL_SEC:
             index: dict[tuple[int, int], set[int]] = {}
             for example in _load_semantic_style_examples(semantic_style_examples_path()):
                 if example.annotation_source != "llm_v2":
@@ -431,7 +433,8 @@ def labeled_semantic_style_reply_ids(bot_id: int, group_id: int) -> set[int]:
             _labeled_ids_index.clear()
             _labeled_ids_index.update(index)
             _labeled_ids_index_built_at = now
-    return _labeled_ids_index.get((int(bot_id), int(group_id)), set())
+        # 锁内返回副本：外部修改不回写索引，也避免与写盘失效交错。
+        return set(_labeled_ids_index.get((int(bot_id), int(group_id)), set()))
 
 
 def get_semantic_style_group_cursor(bot_id: int, group_id: int) -> tuple[int, int]:
@@ -1853,13 +1856,19 @@ def load_examples_with_legacy_migration_locked() -> list[SemanticStyleExample]:
 
 
 def _write_semantic_style_examples(path: Path, examples: list[SemanticStyleExample]) -> None:
+    global _labeled_ids_index_built_at
     tmp = path.with_suffix(".jsonl.tmp")
     payload = "".join(
         json.dumps(example.model_dump(mode="json"), ensure_ascii=False, separators=(",", ":")) + "\n"
         for example in examples
     )
     tmp.write_text(payload, encoding="utf-8")
-    tmp.replace(path)
+    # 落盘成功后再失效同进程 ID 索引，下一次读取立即按新文件重建；写盘失败不失效，
+    # 索引保持旧文件状态。复用现 RLock，避免与 rebuild 交错成旧覆盖。
+    with _semantic_data_thread_lock:
+        tmp.replace(path)
+        _labeled_ids_index.clear()
+        _labeled_ids_index_built_at = 0.0
 
 
 def _apply_legacy_rhythm_statistics(

@@ -86,6 +86,7 @@ work aux 消费 `group.insight` 后，按该 `(bot_id, group_id)` 的持久化�
 - 每页最多 32 条消息
 - 按 `message_id` 去重
 - 排除当前 Bot 和协作 Bot，建立真人消息序列
+- 已落库样本的接话 `message_id` 在排名后、24 上限截断前剔除（只按 reply 端过滤，不按 trigger），避免已标注的头部占满窗口后整批空转
 - 每个 job 最多产生 `_MAX_PAIRS_PER_JOB=24` 个候选对
 
 候选对有两种关系：
@@ -168,7 +169,7 @@ data/pb_webui/repeater_semantic_style/examples.jsonl
 data/pb_webui/repeater_semantic_style/profiles.json
 ```
 
-落盘过程使用进程锁和跨进程文件锁，并按 `example_id` 去重。写入样本后会重建 profile；缓存进程启动时加载，之后按周期刷新。
+落盘过程使用进程锁和跨进程文件锁，并按 `example_id` 去重。写入样本后会重建 profile；缓存进程启动时加载，之后按周期刷新。入 LLM 前用已落库接话 ID 的 TTL 内存索引去重：同进程写盘成功会立即失效该索引、下一次读取按新文件重建；跨进程 warm 索引仍受既有 5 秒 TTL 约束（已在途请求不保证 exactly-once）。
 
 每个 example 按 `pair_kind` 区分两类来源：
 
