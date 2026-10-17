@@ -140,7 +140,7 @@ work aux 消费 `group.insight` 后，按该 `(bot_id, group_id)` 的持久化�
 
 单条与批量两个标注 prompt 都会直接枚举解析器使用的三组受控词表（`interaction_actions`、`semantic_relations`、`forms`），枚举串由同一份词表定义排序生成，不手抄第二套；prompt 要求只取表内词、没有匹配就填 `[]`。解析仍按原词表过滤表外值，词表本身未扩充。
 
-语义标注走共享 Chat Completions 路径：命中固定 CPA 路由、模型为 `deepseek-v4.1-flash` 且 payload 已关闭思考时，Bot 侧会同时携带 `reasoning_effort: none`；其它 provider、其它 DeepSeek 模型以及显式 `enable`/档位不受影响，Responses 与 Anthropic 路径不在此兼容内。该 `none` 需 CPA 侧对应模型声明支持（未声明时 CPA 默认会将其降为 `low`），此配置尚未部署。Cline 直连仅单条合成样本验证到带 `none` 时 reasoning 报数为 0，批量真实稳定性与费用未验证。
+语义标注走共享 Chat Completions 路径：Provider 注册模型可启用 `reasoning_effort_none_on_disable`（默认关闭）。仅当该模型实际关闭思考时，Bot 侧会同时携带 `reasoning_effort: none`；未启用、显式 `enable`/档位以及 Responses、Anthropic 路径均不追加。该选项用于兼容需要显式 `none` 才关闭思考的网关，`none` 仍需上游模型声明支持（例如 CPA 侧模型档位包含 `none`），Bot 不保证网关一定遵守。关闭思考与 `none` 的兼容性应按网关与模型实测后再启用。
 
 只有 `is_reply_pair=true` 且 `transferable=true` 的结果才写入语义样本；非法 JSON、缺必需布尔字段或类型错误解析为未判（None），不算负标签、也不写样本。显式 `false/false` 是有效负判断，可正常推进。仅当本轮所有候选都已判定（长度一致且无未判项）才推进该群的持久化游标。
 

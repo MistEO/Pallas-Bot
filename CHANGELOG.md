@@ -4,6 +4,7 @@
 
 ### Added
 
+* LLM Provider 注册模型可启用「关闭思考时同时发送 reasoning_effort=none」
 * feat(plugins): 提供可复制的社区插件仓库模板
 * feat(plugins): 区分社区插件索引版本与本地安装版本
 * feat(llm): 内置邀请牛牛进群的流程与审批说明，明确流程知识不代表某次邀请状态
@@ -11,6 +12,7 @@
 
 ### Changed
 
+* 语义标注单条与批量输出额度更充足，降低结果截断风险
 * docs(plugins): 明确社区索引自动 PR 为默认关闭的可选接入方式，目前仅 Memes 完成集成
 * docs(plugins): 说明 Memes 社区索引自动 PR 试点
 * chore(deps): 依赖审计发现漏洞或审计覆盖不完整时阻断 CI
@@ -19,6 +21,7 @@
 
 ### Fixed
 
+* 语义标注提示明确枚举动作、关系与句式的受控词表，减少表外标签
 * fix(db): 校验备份文件完整性并清理下载临时文件
 * fix(federation): 保护共享消息 claim 状态，避免并发重复领取
 * fix(commands): 修复插件命令冷却配置覆盖

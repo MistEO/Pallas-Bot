@@ -120,3 +120,118 @@ def test_apply_model_effort_anthropic_default_skips() -> None:
         request_method="anthropic_messages",
     )
     assert "thinking" not in payload
+
+
+def test_apply_model_effort_none_flag_only_for_chat_disable() -> None:
+    payload: dict = {"model": "deepseek-v4-flash"}
+    apply_model_effort_to_payload(
+        payload,
+        {},
+        model="deepseek-v4-flash",
+        reasoning_effort_none_on_disable=True,
+    )
+    assert payload["thinking"] == {"type": "disabled"}
+    assert payload["reasoning_effort"] == "none"
+
+    payload = {"model": "deepseek-v4-flash"}
+    apply_model_effort_to_payload(
+        payload,
+        {"model_effort": "disable"},
+        model="deepseek-v4-flash",
+        reasoning_effort_none_on_disable=True,
+    )
+    assert payload["thinking"] == {"type": "disabled"}
+    assert payload["reasoning_effort"] == "none"
+
+    payload = {"model": "qwen3.7-max"}
+    apply_model_effort_to_payload(
+        payload,
+        {"model_effort": "disable"},
+        model="qwen3.7-max",
+        reasoning_effort_none_on_disable=True,
+    )
+    assert payload["thinking"] == {"type": "disabled"}
+    assert payload["reasoning_effort"] == "none"
+
+    payload = {"model": "qwen3.7-max"}
+    apply_model_effort_to_payload(payload, {}, model="qwen3.7-max", reasoning_effort_none_on_disable=True)
+    assert "thinking" not in payload
+    assert "reasoning_effort" not in payload
+
+
+def test_apply_model_effort_none_flag_false_keeps_original_payload() -> None:
+    payload: dict = {"model": "deepseek-v4-flash"}
+    apply_model_effort_to_payload(
+        payload,
+        {"model_effort": "disable"},
+        model="deepseek-v4-flash",
+        reasoning_effort_none_on_disable=False,
+    )
+    assert payload["thinking"] == {"type": "disabled"}
+    assert "reasoning_effort" not in payload
+
+
+def test_apply_model_effort_none_flag_keeps_enable_and_levels() -> None:
+    payload: dict = {"model": "deepseek-v4-flash"}
+    apply_model_effort_to_payload(
+        payload,
+        {"model_effort": "enable"},
+        model="deepseek-v4-flash",
+        reasoning_effort_none_on_disable=True,
+    )
+    assert payload["thinking"] == {"type": "enabled"}
+    assert "reasoning_effort" not in payload
+
+    payload = {"model": "deepseek-v4-flash"}
+    apply_model_effort_to_payload(
+        payload,
+        {"model_effort": "high"},
+        model="deepseek-v4-flash",
+        reasoning_effort_none_on_disable=True,
+    )
+    assert payload["thinking"] == {"type": "enabled"}
+    assert payload["reasoning_effort"] == "high"
+
+    payload = {"model": "qwen3.7-max"}
+    apply_model_effort_to_payload(
+        payload,
+        {"model_effort": "high"},
+        model="qwen3.7-max",
+        reasoning_effort_none_on_disable=True,
+    )
+    assert payload["reasoning_effort"] == "high"
+
+
+def test_apply_model_effort_none_flag_does_not_leak_to_non_chat_methods() -> None:
+    payload: dict = {}
+    apply_model_effort_to_payload(
+        payload,
+        {"model_effort": "disable"},
+        model="deepseek-v4-flash",
+        request_method="responses",
+        reasoning_effort_none_on_disable=True,
+    )
+    assert payload["reasoning"] == {"effort": "none"}
+    assert "reasoning_effort" not in payload
+    assert "thinking" not in payload
+
+    payload = {"model": "claude-sonnet-4-5", "max_tokens": 512}
+    apply_model_effort_to_payload(
+        payload,
+        {"model_effort": "disable"},
+        model="claude-sonnet-4-5",
+        request_method="anthropic_messages",
+        reasoning_effort_none_on_disable=True,
+    )
+    assert "thinking" not in payload
+    assert "reasoning_effort" not in payload
+
+    payload = {"model": "qwen3.7-max"}
+    apply_model_effort_to_payload(
+        payload,
+        {"model_effort": "disable"},
+        model="qwen3.7-max",
+        request_method="ollama_chat",
+        reasoning_effort_none_on_disable=True,
+    )
+    assert "reasoning_effort" not in payload

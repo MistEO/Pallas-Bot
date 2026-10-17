@@ -86,11 +86,13 @@ def apply_model_effort_to_payload(
     *,
     model: str,
     request_method: str = "chat_completions",
+    reasoning_effort_none_on_disable: bool = False,
 ) -> None:
     """把 Provider model_effort 映射到 Chat Completions / Responses / Anthropic 字段。"""
     effort = str(options.get("model_effort") or options.get("reasoning_effort") or "").strip().lower()
     model_name = str(model or "").strip().lower()
     method = str(request_method or "").strip().lower() or "chat_completions"
+    is_chat = method == "chat_completions"
     is_responses = method == "responses"
     is_anthropic = method == "anthropic_messages"
 
@@ -102,6 +104,8 @@ def apply_model_effort_to_payload(
         else:
             payload["thinking"] = {"type": "disabled"}
             payload.pop("reasoning_effort", None)
+            if is_chat and reasoning_effort_none_on_disable:
+                payload["reasoning_effort"] = "none"
 
     if is_anthropic:
         if not effort or effort == "disable":
@@ -154,6 +158,8 @@ def apply_model_effort_to_payload(
         # 非 DeepSeek 模型（如 qwen3）默认可能开思考，required tool_choice 会被拒；同样禁用
         payload["thinking"] = {"type": "disabled"}
         payload.pop("reasoning_effort", None)
+        if is_chat and reasoning_effort_none_on_disable:
+            payload["reasoning_effort"] = "none"
         return
 
     mapped = "high" if effort == "xhigh" else effort

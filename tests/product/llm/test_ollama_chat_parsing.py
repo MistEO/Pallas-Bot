@@ -32,11 +32,17 @@ async def test_post_ollama_chat_parses_thinking_into_reasoning_content(monkeypat
             }
 
     class FakeClient:
-        async def post(self, *_args, **_kwargs):
+        def __init__(self) -> None:
+            self.payloads: list[dict] = []
+
+        async def post(self, *_args, json=None, **_kwargs):
+            self.payloads.append(json)
             return FakeResponse()
 
+    fake_client_instance = FakeClient()
+
     async def fake_client():
-        return FakeClient()
+        return fake_client_instance
 
     monkeypatch.setattr("pallas.product.llm.provider_client.get_llm_shared_httpx_client", fake_client)
     result = await _post_ollama_chat(
@@ -44,10 +50,11 @@ async def test_post_ollama_chat_parses_thinking_into_reasoning_content(monkeypat
         base_url="https://ollama.com",
         api_key="sk-test",
         model="glm-5.3-flash",
-        options={},
+        options={"model_effort": "disable"},
         tools=None,
         timeout_sec=60,
     )
     assert result["content"] == "2"
     assert result["reasoning_content"] == "The user asks 1+1. Answer with a number."
     assert "thinking" not in result
+    assert "reasoning_effort" not in fake_client_instance.payloads[0]

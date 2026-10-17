@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path  # noqa: TC003
 
+import pytest
+
 from pallas.product.llm.config import LlmConfig, clear_llm_config_cache
 from pallas.product.llm.providers_store import (
     bot_providers_configured,
@@ -657,3 +659,126 @@ def test_provider_row_preserves_daily_caps(tmp_path: Path, monkeypatch) -> None:
     assert found is not None
     assert found.get("daily_tokens_cap") == 1000000
     assert found.get("daily_cost_cap") == 5.5
+
+
+def test_registered_model_reasoning_effort_none_on_disable_roundtrip(tmp_path: Path, monkeypatch) -> None:
+    from pallas.product.llm.providers_store import (
+        provider_model_reasoning_effort_none_on_disable,
+    )
+
+    store = tmp_path / "llm_providers.json"
+    monkeypatch.setattr("pallas.product.llm.providers_store.providers_store_path", lambda: store)
+    monkeypatch.setattr("pallas.product.llm.providers_store._read_ai_providers_toml", lambda: None)
+    clear_providers_store_cache()
+
+    saved = save_providers_document({
+        "providers": [
+            {
+                "id": "gateway",
+                "base_url": "https://example.test/v1",
+                "default_model": "model-off",
+                "models": [
+                    {"model_id": "on", "name": "model-on", "reasoning_effort_none_on_disable": True},
+                    {"model_id": "off", "name": "model-off", "reasoning_effort_none_on_disable": False},
+                    {"model_id": "default", "name": "model-default"},
+                ],
+            }
+        ],
+        "routing": {"tasks": {"llm_chat": "gateway"}},
+    })
+
+    flags = {row["name"]: row["reasoning_effort_none_on_disable"] for row in saved["providers"][0]["models"]}
+    assert flags == {"model-on": True, "model-off": False, "model-default": False}
+
+    raw = json.loads(store.read_text(encoding="utf-8"))
+    raw_flags = {row["name"]: row["reasoning_effort_none_on_disable"] for row in raw["providers"][0]["models"]}
+    assert raw_flags == flags
+
+    loaded = load_providers_document()
+    row = loaded["providers"][0]
+    assert provider_model_reasoning_effort_none_on_disable(row, "model-on") is True
+    assert provider_model_reasoning_effort_none_on_disable(row, "model-off") is False
+    assert provider_model_reasoning_effort_none_on_disable(row, "model-default") is False
+    assert provider_model_reasoning_effort_none_on_disable(row, "missing-model") is False
+    assert (
+        provider_model_reasoning_effort_none_on_disable(
+            {"id": "direct", "reasoning_effort_none_on_disable": True, "models": [{"name": "model-default"}]},
+            "model-default",
+        )
+        is False
+    )
+
+
+def test_registered_model_flag_survives_omission_and_explicit_false_disables(tmp_path: Path, monkeypatch) -> None:
+    from pallas.product.llm.providers_store import upsert_provider_row
+
+    store = tmp_path / "llm_providers.json"
+    monkeypatch.setattr("pallas.product.llm.providers_store.providers_store_path", lambda: store)
+    monkeypatch.setattr("pallas.product.llm.providers_store._read_ai_providers_toml", lambda: None)
+    clear_providers_store_cache()
+
+    def document(models: list[dict]) -> dict:
+        return {
+            "providers": [
+                {
+                    "id": "gateway",
+                    "base_url": "https://example.test/v1",
+                    "default_model": "shared-model",
+                    "models": models,
+                }
+            ],
+            "routing": {"tasks": {"llm_chat": "gateway"}},
+        }
+
+    def flag() -> bool:
+        return load_providers_document()["providers"][0]["models"][0]["reasoning_effort_none_on_disable"]
+
+    save_providers_document(document([{"name": "shared-model", "reasoning_effort_none_on_disable": True}]))
+    save_providers_document(document([{"name": "shared-model"}]))
+    assert flag() is True
+
+    save_providers_document(document([{"name": "shared-model", "reasoning_effort_none_on_disable": False}]))
+    assert flag() is False
+
+    upsert_provider_row(document([{"name": "shared-model", "reasoning_effort_none_on_disable": True}])["providers"][0])
+    assert flag() is True
+    upsert_provider_row(document([{"name": "shared-model"}])["providers"][0])
+    assert flag() is True
+    upsert_provider_row(document([{"name": "shared-model", "reasoning_effort_none_on_disable": False}])["providers"][0])
+    assert flag() is False
+
+
+@pytest.mark.parametrize("invalid", ["false", 0, None])
+def test_registered_model_flag_rejects_non_boolean_without_writing(
+    tmp_path: Path, monkeypatch, invalid: object
+) -> None:
+    from pallas.product.llm.providers_store import upsert_provider_row
+
+    store = tmp_path / "llm_providers.json"
+    monkeypatch.setattr("pallas.product.llm.providers_store.providers_store_path", lambda: store)
+    monkeypatch.setattr("pallas.product.llm.providers_store._read_ai_providers_toml", lambda: None)
+    clear_providers_store_cache()
+
+    save_providers_document({
+        "providers": [
+            {
+                "id": "gateway",
+                "base_url": "https://example.test/v1",
+                "default_model": "shared-model",
+                "models": [{"name": "shared-model", "reasoning_effort_none_on_disable": True}],
+            }
+        ],
+        "routing": {"tasks": {"llm_chat": "gateway"}},
+    })
+    before = store.read_bytes()
+    document = json.loads(store.read_text(encoding="utf-8"))
+    document["providers"][0]["models"][0]["reasoning_effort_none_on_disable"] = invalid
+
+    with pytest.raises(ValueError, match="boolean"):
+        save_providers_document(document)
+    assert store.read_bytes() == before
+
+    with pytest.raises(ValueError, match="boolean"):
+        upsert_provider_row(document["providers"][0])
+    assert store.read_bytes() == before
+    assert load_providers_document()["providers"][0]["models"][0]["reasoning_effort_none_on_disable"] is True

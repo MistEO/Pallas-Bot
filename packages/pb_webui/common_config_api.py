@@ -782,6 +782,8 @@ def register_common_config_router(
 
         try:
             data = await save_providers_config(body.model_dump(exclude_unset=True))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
         except Exception as e:  # noqa: BLE001
             raise HTTPException(status_code=500, detail=str(e)) from e
         return JSONResponse({"ok": True, "data": data})

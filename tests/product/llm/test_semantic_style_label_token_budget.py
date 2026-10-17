@@ -31,11 +31,20 @@ def _sse_response(*chunks: dict) -> SimpleNamespace:
     )
 
 
-def _capture_chat_completions(monkeypatch: pytest.MonkeyPatch, *, provider_id: str, response):
+def _capture_chat_completions(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    provider_id: str,
+    response,
+    models: list[dict] | None = None,
+):
     """安装共享 httpx 客户端桩，返回 (complete_chat_message, 捕获的 payload 列表)。"""
     from pallas.product.llm.provider_client import complete_chat_message
 
     payloads: list[dict] = []
+    provider_row: dict = {"id": str(provider_id or ""), "model_effort": "disable"}
+    if models is not None:
+        provider_row["models"] = models
 
     class FakeClient:
         async def post(self, _url, *, json=None, **_kwargs):
@@ -49,7 +58,7 @@ def _capture_chat_completions(monkeypatch: pytest.MonkeyPatch, *, provider_id: s
     monkeypatch.setattr("pallas.product.llm.availability.llm_calls_enabled", lambda cfg=None: True)
     monkeypatch.setattr(
         "pallas.product.llm.providers_store.find_provider",
-        lambda pid, **_kwargs: {"id": str(pid or provider_id), "model_effort": "disable"},
+        lambda pid, **_kwargs: provider_row,
     )
     return complete_chat_message, payloads
 
@@ -307,27 +316,30 @@ async def test_out_of_vocab_words_still_filtered(monkeypatch: pytest.MonkeyPatch
 
 
 @pytest.mark.asyncio
-async def test_cpa_flash_disable_adds_reasoning_effort_none(monkeypatch: pytest.MonkeyPatch) -> None:
-    response = _sse_response(
-        {"choices": [{"index": 0, "delta": {"content": "{}"}}]},
-        {"choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]},
+async def test_registered_model_flag_adds_reasoning_effort_none_without_identity_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    complete_chat_message, payloads = _capture_chat_completions(
+        monkeypatch,
+        provider_id="gateway-x",
+        response=_OkResponse(),
+        models=[{"name": "vendor/chat-x", "reasoning_effort_none_on_disable": True}],
     )
-    complete_chat_message, payloads = _capture_chat_completions(monkeypatch, provider_id="cpa", response=response)
 
     await complete_chat_message(
         [{"role": "user", "content": "hi"}],
-        model="deepseek-v4.1-flash",
-        options={"temperature": 0, "max_tokens": task_token_budget("repeater.semantic_style")},
-        cfg=SimpleNamespace(llm_api_key="sk", llm_model="deepseek-v4.1-flash", chat_timeout_sec=10.0),
+        model="vendor/chat-x",
+        options={"temperature": 0, "max_tokens": 512, "model_effort": "disable"},
+        cfg=SimpleNamespace(llm_api_key="sk", llm_model="vendor/chat-x", chat_timeout_sec=10.0),
         base_url="https://provider.example/v1",
         api_key="sk",
         task="repeater.semantic_style",
-        provider_id="cpa",
+        provider_id="gateway-x",
     )
 
-    assert payloads[0]["stream"] is True
     assert payloads[0]["thinking"] == {"type": "disabled"}
     assert payloads[0]["reasoning_effort"] == "none"
+    assert "stream" not in payloads[0]
 
 
 @pytest.mark.asyncio
@@ -335,12 +347,13 @@ async def test_cpa_flash_disable_adds_reasoning_effort_none(monkeypatch: pytest.
     ("provider_id", "model", "effort"),
     [
         ("deepseek-test", "deepseek-v4.1-flash", None),
+        ("cpa", "deepseek-v4.1-flash", None),
         ("cpa", "deepseek-v4-flash", None),
         ("cpa", "deepseek-v4.1-flash", "high"),
         ("cpa", "deepseek-v4.1-flash", "enable"),
     ],
 )
-async def test_reasoning_effort_none_stays_scoped_to_cpa_flash_disable(
+async def test_reasoning_effort_none_requires_model_opt_in(
     monkeypatch: pytest.MonkeyPatch, provider_id: str, model: str, effort: str | None
 ) -> None:
     complete_chat_message, payloads = _capture_chat_completions(
@@ -362,3 +375,160 @@ async def test_reasoning_effort_none_stays_scoped_to_cpa_flash_disable(
     )
 
     assert payloads[0].get("reasoning_effort") != "none"
+
+
+@pytest.mark.asyncio
+async def test_reasoning_effort_none_flag_is_scoped_to_exact_registered_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    models = [
+        {"name": "shared-model", "reasoning_effort_none_on_disable": True},
+        {"name": "sibling-model", "reasoning_effort_none_on_disable": False},
+    ]
+    complete_chat_message, payloads = _capture_chat_completions(
+        monkeypatch, provider_id="gateway", response=_OkResponse(), models=models
+    )
+
+    for model in ("shared-model", "sibling-model"):
+        await complete_chat_message(
+            [{"role": "user", "content": "hi"}],
+            model=model,
+            options={"model_effort": "disable"},
+            cfg=SimpleNamespace(llm_api_key="sk", llm_model=model, chat_timeout_sec=10.0),
+            base_url="https://provider.example/v1",
+            api_key="sk",
+            task="repeater.semantic_style",
+            provider_id="gateway",
+        )
+
+    assert payloads[0]["thinking"] == {"type": "disabled"}
+    assert payloads[0]["reasoning_effort"] == "none"
+    assert "reasoning_effort" not in payloads[1]
+
+
+@pytest.mark.asyncio
+async def test_explicit_disable_still_queries_provider_model_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pallas.product.llm import providers_store
+
+    complete_chat_message, payloads = _capture_chat_completions(
+        monkeypatch,
+        provider_id="gateway",
+        response=_OkResponse(),
+        models=[{"name": "shared-model", "reasoning_effort_none_on_disable": True}],
+    )
+    calls: list[str] = []
+
+    def tracking_find_provider(pid: str, **_kwargs):
+        calls.append(pid)
+        return {"id": pid, "models": [{"name": "shared-model", "reasoning_effort_none_on_disable": True}]}
+
+    monkeypatch.setattr(providers_store, "find_provider", tracking_find_provider)
+    monkeypatch.setattr("pallas.product.llm.provider_client.provider_daily_budget_ok", lambda _pid: True)
+
+    await complete_chat_message(
+        [{"role": "user", "content": "hi"}],
+        model="shared-model",
+        options={"model_effort": "disable"},
+        cfg=SimpleNamespace(llm_api_key="sk", llm_model="shared-model", chat_timeout_sec=10.0),
+        base_url="https://provider.example/v1",
+        api_key="sk",
+        task="repeater.semantic_style",
+        provider_id="gateway",
+    )
+
+    assert calls == ["gateway"]
+    assert payloads[0]["reasoning_effort"] == "none"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error_type", [RuntimeError, OSError])
+async def test_model_flag_read_error_blocks_http(monkeypatch: pytest.MonkeyPatch, error_type) -> None:
+    complete_chat_message, payloads = _capture_chat_completions(
+        monkeypatch, provider_id="gateway", response=_OkResponse()
+    )
+    error = error_type("provider configuration unavailable")
+
+    def fail_find_provider(_pid):
+        raise error
+
+    monkeypatch.setattr("pallas.product.llm.providers_store.find_provider", fail_find_provider)
+    monkeypatch.setattr("pallas.product.llm.provider_client.provider_daily_budget_ok", lambda _pid: True)
+
+    with pytest.raises(error_type) as excinfo:
+        await complete_chat_message(
+            [{"role": "user", "content": "hi"}],
+            model="shared-model",
+            options={"model_effort": "disable"},
+            cfg=SimpleNamespace(llm_api_key="sk", llm_model="shared-model", chat_timeout_sec=10.0),
+            base_url="https://provider.example/v1",
+            api_key="sk",
+            provider_id="gateway",
+        )
+
+    assert excinfo.value is error
+    assert payloads == []
+
+
+@pytest.mark.asyncio
+async def test_reasoning_effort_none_flag_does_not_cross_provider_fallback(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    from pallas.product.llm.provider_client import complete_chat_message
+    from pallas.product.llm.providers_store import clear_providers_store_cache, save_providers_document
+
+    store = tmp_path / "llm_providers.json"
+    monkeypatch.setattr("pallas.product.llm.providers_store.providers_store_path", lambda: store)
+    monkeypatch.setattr("pallas.product.llm.providers_store._read_ai_providers_toml", lambda: None)
+    clear_providers_store_cache()
+    save_providers_document({
+        "providers": [
+            {
+                "id": "primary",
+                "base_url": "https://primary.example/v1",
+                "api_key": "sk-primary",
+                "default_model": "shared-flash",
+                "model_effort": "disable",
+                "models": [{"name": "shared-flash"}],
+            },
+            {
+                "id": "backup",
+                "base_url": "https://backup.example/v1",
+                "api_key": "sk-backup",
+                "default_model": "shared-flash",
+                "model_effort": "disable",
+                "models": [{"name": "shared-flash", "reasoning_effort_none_on_disable": True}],
+            },
+        ],
+        "routing": {"tasks": {"llm_chat": "primary"}, "task_backups": {"llm_chat": "backup"}},
+    })
+    clear_providers_store_cache()
+
+    payloads: list[dict] = []
+
+    class FakeClient:
+        async def post(self, _url, *, json=None, **_kwargs):
+            payloads.append(json)
+            if len(payloads) == 1:
+                return SimpleNamespace(status_code=500, headers={}, content=b"", text="upstream failed")
+            return _OkResponse()
+
+    async def fake_client():
+        return FakeClient()
+
+    monkeypatch.setattr("pallas.product.llm.provider_client.get_llm_shared_httpx_client", fake_client)
+    monkeypatch.setattr("pallas.product.llm.availability.llm_calls_enabled", lambda cfg=None: True)
+
+    await complete_chat_message(
+        [{"role": "user", "content": "hi"}],
+        model="",
+        options={"temperature": 0, "max_tokens": 512},
+        cfg=SimpleNamespace(llm_chat_enabled=True, llm_api_key="", chat_timeout_sec=10.0),
+        task="llm_chat",
+    )
+
+    assert len(payloads) == 2
+    assert payloads[0]["thinking"] == {"type": "disabled"}
+    assert "reasoning_effort" not in payloads[0]
+    assert payloads[1]["thinking"] == {"type": "disabled"}
+    assert payloads[1]["reasoning_effort"] == "none"
+    clear_providers_store_cache()

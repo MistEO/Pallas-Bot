@@ -50,6 +50,22 @@ flowchart TD
 `LLM_CHAT_ENABLED` 未开时，即使 AI 后端在线也不会触发多数LLM 对话能力。
 :::
 
+### 关闭思考时附带 `reasoning_effort=none`
+
+部分网关需要 `reasoning_effort: none` 才支持关闭思考。可在 Provider 的注册模型上启用兼容开关（默认关闭），通过现有 Provider 配置 API 的 `models` 字段提交；暂未提供单独的 WebUI 开关。模型对象沿用既有字段，例如：
+
+```json
+{
+  "name": "deepseek-v4.1-flash",
+  "model_effort": "disable",
+  "reasoning_effort_none_on_disable": true
+}
+```
+
+- 仅 Chat Completions 且该模型实际映射为关闭思考时追加 `reasoning_effort: none`；开启思考或显式档位不追加，Responses / Anthropic / Ollama 不受影响。
+- `true` 只是兼容补充，不是强制关闭；上游仍可能忽略。CPA 需其自身模型档位包含 `none`。
+- 从旧固定 CPA 补丁迁移时，先暂停该模型调用，切换新版本后通过新 API 设置已验证模型的开关并读回确认 `true`，再恢复调用。旧版本 API 会丢弃这个新字段，不能提前用旧 API 预写；未完成迁移会失去旧补丁同时发送 `none` 的效果。新建或未设置的模型默认 `false`。
+
 ## 群洞察与语义风格
 
 群表达画像和普通 LLM 对话是两条不同的后台链路。消息先写入 `message` 表，主进程约每 6 小时扫描活跃群并向 `work aux` 投递 `group.insight` 任务；work aux 再批量标注新发现的真人接话，成功后更新语义样本和画像。因此，配置刚打开或群里刚产生新对话后，页面不会立即出现结果。

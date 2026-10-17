@@ -215,6 +215,21 @@ def provider_model_effort(row: dict[str, Any] | None, model: str = "") -> str:
     return _normalize_model_effort(row)
 
 
+def provider_model_reasoning_effort_none_on_disable(row: dict[str, Any] | None, model: str = "") -> bool:
+    """仅精确匹配当前注册模型；不继承 Provider 默认，也不做模糊匹配。"""
+    model_row = _registered_model(row, str(model or "").strip())
+    return bool(model_row and model_row.get("reasoning_effort_none_on_disable") is True)
+
+
+def _normalize_reasoning_effort_none_on_disable(source: dict[str, Any]) -> bool:
+    if "reasoning_effort_none_on_disable" not in source:
+        return False
+    value = source.get("reasoning_effort_none_on_disable")
+    if not isinstance(value, bool):
+        raise ValueError("reasoning_effort_none_on_disable must be a boolean")
+    return value
+
+
 def provider_request_method(row: dict[str, Any] | None) -> str:
     if not isinstance(row, dict):
         return DEFAULT_REQUEST_METHOD
@@ -240,12 +255,18 @@ def _normalize_registered_models(
     default_model: str,
     task_models: dict[str, str],
     model_pricing: dict[str, dict[str, float]],
+    existing_models: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     models_raw = raw.get("models")
     has_registered_models = isinstance(models_raw, list)
     rows = models_raw if has_registered_models else []
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
+    existing_by_name = {
+        str(item.get("name") or "").strip(): item
+        for item in existing_models or []
+        if isinstance(item, dict) and str(item.get("name") or "").strip()
+    }
 
     def add(name_raw: object, source: dict[str, Any] | None = None) -> None:
         name = str(name_raw or "").strip()
@@ -257,12 +278,18 @@ def _normalize_registered_models(
         normalized_rules = [dict(rule) for rule in rules if isinstance(rule, dict)]
         if not normalized_rules and name in model_pricing:
             normalized_rules = [{"id": f"legacy-{len(out) + 1}", "kind": "token", **model_pricing[name]}]
+        if "reasoning_effort_none_on_disable" in source:
+            none_on_disable = _normalize_reasoning_effort_none_on_disable(source)
+        else:
+            previous = existing_by_name.get(name)
+            none_on_disable = bool(previous and previous.get("reasoning_effort_none_on_disable") is True)
         out.append({
             "model_id": str(source.get("model_id") or f"model-{len(out) + 1}").strip(),
             "name": name,
             "is_default": bool(source.get("is_default")) or name == default_model,
             "capabilities": _normalize_capabilities(source),
             "model_effort": _normalize_model_effort(source),
+            "reasoning_effort_none_on_disable": none_on_disable,
             "pricing_rules": normalized_rules,
         })
 
@@ -331,11 +358,13 @@ def _normalize_provider_row(raw: dict[str, Any], existing: dict[str, Any] | None
     else:
         model_pricing = {}
     default_model = str(raw.get("default_model") or "").strip()
+    existing_models = existing.get("models") if existing and isinstance(existing.get("models"), list) else None
     models = _normalize_registered_models(
         raw,
         default_model=default_model,
         task_models=task_models,
         model_pricing=model_pricing,
+        existing_models=existing_models,
     )
     for model in models:
         if model["is_default"]:

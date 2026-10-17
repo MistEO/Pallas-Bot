@@ -347,6 +347,51 @@ def test_llm_providers_put_ignores_readonly_metadata(monkeypatch) -> None:
     assert captured["document"] == {"providers": [], "routing": {"chain_fallback": [], "tasks": {}}}
 
 
+def test_llm_providers_put_roundtrips_model_flag_and_rejects_invalid_boolean(monkeypatch, tmp_path) -> None:
+    from pallas.product.llm.providers_store import clear_providers_store_cache
+
+    store = tmp_path / "llm_providers.json"
+    monkeypatch.setattr("pallas.product.llm.providers_store.providers_store_path", lambda: store)
+    monkeypatch.setattr("pallas.product.llm.providers_store._read_ai_providers_toml", lambda: None)
+    clear_providers_store_cache()
+    client = _build_client(monkeypatch)
+    body = {
+        "providers": [
+            {
+                "id": "gateway",
+                "base_url": "https://example.test/v1",
+                "default_model": "model-a",
+                "models": [{"name": "model-a", "reasoning_effort_none_on_disable": True}],
+            }
+        ],
+        "routing": {"tasks": {"llm_chat": "gateway"}},
+    }
+
+    response = client.put("/pallas/api/common-config/llm/providers", json=body)
+    assert response.status_code == 200, response.text
+    models = response.json()["data"]["providers"][0]["models"]
+    assert models[0]["reasoning_effort_none_on_disable"] is True
+
+    response = client.get("/pallas/api/common-config/llm/providers")
+    assert response.status_code == 200, response.text
+    models = response.json()["data"]["providers"][0]["models"]
+    assert models[0]["reasoning_effort_none_on_disable"] is True
+
+    body["providers"][0]["models"][0]["reasoning_effort_none_on_disable"] = False
+    response = client.put("/pallas/api/common-config/llm/providers", json=body)
+    assert response.status_code == 200, response.text
+    models = response.json()["data"]["providers"][0]["models"]
+    assert models[0]["reasoning_effort_none_on_disable"] is False
+
+    before = store.read_bytes()
+    body["providers"][0]["models"][0]["reasoning_effort_none_on_disable"] = "false"
+    response = client.put("/pallas/api/common-config/llm/providers", json=body)
+    assert response.status_code == 400, response.text
+    assert "boolean" in response.json()["detail"]
+    assert store.read_bytes() == before
+    clear_providers_store_cache()
+
+
 def test_llm_provider_test_accepts_float_latency(monkeypatch) -> None:
     monkeypatch.setattr("pallas.product.llm.ops_api.probe_provider", _fake_probe_provider)
     client = _build_client(monkeypatch)
