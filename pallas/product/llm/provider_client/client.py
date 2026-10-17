@@ -815,6 +815,13 @@ async def _post_chat_completions(
     if max_tokens is not None:
         payload["max_tokens"] = int(max_tokens)
     _repo.apply_model_effort_to_payload(payload, options, model=model_name)
+    # 该兼容模型关闭思考时同时指定 none；仅限该固定路由，不影响其它 provider / 模型 / 显式档位
+    if (
+        provider_id == "cpa"
+        and model_name.strip().lower() == "deepseek-v4.1-flash"
+        and payload.get("thinking") == {"type": "disabled"}
+    ):
+        payload["reasoning_effort"] = "none"
 
     timeout = httpx.Timeout(clamp_timeout_sec(float(timeout_sec), turn_budget))
     headers = _repo.auth_headers(api_key)

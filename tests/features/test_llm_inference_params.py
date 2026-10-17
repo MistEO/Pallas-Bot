@@ -49,7 +49,7 @@ def test_derive_llm_inference_params_drunk_skips_temperature() -> None:
         ("affect_refine", False, 512),
         ("memory_extract", False, 160),
         ("turn_decision", False, 48),
-        ("repeater.semantic_style", False, 240),
+        ("repeater.semantic_style", False, 2048),
         ("sticker_vision", False, 2048),
         ("vision_messages", False, 2048),
         ("memory_graph_extract", False, 1200),
@@ -106,6 +106,11 @@ def test_tool_reply_budget_requires_tools_enabled(task: str) -> None:
 
 
 def test_semantic_vision_has_separate_complexity_budget() -> None:
+    assert task_token_budget("repeater.semantic_style", operation="vision") == 100
+
+
+def test_semantic_style_text_budget_is_widened_but_vision_unchanged() -> None:
+    assert task_token_budget("repeater.semantic_style") == 2048
     assert task_token_budget("repeater.semantic_style", operation="vision") == 100
 
 

@@ -124,7 +124,7 @@ work aux 消费 `group.insight` 后，按该 `(bot_id, group_id)` 的持久化�
 
 - JSON 数组长度有限，模型更容易保持输入顺序和输出项数一致
 - 每个候选前后句最多送入 72 字，8 对的 prompt 仍然较紧凑
-- 单次输出上限为 `128 × batch_size`，不会随群消息量无限增长
+- 单次输出上限为 `max(2048, 512 × batch_size)` token，不会随群消息量无限增长
 - 批量请求失败时，最多只影响这一组 8 对的 fallback 范围
 - 批次太大时，单次格式错误会放大重试成本；批次太小时，HTTP 请求次数增加
 
@@ -137,6 +137,10 @@ work aux 消费 `group.insight` 后，按该 `(bot_id, group_id)` 的持久化�
 - `is_reply_pair`：是否确实在回应前句
 - `transferable`：脱离临时人名、局部梗和临时事实后是否仍可复用
 - 接话动作、语义关系、强度、表达形式
+
+单条与批量两个标注 prompt 都会直接枚举解析器使用的三组受控词表（`interaction_actions`、`semantic_relations`、`forms`），枚举串由同一份词表定义排序生成，不手抄第二套；prompt 要求只取表内词、没有匹配就填 `[]`。解析仍按原词表过滤表外值，词表本身未扩充。
+
+语义标注走共享 Chat Completions 路径：命中固定 CPA 路由、模型为 `deepseek-v4.1-flash` 且 payload 已关闭思考时，Bot 侧会同时携带 `reasoning_effort: none`；其它 provider、其它 DeepSeek 模型以及显式 `enable`/档位不受影响，Responses 与 Anthropic 路径不在此兼容内。该 `none` 需 CPA 侧对应模型声明支持（未声明时 CPA 默认会将其降为 `low`），此配置尚未部署。Cline 直连仅单条合成样本验证到带 `none` 时 reasoning 报数为 0，批量真实稳定性与费用未验证。
 
 只有 `is_reply_pair=true` 且 `transferable=true` 的结果才写入语义样本；非法 JSON、缺必需布尔字段或类型错误解析为未判（None），不算负标签、也不写样本。显式 `false/false` 是有效负判断，可正常推进。仅当本轮所有候选都已判定（长度一致且无未判项）才推进该群的持久化游标。
 

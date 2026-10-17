@@ -102,6 +102,13 @@ SEMANTIC_RELATION_VOCABULARY = frozenset({
     "topic_shift",
 })
 FORM_VOCABULARY = frozenset({"call_response", "emoji", "fragment", "question", "short", "template"})
+# 两个标注 prompt 共用的受控词表枚举，直接派生自解析器词表，避免手抄第二套
+SEMANTIC_STYLE_VOCAB_CLAUSE = (
+    f"interaction_actions 只能取 {'/'.join(sorted(INTERACTION_ACTION_VOCABULARY))}；"
+    f"semantic_relations 只能取 {'/'.join(sorted(SEMANTIC_RELATION_VOCABULARY))}；"
+    f"forms 只能取 {'/'.join(sorted(FORM_VOCABULARY))}；"
+    "只选表内词，没有匹配就填 []。"
+)
 _MAX_LABEL_ITEMS = 8
 _MAX_STYLE_ANCHOR_LEN = 80
 _MAX_SEED_LEN = 80
@@ -2670,7 +2677,8 @@ async def label_semantic_style_with_llm(
         "is_reply_pair 仅当前句确实在回应前句时为 true；transferable 仅接话脱离当时人名、"
         "多人局部梗或临时事实后仍可作为通用措辞参考时为 true。任一不成立都填 false。"
         "intensity 只能 quiet/soft/neutral/sharp/strong；"
-        "数组字段用受控英文词。behavior_strategy 仅在能提炼出可复用行为模式时输出对象，"
+        f"{SEMANTIC_STYLE_VOCAB_CLAUSE}"
+        "behavior_strategy 仅在能提炼出可复用行为模式时输出对象，"
         "否则为 null；对象为 "
         '{"scene":"可泛化场景","action":"实际接话动作","outcome":"可观察变化",'
         '"learning_type":"observed"}。不抄原话，不带人名/临时梗，不做价值判断。\n'
@@ -2838,8 +2846,11 @@ async def label_semantic_style_batch_with_llm(
                     response = await complete_chat_message(
                         [{"role": "user", "content": prompt}],
                         model=str(cfg.llm_model or ""),
-                        # 思考模型预留思考+回答余量；max_tokens 按实际用量计费，stop 时不会多收
-                        options={"temperature": 0, "max_tokens": 256 * len(chunk)},
+                        # 每 chunk 输出上限：512/条，且不低于单条文本任务预算
+                        options={
+                            "temperature": 0,
+                            "max_tokens": max(task_token_budget("repeater.semantic_style"), 512 * len(chunk)),
+                        },
                         cfg=cfg,
                         task="repeater.semantic_style",
                     )
@@ -2897,7 +2908,8 @@ def _label_semantic_style_batch_prompt(count: int) -> str:
         f"判断 {count} 组群聊前后句，只输出长度为 {count} 的 JSON 数组。字段："
         "is_reply_pair、transferable、interaction_actions、semantic_relations、intensity、forms。"
         "确实回应前句才 is_reply_pair=true；脱离人名、局部梗、临时事实仍可复用才 transferable=true，"
-        "否则均为 false。intensity 只能 quiet/soft/neutral/sharp/strong，数组字段只能用受控英文词。"
+        "否则均为 false。intensity 只能 quiet/soft/neutral/sharp/strong，"
+        f"{SEMANTIC_STYLE_VOCAB_CLAUSE}"
         "不抄原话，不带人名或临时梗。严格按输入顺序输出。"
     )
 

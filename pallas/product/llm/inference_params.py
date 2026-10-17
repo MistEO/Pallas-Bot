@@ -34,7 +34,7 @@ _TASK_TOKEN_BUDGETS: dict[TaskBudgetKey, int] = {
     "affect_refine": 512,
     "memory_extract": 160,
     "turn_decision": 48,
-    "repeater.semantic_style": 240,
+    "repeater.semantic_style": 2048,
     "sticker_vision": 2048,
     "vision_messages": 2048,
     "memory_graph_extract": 1200,
