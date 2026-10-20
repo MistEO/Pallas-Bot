@@ -535,6 +535,23 @@ def test_synthetic_summary_outside_last_two_not_scanned() -> None:
     )
 
 
+def test_ordinary_marker_reference_does_not_reject_carry() -> None:
+    """普通消息引用标记但非内部完整前缀时，不因 marker 单独拒绝整个邀请窗口。"""
+    history = [
+        LlmChatTurn(
+            role="user",
+            content="我想邀请牛牛进群，顺便问【此前对话摘要】是什么",
+            user_id=7,
+            created_at=NOW - 20,
+        ),
+        _invite_turn(age=10, text="有啥要求吗"),
+    ]
+    assert resolve_knowledge_query("有啥要求吗", recent_user_turns=history, user_id=7, now=NOW) == (
+        "我想邀请牛牛进群，顺便问【此前对话摘要】是什么 有啥要求吗",
+        True,
+    )
+
+
 # --- 审批时限类短追问 ---
 
 

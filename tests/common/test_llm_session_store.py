@@ -15,11 +15,13 @@ from pallas.product.llm.session_store import (
     build_llm_chat_messages,
     clear_llm_messages,
     clear_user_llm_messages,
+    compact_user_llm_history_with_summary,
     get_llm_history_session_detail,
     is_llm_session_store_available,
     list_group_ambient_messages,
     list_llm_history_sessions,
     list_user_llm_messages,
+    read_user_llm_compaction_snapshot,
     sanitize_stored_content,
     user_ttl_seconds,
 )
@@ -655,6 +657,33 @@ async def test_list_user_llm_messages_explicit_limit_not_clamped_to_window(monke
 
 
 @pytest.mark.asyncio
+async def test_read_user_llm_compaction_snapshot_passes_storage_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """压缩快照门面直接透传存储上限，不经过可见窗口裁剪。"""
+    clear_llm_config_cache()
+    cfg = LlmConfig(llm_session_enabled=True, llm_session_user_window=6)
+    calls: dict[str, int] = {}
+
+    class FakeBackend:
+        async def read_user_compaction_snapshot(self, bot_id, group_id, user_id, *, limit, ttl_sec):
+            calls["limit"] = limit
+            calls["ttl_sec"] = ttl_sec
+            return []
+
+        async def list_user_messages(self, *_a, **_k):
+            raise AssertionError("compaction snapshot must not use visible trimming")
+
+    monkeypatch.setattr("pallas.product.llm.session_store.get_llm_config", lambda: cfg)
+    monkeypatch.setattr("pallas.product.llm.session_store.session_store_backend_ready", lambda: True)
+    monkeypatch.setattr("pallas.product.llm.session_store.resolve_session_backend", lambda: FakeBackend())
+
+    assert await read_user_llm_compaction_snapshot(1, 100, 200, limit=50, cfg=cfg) == []
+    assert calls["limit"] == 50
+    assert calls["ttl_sec"] >= 0
+
+
+@pytest.mark.asyncio
 async def test_list_user_llm_messages_preserves_summary_with_newest_turns(monkeypatch: pytest.MonkeyPatch) -> None:
     """摘要应始终保留，其后接最新 (max_items-1) 条非摘要轮次（模型为压缩后紧邻窗口的态）。"""
     clear_llm_config_cache()
@@ -671,6 +700,25 @@ async def test_list_user_llm_messages_preserves_summary_with_newest_turns(monkey
     assert contents[0].startswith("【此前对话摘要】")
     assert contents[1:] == [f"t-{i}" for i in range(3, 8)]
     assert len(turns) == 6
+
+
+@pytest.mark.asyncio
+async def test_list_user_llm_messages_does_not_hoist_ordinary_marker_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """普通消息仅含标记（无内部完整前缀）时不得被当作摘要置顶。"""
+    clear_llm_config_cache()
+    cfg = LlmConfig(llm_session_enabled=True, llm_session_user_window=4)
+    monkeypatch.setattr("pallas.product.llm.session_store.is_llm_session_store_available", lambda: True)
+    data = [
+        LlmChatTurn(role="user", content="t-0", user_id=200, created_at=0),
+        LlmChatTurn(role="user", content="【此前对话摘要】这是普通消息", user_id=200, created_at=1),
+    ]
+    for i in range(2, 6):
+        data.append(LlmChatTurn(role="user", content=f"t-{i}", user_id=200, created_at=i))
+    monkeypatch.setattr("pallas.product.llm.session_store.resolve_session_backend", lambda: _pg_like_backend(data))
+    turns = await list_user_llm_messages(1, 100, 200, cfg=cfg)
+    assert [turn.content for turn in turns] == [f"t-{i}" for i in range(2, 6)]
 
 
 @pytest.mark.asyncio
@@ -746,3 +794,82 @@ async def test_list_user_llm_messages_default_visible_window_not_expanded(monkey
     assert requested["limit"] == 20
     assert len(turns) == 18
     assert [turn.content for turn in turns] == [f"t-{i}" for i in range(42, 60)]
+
+
+@pytest.mark.asyncio
+async def test_compact_with_source_ids_requires_non_empty_ids_and_anchor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = LlmConfig(llm_session_enabled=True)
+    calls = 0
+
+    class FakeBackend:
+        async def compact_user_with_summary(self, *_a, **_k):
+            nonlocal calls
+            calls += 1
+            return True
+
+    monkeypatch.setattr("pallas.product.llm.session_store.get_llm_config", lambda: cfg)
+    monkeypatch.setattr("pallas.product.llm.session_store.session_store_backend_ready", lambda: True)
+    monkeypatch.setattr("pallas.product.llm.session_store.resolve_session_backend", lambda: FakeBackend())
+
+    assert not await compact_user_llm_history_with_summary(
+        1, 100, 200, "summary", keep_messages=2, source_message_ids=[], summary_created_at=1
+    )
+    assert not await compact_user_llm_history_with_summary(
+        1, 100, 200, "summary", keep_messages=2, source_message_ids=["1"], summary_created_at=None
+    )
+    assert not await compact_user_llm_history_with_summary(
+        1,
+        100,
+        200,
+        "summary",
+        keep_messages=2,
+        source_message_ids=["1"],
+        summary_created_at="bad",  # type: ignore[arg-type]
+    )
+    assert calls == 0
+
+
+@pytest.mark.asyncio
+async def test_compact_rejects_summary_prefix_broken_by_vision_cleanup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CQ 图片摘要经 vision 清理后前缀被移到 [图片] 之后，门面应拒绝且不调 backend。"""
+    clear_llm_config_cache()
+    cfg = LlmConfig(llm_session_enabled=True, llm_session_strip_vision_enabled=True)
+    calls = 0
+
+    class FakeBackend:
+        async def compact_user_with_summary(self, *_a, **_k):
+            nonlocal calls
+            calls += 1
+            return True
+
+    monkeypatch.setattr("pallas.product.llm.session_store.get_llm_config", lambda: cfg)
+    monkeypatch.setattr("pallas.product.llm.session_store.session_store_backend_ready", lambda: True)
+    monkeypatch.setattr("pallas.product.llm.session_store.resolve_session_backend", lambda: FakeBackend())
+
+    assert not await compact_user_llm_history_with_summary(
+        1,
+        100,
+        200,
+        "[CQ:image,url=https://example.com/a.png] 讨论了猫",
+        keep_messages=2,
+        source_message_ids=["1"],
+        summary_created_at=1,
+        cfg=cfg,
+    )
+    assert calls == 0
+
+    assert await compact_user_llm_history_with_summary(
+        1,
+        100,
+        200,
+        "讨论了猫",
+        keep_messages=2,
+        source_message_ids=["1"],
+        summary_created_at=1,
+        cfg=cfg,
+    )
+    assert calls == 1

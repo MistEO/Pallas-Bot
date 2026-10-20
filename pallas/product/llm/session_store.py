@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from nonebot import logger
 
@@ -21,15 +21,21 @@ from pallas.product.llm.models import ChatCompletionMessage
 from pallas.product.llm.session_backend import resolve_session_backend, session_store_backend_ready
 from pallas.product.llm.session_models import (
     ALLOWED_ROLES,
+    SESSION_SUMMARY_PREFIX,
     LlmChatRole,
     LlmChatTurn,
     LlmHistorySessionDetail,
     LlmHistorySessionSummary,
     LlmSessionScope,
+    LlmSessionSnapshotTurn,
     is_private_scope,
+    is_session_summary_turn,
     normalize_group_scope,
 )
 from pallas.product.persona.prompt_guard import normalize_enum, sanitize_prompt_block, sanitize_prompt_literal
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 # Backward-compatible alias used by older imports/tests.
 _ALLOWED_ROLES = ALLOWED_ROLES
@@ -127,9 +133,9 @@ async def list_user_llm_messages(
         ttl_sec=ttl,
     )
     # 后端按旧→新升序返回；取最新尾部窗口。
-    # 摘要消息（【此前对话摘要】）始终保留在读取窗口内，优先于同窗口的普通旧消息。
+    # 只优先保留真正的内部摘要回合；普通消息即使含相同标记也不抬升。
     summary_index = next(
-        (i for i, turn in enumerate(turns) if "【此前对话摘要】" in str(turn.content or "")),
+        (i for i, turn in enumerate(turns) if is_session_summary_turn(turn)),
         None,
     )
     if summary_index is None:
@@ -141,6 +147,29 @@ async def list_user_llm_messages(
         return [summary]
     kept = turns[-(max_items - 1) :]
     return [summary, *kept]
+
+
+async def read_user_llm_compaction_snapshot(
+    bot_id: int,
+    group_id: int | None,
+    user_id: int,
+    *,
+    limit: int,
+    cfg: LlmConfig | None = None,
+) -> list[LlmSessionSnapshotTurn] | None:
+    """读取压缩专用快照；超窗返回 None，不做可见窗口裁剪。"""
+    if not is_llm_session_store_available():
+        return []
+    c = cfg or get_llm_config()
+    scope_gid = normalize_group_scope(group_id)
+    ttl = user_ttl_seconds(scope_gid, c)
+    return await resolve_session_backend().read_user_compaction_snapshot(
+        int(bot_id),
+        scope_gid,
+        int(user_id),
+        limit=max(1, int(limit)),
+        ttl_sec=ttl,
+    )
 
 
 async def list_group_ambient_messages(
@@ -454,21 +483,35 @@ async def compact_user_llm_history_with_summary(
     summary: str,
     *,
     keep_messages: int,
+    source_message_ids: Sequence[str] | None = None,
+    summary_created_at: int | None = None,
     cfg: LlmConfig | None = None,
 ) -> bool:
+    """传 source_message_ids 时走自动压缩的精确 ID 路径；不传时保留手工/回调旧语义。"""
     if not is_llm_session_store_available():
         return False
     c = cfg or get_llm_config()
+    if source_message_ids is not None:
+        source_ids = tuple(str(item) for item in source_message_ids)
+        if not source_ids or summary_created_at is None:
+            return False
+        try:
+            summary_anchor = int(summary_created_at)
+        except (TypeError, ValueError):
+            return False
+    else:
+        source_ids = None
+        summary_anchor = None
     safe_summary = sanitize_prompt_block(summary, max_len=c.llm_session_max_content_len)
     if not safe_summary:
         return False
     scope_gid = normalize_group_scope(group_id)
     summary_content = sanitize_stored_content(
         "user",
-        f"【此前对话摘要】\n{safe_summary}",
+        f"{SESSION_SUMMARY_PREFIX}{safe_summary}",
         max_len=c.llm_session_max_content_len,
     )
-    if not summary_content:
+    if not summary_content or not summary_content.startswith(SESSION_SUMMARY_PREFIX):
         return False
     return await resolve_session_backend().compact_user_with_summary(
         int(bot_id),
@@ -476,4 +519,6 @@ async def compact_user_llm_history_with_summary(
         int(user_id),
         summary_content,
         keep_messages=keep_messages,
+        source_message_ids=source_ids,
+        summary_created_at=summary_anchor,
     )

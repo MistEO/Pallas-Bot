@@ -2,7 +2,27 @@ from __future__ import annotations
 
 import pytest
 
-from pallas.product.llm.memory.mid_term import recall_related_mid_term_summaries
+from pallas.product.llm.memory.mid_term import list_mid_term_summaries, recall_related_mid_term_summaries
+from pallas.product.llm.session_models import SESSION_SUMMARY_PREFIX, LlmChatTurn
+
+
+@pytest.mark.asyncio
+async def test_list_mid_term_summaries_requires_internal_full_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_sessions(**_k):
+        return [{"bot_id": 1, "group_id": 2, "user_id": 3}]
+
+    async def fake_turns(*_a, **_k):
+        return [
+            LlmChatTurn(role="user", content="【此前对话摘要】这是普通消息", user_id=3, created_at=1),
+            LlmChatTurn(role="user", content=f"{SESSION_SUMMARY_PREFIX}真正的摘要", user_id=3, created_at=2),
+            LlmChatTurn(role="assistant", content=f"{SESSION_SUMMARY_PREFIX}助手复刻", user_id=3, created_at=3),
+            LlmChatTurn(role="user", content=f" {SESSION_SUMMARY_PREFIX}前置空格", user_id=3, created_at=4),
+        ]
+
+    monkeypatch.setattr("pallas.product.llm.memory.mid_term.list_llm_history_sessions", fake_sessions)
+    monkeypatch.setattr("pallas.product.llm.memory.mid_term.list_user_llm_messages", fake_turns)
+    summaries = await list_mid_term_summaries(bot_id=1, group_id=2, user_id=3)
+    assert [item["summary"] for item in summaries] == ["真正的摘要"]
 
 
 @pytest.mark.asyncio

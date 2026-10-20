@@ -11,18 +11,23 @@ from typing import Any
 
 from nonebot import logger
 
+from pallas.core.foundation.logging import log_rate_limited
 from pallas.product.llm.config import LlmConfig, get_llm_config
 from pallas.product.llm.inference_params import task_token_budget
 from pallas.product.llm.kernel.memory_governance import can_write_runtime_state_summary
 from pallas.product.llm.memory.rate_limit import DailyBudget, WriteCooldown
 from pallas.product.llm.provider_client import complete_chat_message
+from pallas.product.llm.session_models import (
+    SESSION_SUMMARY_MARK,
+    SESSION_SUMMARY_PREFIX,
+    is_session_summary_turn,
+)
 from pallas.product.llm.session_store import (
     compact_user_llm_history_with_summary,
     is_llm_session_store_available,
-    list_user_llm_messages,
+    read_user_llm_compaction_snapshot,
 )
 
-_summary_mark = "【此前对话摘要】"
 _in_flight: set[tuple[int, int, int]] = set()
 _last_compact_at = WriteCooldown()
 _daily_budget = DailyBudget()
@@ -41,15 +46,15 @@ async def _summary_messages(history: list[Any], *, group_id: int | None = None, 
     lines: list[str] = []
     for turn in history:
         role = str(getattr(turn, "role", "") or "").strip()
-        content = str(getattr(turn, "content", "") or "").strip()
-        if not content:
+        raw_content = str(getattr(turn, "content", "") or "")
+        if not raw_content.strip():
             continue
-        if _summary_mark in content:
-            # 继承旧摘要正文，避免连续压缩时丢失已沉淀的上下文
-            body = content.split(_summary_mark, 1)[-1].strip()
+        if is_session_summary_turn(turn):
+            body = raw_content[len(SESSION_SUMMARY_PREFIX) :].strip()
             if body:
                 lines.append(f"此前摘要：{body[:240]}")
             continue
+        content = raw_content.strip()
         # 延迟识别：历史里只存了 [图片]:url=X 占位符（进历史零 LLM 成本），
         # 摘要在「需要时」才请视觉模型看图描述，避免每张图进历史都调一次视觉模型。
         if image_urls_from_placeholder(content):
@@ -106,13 +111,37 @@ async def maybe_compact_session_history(
         return False
     if not _daily_budget_ok(cfg=c):
         return False
-    history = await list_user_llm_messages(bid, gid, uid, limit=int(c.llm_session_user_storage_window), cfg=c)
-    user_turns = [turn for turn in history if str(getattr(turn, "role", "") or "") == "user"]
-    if len(user_turns) < threshold:
-        return False
+    # 首次 await 前认领 scope，读取/生成/压缩全程由 finally 释放
     _in_flight.add(key)
     try:
-        transcript = await _summary_messages(history, group_id=gid, bot_id=bid)
+        snapshot = await read_user_llm_compaction_snapshot(
+            bid,
+            gid,
+            uid,
+            limit=int(c.llm_session_user_storage_window),
+            cfg=c,
+        )
+        if snapshot is None:
+            log_rate_limited(
+                logger,
+                "warning",
+                "llm.session_summary.snapshot_over_window",
+                "Session summary skipped for bot [{}], group [{}], user [{}]: storage window overflow",
+                bid,
+                gid or "-",
+                uid,
+            )
+            return False
+        ordinary_turns = [turn for turn in snapshot if not is_session_summary_turn(turn)]
+        user_turns = [turn for turn in ordinary_turns if str(getattr(turn, "role", "") or "") == "user"]
+        if len(user_turns) < threshold:
+            return False
+        keep_turns = ordinary_turns[-keep:]
+        keep_ids = {turn.message_id for turn in keep_turns}
+        source_turns = [turn for turn in snapshot if turn.message_id not in keep_ids]
+        if not any(not is_session_summary_turn(turn) for turn in source_turns):
+            return False
+        transcript = await _summary_messages(source_turns, group_id=gid, bot_id=bid)
         if not transcript:
             return False
         try:
@@ -134,14 +163,21 @@ async def maybe_compact_session_history(
             _bump_daily_budget(cfg=c)
         summary = str(message.get("content") or "") if isinstance(message, dict) else ""
         summary = " ".join(summary.split()).strip()
-        if not summary or _summary_mark in summary:
+        if not summary or SESSION_SUMMARY_MARK in summary:
             return False
+        source_message_ids = [turn.message_id for turn in source_turns]
+        anchor_turns = keep_turns or source_turns
+        if not source_message_ids or not anchor_turns:
+            return False
+        summary_created_at = min(int(turn.created_at) for turn in anchor_turns) - 1
         ok = await compact_user_llm_history_with_summary(
             bid,
             gid,
             uid,
             summary,
             keep_messages=keep,
+            source_message_ids=source_message_ids,
+            summary_created_at=summary_created_at,
             cfg=c,
         )
         if ok:
