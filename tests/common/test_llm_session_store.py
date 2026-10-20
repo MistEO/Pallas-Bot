@@ -615,3 +615,134 @@ async def test_llm_history_detail_auto_settles_behavior_outcome_from_group_ambie
     assert detail.behavior_runs[-1]["final_outcome"] == BehaviorOutcome.DERAILED
     assert detail.behavior_runs[-1]["score_delta"] == -3
     assert list_behavior_patterns()[0].success_score == -3
+
+
+def _pg_like_backend(data: list[LlmChatTurn]):
+    """模拟 Pg 后端 list_user_messages：按旧→新升序、只返回最新 limit 条。"""
+
+    class Backend:
+        async def list_user_messages(self, bot_id, group_id, user_id, *, limit, ttl_sec):
+            return list(data[-limit:])
+
+    return Backend()
+
+
+@pytest.mark.asyncio
+async def test_list_user_llm_messages_returns_newest_window(monkeypatch: pytest.MonkeyPatch) -> None:
+    """读取窗口应取最新尾部而非最旧头部（后端按旧→新升序返回）。"""
+    clear_llm_config_cache()
+    cfg = LlmConfig(llm_session_enabled=True, llm_session_user_window=6)
+    monkeypatch.setattr("pallas.product.llm.session_store.is_llm_session_store_available", lambda: True)
+    data = [
+        LlmChatTurn(role="user" if i % 2 == 0 else "assistant", content=f"t-{i}", user_id=200, created_at=i)
+        for i in range(200)
+    ]
+    monkeypatch.setattr("pallas.product.llm.session_store.resolve_session_backend", lambda: _pg_like_backend(data))
+    turns = await list_user_llm_messages(1, 100, 200, cfg=cfg)
+    assert [turn.content for turn in turns] == [f"t-{i}" for i in range(194, 200)]
+
+
+@pytest.mark.asyncio
+async def test_list_user_llm_messages_explicit_limit_not_clamped_to_window(monkeypatch: pytest.MonkeyPatch) -> None:
+    """显式 limit 不应被可见窗口钳到 18，摘要/记忆/反馈需要读取更大的存储窗口。"""
+    clear_llm_config_cache()
+    cfg = LlmConfig(llm_session_enabled=True, llm_session_user_window=6)
+    monkeypatch.setattr("pallas.product.llm.session_store.is_llm_session_store_available", lambda: True)
+    data = [LlmChatTurn(role="user", content=f"t-{i}", user_id=200, created_at=i) for i in range(200)]
+    monkeypatch.setattr("pallas.product.llm.session_store.resolve_session_backend", lambda: _pg_like_backend(data))
+    turns = await list_user_llm_messages(1, 100, 200, limit=50, cfg=cfg)
+    assert [turn.content for turn in turns] == [f"t-{i}" for i in range(150, 200)]
+
+
+@pytest.mark.asyncio
+async def test_list_user_llm_messages_preserves_summary_with_newest_turns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """摘要应始终保留，其后接最新 (max_items-1) 条非摘要轮次（模型为压缩后紧邻窗口的态）。"""
+    clear_llm_config_cache()
+    cfg = LlmConfig(llm_session_enabled=True, llm_session_user_window=6)
+    monkeypatch.setattr("pallas.product.llm.session_store.is_llm_session_store_available", lambda: True)
+    data = [LlmChatTurn(role="user", content="【此前对话摘要】\n早期总结", user_id=200, created_at=0)]
+    for i in range(1, 8):
+        data.append(
+            LlmChatTurn(role="user" if i % 2 == 0 else "assistant", content=f"t-{i}", user_id=200, created_at=i)
+        )
+    monkeypatch.setattr("pallas.product.llm.session_store.resolve_session_backend", lambda: _pg_like_backend(data))
+    turns = await list_user_llm_messages(1, 100, 200, cfg=cfg)
+    contents = [turn.content for turn in turns]
+    assert contents[0].startswith("【此前对话摘要】")
+    assert contents[1:] == [f"t-{i}" for i in range(3, 8)]
+    assert len(turns) == 6
+
+
+@pytest.mark.asyncio
+async def test_list_user_llm_messages_limit_one_without_summary(monkeypatch: pytest.MonkeyPatch) -> None:
+    """limit=1 无摘要：仍返回最新 1 条，不越界。"""
+    clear_llm_config_cache()
+    cfg = LlmConfig(llm_session_enabled=True, llm_session_user_window=6)
+    monkeypatch.setattr("pallas.product.llm.session_store.is_llm_session_store_available", lambda: True)
+    data = [
+        LlmChatTurn(role="user", content="旧提问", user_id=200, created_at=0),
+        LlmChatTurn(role="assistant", content="旧回复", user_id=200, created_at=1),
+        LlmChatTurn(role="user", content="最新提问", user_id=200, created_at=2),
+    ]
+    monkeypatch.setattr("pallas.product.llm.session_store.resolve_session_backend", lambda: _pg_like_backend(data))
+    turns = await list_user_llm_messages(1, 100, 200, limit=1, cfg=cfg)
+    assert [turn.content for turn in turns] == ["最新提问"]
+
+
+@pytest.mark.asyncio
+async def test_list_user_llm_messages_limit_one_with_summary(monkeypatch: pytest.MonkeyPatch) -> None:
+    """limit=1 且摘要存在：只返回摘要，不把剩余窗口兜底全部带出。"""
+    clear_llm_config_cache()
+    cfg = LlmConfig(llm_session_enabled=True, llm_session_user_window=6)
+    monkeypatch.setattr("pallas.product.llm.session_store.is_llm_session_store_available", lambda: True)
+    data = [
+        LlmChatTurn(role="user", content="【此前对话摘要】\n早期总结", user_id=200, created_at=0),
+        LlmChatTurn(role="user", content="最新提问", user_id=200, created_at=1),
+        LlmChatTurn(role="assistant", content="最新回复", user_id=200, created_at=2),
+    ]
+    monkeypatch.setattr("pallas.product.llm.session_store.resolve_session_backend", lambda: _pg_like_backend(data))
+    turns = await list_user_llm_messages(1, 100, 200, limit=1, cfg=cfg)
+    assert len(turns) == 1
+    assert turns[0].content.startswith("【此前对话摘要】")
+
+
+@pytest.mark.asyncio
+async def test_list_user_llm_messages_keeps_latest_user_and_assistant_tail(monkeypatch: pytest.MonkeyPatch) -> None:
+    """窗口裁剪应保留最新 user 与 assistant 尾部，而非最旧头部。"""
+    clear_llm_config_cache()
+    cfg = LlmConfig(llm_session_enabled=True, llm_session_user_window=4)
+    monkeypatch.setattr("pallas.product.llm.session_store.is_llm_session_store_available", lambda: True)
+    data = [
+        LlmChatTurn(role="user", content="u-0", user_id=200, created_at=0),
+        LlmChatTurn(role="assistant", content="a-1", user_id=200, created_at=1),
+        LlmChatTurn(role="user", content="u-2", user_id=200, created_at=2),
+        LlmChatTurn(role="assistant", content="a-3", user_id=200, created_at=3),
+        LlmChatTurn(role="user", content="u-4", user_id=200, created_at=4),
+        LlmChatTurn(role="assistant", content="a-5", user_id=200, created_at=5),
+    ]
+    monkeypatch.setattr("pallas.product.llm.session_store.resolve_session_backend", lambda: _pg_like_backend(data))
+    turns = await list_user_llm_messages(1, 100, 200, cfg=cfg)
+    assert [turn.content for turn in turns] == ["u-2", "a-3", "u-4", "a-5"]
+    assert turns[-1].role == "assistant"
+    assert turns[-2].role == "user"
+
+
+@pytest.mark.asyncio
+async def test_list_user_llm_messages_default_visible_window_not_expanded(monkeypatch: pytest.MonkeyPatch) -> None:
+    """默认可见窗口 18 不应被放大；后端只请求 20（18+2 摘要缓冲）。"""
+    clear_llm_config_cache()
+    cfg = LlmConfig(llm_session_enabled=True)  # llm_session_user_window 默认 18
+    monkeypatch.setattr("pallas.product.llm.session_store.is_llm_session_store_available", lambda: True)
+    data = [LlmChatTurn(role="user", content=f"t-{i}", user_id=200, created_at=i) for i in range(60)]
+    requested: dict[str, int] = {}
+
+    class Backend:
+        async def list_user_messages(self, bot_id, group_id, user_id, *, limit, ttl_sec):
+            requested["limit"] = limit
+            return list(data[-limit:])
+
+    monkeypatch.setattr("pallas.product.llm.session_store.resolve_session_backend", lambda: Backend())
+    turns = await list_user_llm_messages(1, 100, 200, cfg=cfg)
+    assert requested["limit"] == 20
+    assert len(turns) == 18
+    assert [turn.content for turn in turns] == [f"t-{i}" for i in range(42, 60)]

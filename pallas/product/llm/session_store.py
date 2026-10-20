@@ -117,7 +117,7 @@ async def list_user_llm_messages(
     c = cfg or get_llm_config()
     scope_gid = normalize_group_scope(group_id)
     max_items = limit if limit is not None else c.llm_session_user_window
-    max_items = max(1, min(max_items, c.llm_session_user_window))
+    max_items = max(1, int(max_items))
     ttl = user_ttl_seconds(scope_gid, c)
     turns = await resolve_session_backend().list_user_messages(
         int(bot_id),
@@ -126,15 +126,19 @@ async def list_user_llm_messages(
         limit=max_items + 2,
         ttl_sec=ttl,
     )
-    # 摘要消息（【此前对话摘要】）始终保留在读取窗口内，优先于同窗口的普通旧消息
+    # 后端按旧→新升序返回；取最新尾部窗口。
+    # 摘要消息（【此前对话摘要】）始终保留在读取窗口内，优先于同窗口的普通旧消息。
     summary_index = next(
         (i for i, turn in enumerate(turns) if "【此前对话摘要】" in str(turn.content or "")),
         None,
     )
-    if summary_index is None or summary_index < max_items:
-        return turns[:max_items]
+    if summary_index is None:
+        return turns[-max_items:]
     turns = list(turns)
     summary = turns.pop(summary_index)
+    # 窗口 1 且摘要存在时只回摘要本身，避免 [-(max_items-1):] 退化为 [-0:] 全量兜出
+    if max_items <= 1:
+        return [summary]
     kept = turns[-(max_items - 1) :]
     return [summary, *kept]
 

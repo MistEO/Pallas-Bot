@@ -3,7 +3,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from pallas.product.llm.reply_variation import (
-    build_recent_reply_ending_hint,
     build_recent_reply_variation_hint,
     build_variation_hint_from_recent_texts,
     classify_repeated_opener,
@@ -13,31 +12,6 @@ from pallas.product.llm.reply_variation import (
     should_wait_for_more,
 )
 from pallas.product.persona.self_identity import compile_self_identity_prompt
-
-
-def test_build_recent_reply_ending_hint_collects_natural_endings() -> None:
-    turns = [
-        SimpleNamespace(role="assistant", content="其实就是这样"),
-        SimpleNamespace(role="assistant", content="那也不是不行。"),
-        SimpleNamespace(role="assistant", content="行啊"),
-    ]
-
-    hint = build_recent_reply_ending_hint(turns)
-
-    assert hint.startswith("\n【收尾变化参考】")
-    assert "就是这样"[-4:] in hint
-    assert "不是不行"[-4:] in hint
-    assert "行啊" in hint
-
-
-def test_build_recent_reply_ending_hint_skips_kaomoji_dominated_history() -> None:
-    turns = [
-        SimpleNamespace(role="assistant", content="哞~ 好呀！(*^_^*)"),
-        SimpleNamespace(role="assistant", content="喵~ 行！(*^ω^*)"),
-        SimpleNamespace(role="assistant", content="嗯嗯 (*^_^*)"),
-    ]
-
-    assert build_recent_reply_ending_hint(turns) == ""
 
 
 def test_classify_repeated_opener_detects_animal_prefix() -> None:

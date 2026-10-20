@@ -244,38 +244,6 @@ def repeated_attitude_skeletons(texts: list[str]) -> list[str]:
     return picked
 
 
-def recent_assistant_endings(turns: list[LlmChatTurn], *, limit: int = 3) -> list[str]:
-    seen: list[str] = []
-    for turn in reversed(turns):
-        if turn.role != "assistant":
-            continue
-        text = str(turn.content or "").strip()
-        if not text or has_kaomoji_suffix(text):
-            continue
-        compact = text.rstrip("。！？!?~～…，,、 ")
-        if not compact:
-            continue
-        ending = compact[-4:]
-        if len(ending) < 2 or ending in seen:
-            continue
-        seen.append(ending)
-        if len(seen) >= limit:
-            break
-    return seen
-
-
-def build_recent_reply_ending_hint(turns: list[LlmChatTurn]) -> str:
-    assistant_texts = [str(turn.content or "").strip() for turn in turns if turn.role == "assistant" and turn.content]
-    if len(assistant_texts) >= 3:
-        kaomoji_count = sum(1 for text in assistant_texts[-3:] if has_kaomoji_suffix(text))
-        if kaomoji_count >= 2:
-            return ""
-    endings = recent_assistant_endings(turns)
-    if not endings:
-        return ""
-    return "\n【收尾变化参考】这轮可优先试试这些自然收口：" + "、".join(endings) + "。"
-
-
 def build_recent_reply_variation_hint(turns: list[LlmChatTurn]) -> str:
     assistant_texts = [str(turn.content or "").strip() for turn in turns if turn.role == "assistant" and turn.content]
     if not assistant_texts:

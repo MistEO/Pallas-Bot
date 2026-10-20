@@ -68,9 +68,6 @@ FEEDBACK_META_BLOCK_PHRASES: tuple[str, ...] = (
 )
 
 CHAT_HARD_BLOCK_PHRASES: tuple[str, ...] = (
-    "您",
-    "继续聊",
-    "想聊",
     "有什么想",
     "有什么可以",
     "换个话题",

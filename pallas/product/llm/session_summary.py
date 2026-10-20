@@ -42,7 +42,13 @@ async def _summary_messages(history: list[Any], *, group_id: int | None = None, 
     for turn in history:
         role = str(getattr(turn, "role", "") or "").strip()
         content = str(getattr(turn, "content", "") or "").strip()
-        if not content or _summary_mark in content:
+        if not content:
+            continue
+        if _summary_mark in content:
+            # 继承旧摘要正文，避免连续压缩时丢失已沉淀的上下文
+            body = content.split(_summary_mark, 1)[-1].strip()
+            if body:
+                lines.append(f"此前摘要：{body[:240]}")
             continue
         # 延迟识别：历史里只存了 [图片]:url=X 占位符（进历史零 LLM 成本），
         # 摘要在「需要时」才请视觉模型看图描述，避免每张图进历史都调一次视觉模型。
