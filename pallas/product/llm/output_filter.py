@@ -354,7 +354,8 @@ def resolve_output_filtered_reply(task: dict, reply_text: str) -> str:
 def _resolve_filtered_fallback(task: dict, *, profile: OutputFilterProfile, task_type: str) -> StructuredChatReply:
     fallback = str(task.get("fallback_text") or "").strip()
     guarded_fallback = _clean_and_guard_reply(fallback, task_type=task_type)
-    if guarded_fallback and match_output_filter(guarded_fallback, profile) is None:
+    fb_hit = match_output_filter(guarded_fallback, profile)
+    if guarded_fallback and (fb_hit is None or fb_hit.tier == "soft_retry"):
         return StructuredChatReply.single(guarded_fallback)
     return StructuredChatReply()
 
@@ -372,7 +373,7 @@ def resolve_output_filtered_chat_reply(task: dict, reply: StructuredChatReply) -
         if not cleaned:
             continue
         hit = match_output_filter(cleaned, profile) if filter_enabled else None
-        if hit is not None:
+        if hit is not None and hit.tier == "hard_block":
             logger.info(
                 "LLM output filter [{}] dropped segment for task [{}], phrase [{}]",
                 hit.tier,
@@ -380,6 +381,16 @@ def resolve_output_filtered_chat_reply(task: dict, reply: StructuredChatReply) -
                 hit.phrase,
             )
             continue
+        if hit is not None:
+            # soft_retry 为非破坏性信号：保留气泡，仅记录供观测，不静默丢弃
+            log_rate_limited(
+                logger,
+                "info",
+                "llm.output_filter.soft_retry_signal",
+                "LLM output filter soft_retry signal kept segment for task [{}], phrase [{}]",
+                task_type,
+                hit.phrase,
+            )
         reply_segments.append(cleaned)
     if not reply_segments:
         if filter_enabled:
@@ -433,8 +444,15 @@ def resolve_output_filtered_chat_reply(task: dict, reply: StructuredChatReply) -
                 text = filtered.logical_text
     if not filter_enabled:
         return filtered
-    hit = match_output_filter(text, profile) or match_output_filter("".join(filtered.reply_segments), profile)
-    if hit is None:
+    text_hit = match_output_filter(text, profile)
+    joined_hit = match_output_filter("".join(filtered.reply_segments), profile)
+    # hard 优先：任一表示命中 hard 即拦截，不能用任一 soft 命中遮住另一表示的 hard
+    hard_hit = next(
+        (item for item in (text_hit, joined_hit) if item is not None and item.tier == "hard_block"),
+        None,
+    )
+    hit = hard_hit if hard_hit is not None else (text_hit or joined_hit)
+    if hit is None or hit.tier == "soft_retry":
         return filtered
     fallback_reply = _resolve_filtered_fallback(task, profile=profile, task_type=task_type)
     if fallback_reply.reply_segments:

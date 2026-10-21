@@ -99,7 +99,6 @@ from pallas.product.llm.reply_target_candidates import (
     record_reply_target_candidate,
 )
 from pallas.product.llm.reply_variation import (
-    build_recent_reply_ending_hint,
     build_recent_reply_variation_hint,
     should_wait_for_more,
 )
@@ -1503,11 +1502,8 @@ async def prepare_and_submit_llm_chat_turn(
         style_user_hints: list[str] = []
         if recent_turns:
             variation_hint = build_recent_reply_variation_hint(recent_turns)
-            ending_hint = build_recent_reply_ending_hint(recent_turns)
             if variation_hint:
                 style_user_hints.append(variation_hint)
-            if ending_hint:
-                style_user_hints.append(ending_hint)
             previous_reply = find_previous_reply_for_utterance(
                 llm_user_text,
                 recent_turns=recent_turns,

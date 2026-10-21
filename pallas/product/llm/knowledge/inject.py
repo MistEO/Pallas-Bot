@@ -11,6 +11,7 @@ from pallas.product.llm.config import LlmConfig, get_llm_config
 from pallas.product.llm.kernel.memory_governance import can_read_generic_knowledge
 from pallas.product.llm.knowledge.models import KnowledgeInjectionResult, RetrievedKnowledgeChunk
 from pallas.product.llm.knowledge.registry import retrieve_from_knowledge_sources
+from pallas.product.llm.session_models import is_session_summary_turn
 from pallas.product.persona.prompt_guard import sanitize_prompt_block
 
 if TYPE_CHECKING:
@@ -61,8 +62,7 @@ _INVITE_HISTORY_MAX_TURNS = 2
 _INVITE_HISTORY_MAX_CHARS = 60
 _INVITE_HISTORY_MAX_AGE_SEC = 600
 
-# 合成摘要回合（session_store 写入的【此前对话摘要】）只带写入时序，混入窗口即整窗拒绝
-_SESSION_SUMMARY_MARK = "【此前对话摘要】"
+# 合成摘要回合（session_store 写入的完整前缀）只带写入时序，混入窗口即整窗拒绝
 
 # 明确邀请本牛知识块的稳定标识：非邀请语境下不注入该 chunk
 _INVITE_FAQ_SOURCE_ID = "llm_chat.faq"
@@ -117,7 +117,7 @@ def trusted_window_invite_anchor(
         content = str(getattr(turn, "content", "") or "").strip()
         if not content or len(content) > _INVITE_HISTORY_MAX_CHARS:
             return None
-        if _SESSION_SUMMARY_MARK in content:
+        if is_session_summary_turn(turn):
             return None
         try:
             created_at = int(getattr(turn, "created_at", 0) or 0)

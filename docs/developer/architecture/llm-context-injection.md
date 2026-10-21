@@ -187,7 +187,7 @@ Provider 已显式声明 `image` 时，`vision_messages` 在请求前下载这�
 
 ### 长会话压缩
 
-会话太长时先压再注入（`session_summary.py`）：当该用户消息数 ≥ `llm_session_summary_threshold`（默认 24）且距上次压缩超过冷却期（默认 600s），用低成本模型把窗口外历史压成 ≤120 字中文，写入一条 `user` 记录的【此前对话摘要】，并只保留最近 `llm_session_summary_keep_messages`（默认 16）条。**读取时摘要始终保留在窗口内**——若摘要滑出当前窗口，会弹出它、保留最近 `N-1` 条、把摘要放回最前。压缩发生在投递成功后异步执行。
+会话太长时先压再注入（`session_summary.py`）：当该用户普通 user 消息数 ≥ `llm_session_summary_threshold`（默认 24）且距上次压缩超过冷却期（默认 600s），用低成本模型把窗口外历史压成 ≤120 字中文，写入一条 `user` 记录的【此前对话摘要】，并只保留最近 `llm_session_summary_keep_messages`（默认 16）条普通原文。自动压缩先读取同 TTL 的存储窗口快照（稳定排序；W+1 即本轮放弃、不改历史），摘要来源是快照去掉冻结 keep 后的精确 ID 集合（旧摘要不占 keep），时间锚取 keep 最早 `created_at - 1`；仅自动路径按来源 ID 提交，手工/回调 compact 仍沿用原语义。**读取时摘要始终保留在窗口内**——若摘要滑出当前窗口，会弹出它、保留最近 `N-1` 条、把摘要放回最前。压缩发生在投递成功后异步执行。
 
 **图片进历史的延迟识别**：含 `[CQ:image]` 的 user 消息进会话历史时，不立即调用视觉模型识别（避免每张图都产生一次 LLM 成本），而是存成 `[图片]:url=X` 占位符（`vision_content.placeholder_with_image_urls`），保留图片 URL。到会话摘要压缩需要理解历史图时，`session_summary._summary_messages` 才从占位符提取 URL、查图片缓存并对占位符段做一次视觉描述（`vision_messages.describe_placeholder_images`），占位符外的文字保留。开关 `llm_session_vision_describe_enabled` 控制此行为；关闭时直接退化为纯 `[图片]` 占位（丢 URL）。
 

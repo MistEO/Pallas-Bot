@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import time
+
 import pytest
 
+from pallas.core.foundation.db.modules import LlmChatMessage
 from pallas.product.llm.config import LlmConfig, clear_llm_config_cache
+from pallas.product.llm.session_models import SESSION_SUMMARY_PREFIX
 from pallas.product.llm.session_store import (
     append_llm_message,
     build_llm_chat_messages,
@@ -15,6 +19,7 @@ from pallas.product.llm.session_store import (
     list_llm_history_sessions,
     list_user_llm_messages,
 )
+from pallas.product.llm.session_store_mongo import MongoLlmSessionMessageBackend
 
 
 def _patch_mongo_backend(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -154,3 +159,232 @@ async def test_mongo_compact_user_history(beanie_fixture, monkeypatch) -> None:
     turns = await list_user_llm_messages(1, 10, 20, limit=20)
     assert any("此前对话摘要" in turn.content and "summary-text" in turn.content for turn in turns)
     assert len(turns) == 3
+
+
+@pytest.mark.asyncio
+async def test_mongo_snapshot_and_compact_by_source_ids(beanie_fixture) -> None:
+    backend = MongoLlmSessionMessageBackend()
+    for index in range(6):
+        await LlmChatMessage(
+            bot_id=1,
+            group_id=10,
+            user_id=20,
+            role="user",
+            content=f"{SESSION_SUMMARY_PREFIX}旧摘要" if index == 0 else f"m-{index}",
+            created_at=index + 1,
+        ).insert()
+    await LlmChatMessage(
+        bot_id=1,
+        group_id=10,
+        user_id=21,
+        role="user",
+        content="other-user",
+        created_at=1,
+    ).insert()
+    await LlmChatMessage(
+        bot_id=1,
+        group_id=11,
+        user_id=20,
+        role="user",
+        content="other-group",
+        created_at=1,
+    ).insert()
+
+    snapshot = await backend.read_user_compaction_snapshot(1, 10, 20, limit=6, ttl_sec=0)
+    assert [turn.message_id for turn in snapshot] == sorted(turn.message_id for turn in snapshot)
+    source_ids = [turn.message_id for turn in snapshot[:-2]]
+    summary_created_at = snapshot[-2].created_at - 1
+    assert await backend.compact_user_with_summary(
+        1,
+        10,
+        20,
+        f"{SESSION_SUMMARY_PREFIX}新摘要",
+        keep_messages=99,
+        source_message_ids=source_ids,
+        summary_created_at=summary_created_at,
+    )
+
+    turns = await backend.list_user_messages(1, 10, 20, limit=20, ttl_sec=0)
+    assert len(turns) == 3
+    assert turns[0].content == f"{SESSION_SUMMARY_PREFIX}新摘要"
+    assert [turn.content for turn in turns[1:]] == [turn.content for turn in snapshot[-2:]]
+    other_user = await backend.list_user_messages(1, 10, 21, limit=20, ttl_sec=0)
+    assert [turn.content for turn in other_user] == ["other-user"]
+    other_group = await backend.list_user_messages(1, 11, 20, limit=20, ttl_sec=0)
+    assert [turn.content for turn in other_group] == ["other-group"]
+
+
+@pytest.mark.asyncio
+async def test_mongo_snapshot_same_second_order_and_over_window(beanie_fixture) -> None:
+    backend = MongoLlmSessionMessageBackend()
+    docs = []
+    for index in range(4):
+        doc = LlmChatMessage(
+            bot_id=1,
+            group_id=10,
+            user_id=20,
+            role="user",
+            content=f"same-second-{index}",
+            created_at=50,
+        )
+        await doc.insert()
+        docs.append(doc)
+
+    snapshot = await backend.read_user_compaction_snapshot(1, 10, 20, limit=4, ttl_sec=0)
+    assert [turn.message_id for turn in snapshot] == [str(doc.id) for doc in docs]
+    assert await backend.read_user_compaction_snapshot(1, 10, 20, limit=3, ttl_sec=0) is None
+
+
+@pytest.mark.asyncio
+async def test_mongo_snapshot_excludes_expired_and_compact_leaves_it(beanie_fixture, monkeypatch) -> None:
+    backend = MongoLlmSessionMessageBackend()
+    now = int(time.time())
+    expired = LlmChatMessage(
+        bot_id=1,
+        group_id=10,
+        user_id=20,
+        role="user",
+        content="expired",
+        created_at=now - 1000,
+    )
+    current = LlmChatMessage(
+        bot_id=1,
+        group_id=10,
+        user_id=20,
+        role="user",
+        content="current",
+        created_at=now - 10,
+    )
+    await expired.insert()
+    await current.insert()
+
+    snapshot = await backend.read_user_compaction_snapshot(1, 10, 20, limit=10, ttl_sec=60)
+    assert [turn.message_id for turn in snapshot] == [str(current.id)]
+    assert await backend.compact_user_with_summary(
+        1,
+        10,
+        20,
+        f"{SESSION_SUMMARY_PREFIX}摘要",
+        keep_messages=1,
+        source_message_ids=[str(current.id)],
+        summary_created_at=now - 11,
+    )
+    docs = await LlmChatMessage.find({"bot_id": 1, "group_id": 10, "user_id": 20}).to_list()
+    assert any(doc.content == "expired" for doc in docs)
+    assert not any(doc.content == "current" for doc in docs)
+
+
+@pytest.mark.asyncio
+async def test_mongo_compact_insert_failure_deletes_nothing(beanie_fixture, monkeypatch) -> None:
+    backend = MongoLlmSessionMessageBackend()
+    for index in range(3):
+        await LlmChatMessage(
+            bot_id=1,
+            group_id=10,
+            user_id=20,
+            role="user",
+            content=f"m-{index}",
+            created_at=index + 1,
+        ).insert()
+    snapshot = await backend.read_user_compaction_snapshot(1, 10, 20, limit=10, ttl_sec=0)
+
+    async def fail_insert(_self):
+        raise RuntimeError("insert failed")
+
+    monkeypatch.setattr(LlmChatMessage, "insert", fail_insert)
+    assert not await backend.compact_user_with_summary(
+        1,
+        10,
+        20,
+        f"{SESSION_SUMMARY_PREFIX}摘要",
+        keep_messages=1,
+        source_message_ids=[turn.message_id for turn in snapshot[:2]],
+        summary_created_at=0,
+    )
+    docs = (
+        await LlmChatMessage
+        .get_pymongo_collection()
+        .find({
+            "bot_id": 1,
+            "group_id": 10,
+            "user_id": 20,
+        })
+        .to_list(length=20)
+    )
+    assert {doc["content"] for doc in docs} == {"m-0", "m-1", "m-2"}
+
+
+@pytest.mark.asyncio
+async def test_mongo_compact_delete_failure_keeps_summary_and_originals(beanie_fixture, monkeypatch) -> None:
+    backend = MongoLlmSessionMessageBackend()
+    for index in range(3):
+        await LlmChatMessage(
+            bot_id=1,
+            group_id=10,
+            user_id=20,
+            role="user",
+            content=f"m-{index}",
+            created_at=index + 1,
+        ).insert()
+    snapshot = await backend.read_user_compaction_snapshot(1, 10, 20, limit=10, ttl_sec=0)
+    original_find = LlmChatMessage.find
+
+    class FailingDeleteQuery:
+        def __init__(self, query):
+            self._query = query
+
+        def __getattr__(self, name):
+            return getattr(self._query, name)
+
+        async def delete(self):
+            raise RuntimeError("delete failed")
+
+    def fake_find(*args, **kwargs):
+        return FailingDeleteQuery(original_find(*args, **kwargs))
+
+    monkeypatch.setattr(LlmChatMessage, "find", fake_find)
+    assert not await backend.compact_user_with_summary(
+        1,
+        10,
+        20,
+        f"{SESSION_SUMMARY_PREFIX}摘要",
+        keep_messages=1,
+        source_message_ids=[turn.message_id for turn in snapshot[:2]],
+        summary_created_at=0,
+    )
+    docs = (
+        await LlmChatMessage
+        .get_pymongo_collection()
+        .find({
+            "bot_id": 1,
+            "group_id": 10,
+            "user_id": 20,
+        })
+        .to_list(length=20)
+    )
+    contents = {doc["content"] for doc in docs}
+    assert {"m-0", "m-1", "m-2"}.issubset(contents)
+    assert any(content.startswith(SESSION_SUMMARY_PREFIX) for content in contents)
+
+
+@pytest.mark.asyncio
+async def test_mongo_compact_rejects_invalid_object_id(beanie_fixture) -> None:
+    backend = MongoLlmSessionMessageBackend()
+    await LlmChatMessage(
+        bot_id=1,
+        group_id=10,
+        user_id=20,
+        role="user",
+        content="m-0",
+        created_at=1,
+    ).insert()
+    assert not await backend.compact_user_with_summary(
+        1,
+        10,
+        20,
+        f"{SESSION_SUMMARY_PREFIX}摘要",
+        keep_messages=1,
+        source_message_ids=["not-an-object-id"],
+        summary_created_at=0,
+    )
+    assert await LlmChatMessage.find({"bot_id": 1, "group_id": 10, "user_id": 20}).count() == 1

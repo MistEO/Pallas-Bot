@@ -33,7 +33,7 @@ def test_match_output_filter_chat_hard_block() -> None:
     hit = match_output_filter("您好，想聊点什么？", "chat")
     assert hit is not None
     assert hit.tier == "hard_block"
-    assert hit.phrase == "您"
+    assert hit.phrase == "聊点什么"
 
 
 def test_match_output_filter_chat_soft_retry() -> None:
@@ -130,6 +130,36 @@ def test_resolve_output_filtered_reply_blocks_service_tone_after_strip() -> None
     task = {"task_type": LLM_CHAT_TASK_TYPE}
     assert resolve_output_filtered_reply(task, "吧。时间管理真的很重要呢。你有没有什么好方法来提高效率？") == ""
     assert resolve_output_filtered_reply(task, "得看设定啦。") == ""
+
+
+def test_resolve_output_filtered_reply_preserves_normal_chat_sentences() -> None:
+    """收窄后的内置风格词不应误杀正常聊天的继续/想聊/聊聊等表述。"""
+    task = {"task_type": LLM_CHAT_TASK_TYPE}
+    assert resolve_output_filtered_reply(task, "这个我还想继续聊") == "这个我还想继续聊"
+    assert resolve_output_filtered_reply(task, "我还想聊这个问题") == "我还想聊这个问题"
+    assert resolve_output_filtered_reply(task, "那咱们聊聊吗") == "那咱们聊聊吗"
+
+
+def test_resolve_output_filtered_reply_soft_retry_is_non_destructive() -> None:
+    """soft_retry 仅作非破坏性信号，不应静默丢弃整条回复。"""
+    task = {"task_type": LLM_CHAT_TASK_TYPE}
+    assert resolve_output_filtered_reply(task, "今天很高兴见到你") == "今天很高兴见到你"
+
+
+def test_resolve_output_filtered_reply_preserves_normal_sentences_multi_bubble() -> None:
+    task = {"task_type": LLM_CHAT_TASK_TYPE}
+    reply = '{"reply_segments":["这个我还想继续聊","那咱们聊聊吗"]}'
+    assert resolve_output_filtered_reply(task, reply) == "这个我还想继续聊\n那咱们聊聊吗"
+
+
+def test_resolve_output_filtered_reply_honors_user_configured_hard_phrase(monkeypatch) -> None:
+    """用户显式配置的 hard_block 契约即使包含泛短片段也须保留。"""
+    monkeypatch.setattr(
+        "pallas.product.llm.config.get_llm_config",
+        lambda: LlmConfig(llm_output_filter_chat_hard_phrases=["继续聊"]),
+    )
+    task = {"task_type": LLM_CHAT_TASK_TYPE}
+    assert resolve_output_filtered_reply(task, "这个我还想继续聊") == ""
 
 
 def test_resolve_output_filtered_reply_enforces_max_length() -> None:
@@ -258,3 +288,32 @@ def test_resolve_output_filtered_reply_keeps_long_tool_answer_across_bubbles() -
     assert "第1条资料内容" in filtered
     assert "第8条资料内容" in filtered
     assert all(len(segment) <= 20 for segment in segments)
+
+
+def test_resolve_output_filtered_reply_blocks_cross_segment_hard_phrase(monkeypatch) -> None:
+    """跨泡拼接出的 hard 短语不能被前段 soft 命中短路（issue B）。"""
+    monkeypatch.setattr(
+        "pallas.product.llm.config.get_llm_config",
+        lambda: LlmConfig(llm_output_filter_chat_hard_phrases=["甲乙"]),
+    )
+    task = {"task_type": LLM_CHAT_TASK_TYPE}
+    reply = '{"reply_segments":["今天很高兴","甲","乙"]}'
+    assert resolve_output_filtered_reply(task, reply) == ""
+
+
+def test_resolve_output_filtered_reply_blocks_builtin_cross_segment_hard_phrase() -> None:
+    """内置 hard 短语跨泡拼接也须拦截，不能用任一 soft 表示遮 hard。"""
+    task = {"task_type": LLM_CHAT_TASK_TYPE}
+    reply = '{"reply_segments":["有什么","想聊聊吗"]}'
+    assert resolve_output_filtered_reply(task, reply) == ""
+
+
+def test_resolve_output_filtered_reply_falls_back_to_clean_on_cross_segment_hard(monkeypatch) -> None:
+    """跨泡 hard 命中后落到合法 fallback，而不是静默或原样放行。"""
+    monkeypatch.setattr(
+        "pallas.product.llm.config.get_llm_config",
+        lambda: LlmConfig(llm_output_filter_chat_hard_phrases=["甲乙"]),
+    )
+    task = {"task_type": LLM_CHAT_TASK_TYPE, "fallback_text": "好的"}
+    reply = '{"reply_segments":["今天很高兴","甲","乙"]}'
+    assert resolve_output_filtered_reply(task, reply) == "好的"

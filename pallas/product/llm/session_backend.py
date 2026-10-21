@@ -3,7 +3,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from pallas.product.llm.session_models import LlmChatRole, LlmChatTurn, LlmHistorySessionSummary
+    from collections.abc import Sequence
+
+    from pallas.product.llm.session_models import (
+        LlmChatRole,
+        LlmChatTurn,
+        LlmHistorySessionSummary,
+        LlmSessionSnapshotTurn,
+    )
 
 
 class LlmSessionMessageBackend(Protocol):
@@ -28,6 +35,16 @@ class LlmSessionMessageBackend(Protocol):
         limit: int,
         ttl_sec: int,
     ) -> list[LlmChatTurn]: ...
+
+    async def read_user_compaction_snapshot(
+        self,
+        bot_id: int,
+        group_id: int,
+        user_id: int,
+        *,
+        limit: int,
+        ttl_sec: int,
+    ) -> list[LlmSessionSnapshotTurn] | None: ...
 
     async def list_group_ambient(
         self,
@@ -59,6 +76,8 @@ class LlmSessionMessageBackend(Protocol):
         summary_content: str,
         *,
         keep_messages: int,
+        source_message_ids: Sequence[str] | None = None,
+        summary_created_at: int | None = None,
     ) -> bool: ...
 
 

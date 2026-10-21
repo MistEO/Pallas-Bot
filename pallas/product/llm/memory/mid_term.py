@@ -9,10 +9,16 @@ from __future__ import annotations
 import operator
 from typing import Any
 
-from pallas.product.llm.session_models import normalize_group_scope
+from pallas.product.llm.session_models import (
+    SESSION_SUMMARY_MARK,
+    SESSION_SUMMARY_PREFIX,
+    is_session_summary_turn,
+    normalize_group_scope,
+)
 from pallas.product.llm.session_store import list_llm_history_sessions, list_user_llm_messages
 
-MID_TERM_PREFIX = "【此前对话摘要】"
+# 兼容旧调用方的无换行标记别名；真正的识别以完整前缀与 user 角色为准。
+MID_TERM_PREFIX = SESSION_SUMMARY_MARK
 MID_TERM_RECALL_MIN_SCORE = 8
 MID_TERM_RECALL_MAX = 3
 
@@ -40,12 +46,11 @@ async def list_mid_term_summaries(
         sid_user = int(getattr(session, "user_id", 0) if not isinstance(session, dict) else session.get("user_id") or 0)
         turns = await list_user_llm_messages(sid_bot, sid_group, sid_user, limit=80)
         for turn in turns:
-            content = str(turn.content or "").strip()
-            if not content.startswith(MID_TERM_PREFIX):
+            if not is_session_summary_turn(turn):
                 continue
-            body = content[len(MID_TERM_PREFIX) :].strip()
-            if body.startswith("\n"):
-                body = body[1:].strip()
+            raw = str(turn.content or "")
+            content = raw.strip()
+            body = raw[len(SESSION_SUMMARY_PREFIX) :].strip()
             out.append({
                 "bot_id": sid_bot,
                 "group_id": sid_group,
