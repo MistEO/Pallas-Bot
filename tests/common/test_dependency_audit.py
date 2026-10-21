@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import subprocess
+import tomllib
 from datetime import date
 from typing import TYPE_CHECKING
 
 import pytest
+from packaging.requirements import Requirement
 
 from tools import audit_dependencies
 
@@ -145,3 +147,23 @@ def test_audit_rejects_invalid_or_expired_exceptions(content: str, tmp_path: Pat
 
     with pytest.raises(audit_dependencies.AuditConfigurationError):
         audit_dependencies.load_exceptions(config, today=date(2026, 10, 7))
+
+
+def test_project_pins_pillow_13_with_uv_override() -> None:
+    config = tomllib.loads((audit_dependencies.PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    project = config["project"]
+
+    pillow = [req for req in map(Requirement, project["dependencies"]) if req.name.lower() == "pillow"]
+    assert len(pillow) == 1, "pillow must have exactly one direct requirement"
+    assert str(pillow[0].specifier) == "==13.0.0"
+
+    embedding = [
+        req
+        for req in map(Requirement, project["optional-dependencies"]["embedding-local"])
+        if req.name.lower() == "fastembed"
+    ]
+    assert len(embedding) == 1, "embedding-local must have exactly one fastembed requirement"
+    assert str(embedding[0].specifier) == "==0.8.0"
+
+    overrides = [Requirement(raw) for raw in config["tool"]["uv"]["override-dependencies"]]
+    assert [(requirement.name, str(requirement.specifier)) for requirement in overrides] == [("pillow", "==13.0.0")]

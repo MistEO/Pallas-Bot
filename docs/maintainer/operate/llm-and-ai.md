@@ -155,11 +155,13 @@ flowchart TD
 4. 保存后点上方 **探测**：应显示「语义可用」。DeepSeek 官方多数无 `/embeddings`，改用兼容网关。
 5. 换模型后旧记忆向量可能对不上，等后台回填或重新写入记忆。
 
-本机依赖（用 pip 装包，不要对含 editable 插件的环境跑会裁剪依赖的 `uv sync --extra`）：
+本机依赖（项目级安装；`--inexact` 保留额外/editable 插件）：
 
 ```bash
-uv pip install 'fastembed>=0.5'
+uv sync --inexact --extra embedding-local
 ```
+
+临时限制：`fastembed 0.8.0` 官方声明 `Pillow<13`，项目固定 `Pillow 13.0.0` 并通过 `[tool.uv]` 的 `override-dependencies` 覆盖该上限（仅项目工具配置，不进入 wheel）。裸 `pip` / `uv pip` 安装 embedding extra 无法解析，`pip check` 会报告该官方声明冲突；待上游支持后复验并撤除。
 
 等价落盘（`data/pallas_config/webui.json` 或环境变量）：
 

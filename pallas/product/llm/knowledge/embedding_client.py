@@ -56,7 +56,7 @@ def embedding_capability_trace(cfg: LlmConfig | None = None) -> dict[str, Any]:
     resolved_model = resolved_embedding_model_name(cfg)
     if provider_name == "local":
         if not local_embedding_dependency_available():
-            error = error or "未安装 fastembed；请执行 uv pip install 'fastembed>=0.5'"
+            error = error or "未安装 fastembed；请执行 uv sync --inexact --extra embedding-local"
             semantic = False
         else:
             semantic = not bool(_last_embedding_error)
