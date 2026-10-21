@@ -43,6 +43,22 @@ jobs:
         run: |
           uv run python tools/check_plugin_imports.py --scope packages
 
+      - name: Check plugin identity imports
+        run: |
+          uv run python tools/check_plugin_identity_imports.py
+
+      - name: Check LLM import boundaries
+        run: |
+          uv run python tools/check_llm_import_boundaries.py
+
+      - name: Check harness map golden principles
+        run: |
+          uv run python tools/check_golden_principles.py
+
+      - name: Check harness fixture health
+        run: |
+          uv run python tools/check_fixture_health.py
+
       - name: Build pallas-core wheel
         run: |
           ./scripts/build_core.sh
@@ -61,6 +77,16 @@ jobs:
             -q
           uv run pytest tests/common/test_plugin_loader_unified.py -q
 
+      - name: Run configuration storage regression tests
+        run: |
+          env -u PG_TEST_DSN uv run pytest \
+            tests/common/test_config_repository.py \
+            tests/common/test_repo_settings.py \
+            tests/common/test_plugin_config_patch.py \
+            tests/plugins/test_webui_env_sections.py \
+            tests/plugins/pb_webui/test_llm_ops_api.py \
+            -q
+
       - name: Run runtime reliability regression tests
         run: |
           env -u PG_TEST_DSN uv run pytest \
@@ -71,6 +97,9 @@ jobs:
             tests/platform/message_runtime/test_committer.py \
             tests/platform/ingress/test_send_queue.py \
             tests/platform/ingress/test_send_queue_retry.py \
+            tests/platform/ingress/test_dispatch_lanes.py \
+            tests/platform/ingress/test_dispatch_runtime_config.py \
+            tests/platform/ingress/test_dispatch_metrics.py \
             tests/plugins/pb_webui/test_console_read_cache_snapshot.py \
             tests/plugins/repeater/test_work_enqueue.py \
             tests/plugins/repeater/test_payload_replay.py \

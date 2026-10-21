@@ -38,7 +38,7 @@
 
 | 主题 | 文档 | Owner | 验证状态 |
 | --- | --- | --- | --- |
-| 配置存储（`pallas.toml`/`webui.json`） | [architecture/config-storage](/developer/architecture/config-storage) | platform | unit · 结构检查 `tools/check_*` |
+| 配置存储（`pallas.toml`/`webui.json`） | [architecture/config-storage](/developer/architecture/config-storage) | platform | unit · ci · 配置契约测试 `tests/common/test_config_repository.py` 等 |
 | 插件业务事件日志 | [architecture/plugin-event-logging](/developer/architecture/plugin-event-logging) | plugin | manual |
 | 日志/指标/trace 排障入口 | [maintainer/operate/logs](/maintainer/operate/logs) · [troubleshooting](/maintainer/operate/troubleshooting) | platform | manual |
 
@@ -50,12 +50,12 @@
 | 行为实验方法与契约 | [harness/behavior-lab](/developer/harness/behavior-lab) | llm | unit |
 | 跨进程运行态观测（脱敏快照/查询/TTL） | `tools/observe_runtime.py` | platform | unit · `tests/tools/test_observe_runtime.py` |
 | 浏览器级 UI 验收（CDP 驱动 headless chromium） | `tools/browser_acceptance.py` | webui | unit · `tests/tools/test_browser_acceptance.py` |
-| 结构检查脚本 | `tools/check_plugin_imports.py`、`check_console_openapi_drift.py` 等 | platform | ci · `tools/check_*` |
-| 文档链接/锚点检查（doc-gardening） | `tools/check_doc_links.py` | platform | ci · `tools/check_*` |
+| 结构检查脚本（import 规则/插件身份/LLM 边界/OpenAPI） | `tools/check_plugin_imports.py`、`check_plugin_identity_imports.py`、`check_llm_import_boundaries.py`、`check_console_openapi_drift.py` | platform | ci · `tools/check_*` |
+| 文档链接/锚点检查（doc-gardening） | `tools/check_doc_links.py` | platform | manual · 未接入 CI（存量断链待清理） |
 | fixture 健康扫描 | `tools/check_fixture_health.py` | llm | ci · `tools/check_*` |
 | 黄金原则扫描（地图链接/owner/验证状态） | `tools/check_golden_principles.py` | platform | ci · `tools/check_*` |
 | 自动 PR loop（治理漂移→修复 PR，保留人工审批） | `tools/auto_pr_loop.py` | platform | unit · `tests/tools/test_auto_pr_loop.py` |
-| CI 门禁（Ruff/import/矩阵/OpenAPI/构建） | `.github/workflows/ci.yml` | platform | ci |
+| CI 门禁（Ruff/import/结构检查/矩阵/OpenAPI/构建） | `.github/workflows/ci.yml` | platform | ci |
 | 健康/启动检查与容器健康 | `.github/workflows/health-check.yml` | platform | ci · `uv run pallas status` |
 | 回归测试目录 | `tests/api/runtime/`、`tests/platform/message_runtime/`、`tests/product/llm/` | platform | unit |
 

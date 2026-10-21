@@ -12,6 +12,7 @@
 
 ### Changed
 
+* 配置保存与消息调度回归、插件身份与 LLM 导入边界、架构地图与 fixture 检查纳入 CI
 * 语义标注单条与批量输出额度更充足，降低结果截断风险
 * docs(plugins): 明确社区索引自动 PR 为默认关闭的可选接入方式，目前仅 Memes 完成集成
 * docs(plugins): 说明 Memes 社区索引自动 PR 试点

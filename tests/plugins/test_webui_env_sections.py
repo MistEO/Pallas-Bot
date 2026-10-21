@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -6,6 +7,15 @@ import pytest
 
 _MS_CFG = Path(__file__).resolve().parents[2] / "pallas" / "product" / "message_scrub" / "config.py"
 skip_no_message_scrub = pytest.mark.skipif(not _MS_CFG.is_file(), reason="无 message_scrub 配置模块")
+
+_GATEWAY_PLUGIN_MODULES = ("pallas_plugin_draw", "pallas_plugin_maa", "pallas_plugin_sing")
+_MISSING_GATEWAY_PLUGIN_MODULES = tuple(
+    name for name in _GATEWAY_PLUGIN_MODULES if importlib.util.find_spec(name) is None
+)
+skip_missing_gateway_plugins = pytest.mark.skipif(
+    bool(_MISSING_GATEWAY_PLUGIN_MODULES),
+    reason=f"缺少可选插件: {', '.join(_MISSING_GATEWAY_PLUGIN_MODULES)}",
+)
 
 _REMOVED_COMMON_CONFIG_SECTIONS = frozenset({
     "cmd_perm",
@@ -141,6 +151,7 @@ def test_removed_common_config_sections_are_unknown():
             get_webui_env_section(section_id)
 
 
+@skip_missing_gateway_plugins
 def test_service_gateways_payload_shape():
     from pallas.console.webui import webui_env_section_payload
 
