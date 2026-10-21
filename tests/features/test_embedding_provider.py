@@ -211,6 +211,7 @@ def test_build_embedding_status_dependency_hint_uses_project_sync(monkeypatch) -
 def test_local_model_import_error_hint_uses_project_sync(monkeypatch) -> None:
     import pallas.product.llm.knowledge.embedding_provider as ep
 
+    monkeypatch.setattr(ep, "_local_models", {})
     monkeypatch.setitem(sys.modules, "fastembed", None)
 
     with pytest.raises(ImportError) as exc_info:
