@@ -10,8 +10,11 @@ from typing import TYPE_CHECKING
 from nonebot import get_loaded_plugins
 from nonebot.log import logger
 
-from pallas.core.foundation.config.repo_settings import repo_env_raw_value
-from pallas.core.foundation.db.pool_budget import cap_by_pg_pool, pg_pool_capacity, pg_pool_under_pressure
+from pallas.core.foundation.db.pool_budget import pg_pool_capacity, pg_pool_under_pressure
+from pallas.core.platform.ingress.dispatch_runtime_config import (
+    dispatch_env_int_any,
+    get_ingress_dispatch_runtime_config,
+)
 from pallas.core.platform.ingress.fleet_dispatch_scale import scaled_dispatch_int
 from pallas.core.platform.ingress.matcher_activation import iter_matcher_checker_calls, matcher_is_command_only
 from pallas.core.platform.ingress.route_index import matcher_module_key, plugin_module_key_from_plugin
@@ -32,7 +35,10 @@ _LANE_ALIASES: dict[str, str] = {
     "passive_render": "remote",
 }
 _LANES: dict[str, LaneController] | None = None
+_LANES_RUNTIME_ENABLED: bool | None = None
 _PLUGIN_LANE_CACHE: dict[str, str | None] | None = None
+_LAST_LIMIT_SNAPSHOT: object | None = None
+_WAKE_TASKS: set[asyncio.Task[None]] = set()
 
 
 class DispatchLane(StrEnum):
@@ -53,6 +59,7 @@ class LaneController:
     def __init__(self, lane: str, base_limit: int) -> None:
         self.lane = lane
         self.base_limit = max(1, int(base_limit))
+        self.configured_limit = self.base_limit
         self.in_use = 0
         self._cond = asyncio.Condition()
 
@@ -66,6 +73,40 @@ class LaneController:
         async with self._cond:
             self.base_limit = max(1, int(limit))
             self._cond.notify_all()
+
+    def sync_configured_limit(self, limit: int) -> None:
+        """配置值变化时原地重设上限；无关刷新不打断自适应扩容。"""
+        limit = max(1, int(limit))
+        if limit == self.configured_limit:
+            return
+        self.configured_limit = limit
+        self.apply_limit(limit)
+
+    def apply_limit(self, limit: int) -> None:
+        """原地更新上限：已持有的执行不受影响，等待者按新上限放行。"""
+        limit = max(1, int(limit))
+        if limit == self.base_limit:
+            return
+        increased = limit > self.base_limit
+        self.base_limit = limit
+        if increased:
+            self.wake_waiters()
+
+    def wake_waiters(self) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        task = loop.create_task(self.notify_waiters())
+        _WAKE_TASKS.add(task)
+        task.add_done_callback(_WAKE_TASKS.discard)
+
+    async def notify_waiters(self) -> None:
+        try:
+            async with self._cond:
+                self._cond.notify_all()
+        except RuntimeError:
+            return
 
     def snapshot(self) -> dict[str, int]:
         return {"limit": self.effective_limit(), "in_use": self.in_use}
@@ -103,81 +144,62 @@ def normalize_lane(raw: str | None) -> str | None:
 
 
 def dispatch_lanes_enabled() -> bool:
-    raw = repo_env_raw_value("PALLAS_DISPATCH_LANES_ENABLED")
-    if raw is None:
-        return True
-    text = str(raw).strip().lower()
-    if text in ("0", "false", "no", "off"):
-        return False
-    return True
+    return get_ingress_dispatch_runtime_config().dispatch_lanes_enabled
+
+
+def dispatch_lanes_runtime_enabled() -> bool:
+    """启动时确定的运行态；开关变更需重启，运行期保存不会切换。"""
+    if _LANES_RUNTIME_ENABLED is None:
+        install_dispatch_lanes()
+    return _LANES_RUNTIME_ENABLED is True
 
 
 def lane_acquire_timeout_sec() -> float:
-    raw = repo_env_raw_value("PALLAS_LANE_ACQUIRE_TIMEOUT_SEC")
-    if raw is None:
-        return 1.0
-    try:
-        return max(0.0, float(str(raw).strip()))
-    except ValueError:
-        return 1.0
+    return get_ingress_dispatch_runtime_config().lane_acquire_timeout_sec
 
 
 def lane_busy_reply_enabled() -> bool:
-    raw = repo_env_raw_value("PALLAS_LANE_BUSY_REPLY")
-    if raw is None:
-        return True
-    text = str(raw).strip().lower()
-    if text in ("0", "false", "no", "off"):
-        return False
-    return True
-
-
-def _env_lane_limit(*keys: str, default: int) -> int:
-    for key in keys:
-        raw = repo_env_raw_value(key)
-        if raw is None:
-            continue
-        try:
-            return max(1, int(str(raw).strip()))
-        except ValueError:
-            continue
-    return default
+    return get_ingress_dispatch_runtime_config().lane_busy_reply
 
 
 def default_lane_limits() -> dict[str, int]:
-    pool_size_raw = repo_env_raw_value("PG_POOL_SIZE")
-    try:
-        pool_size = max(1, int(str(pool_size_raw if pool_size_raw is not None else "10").strip()))
-    except ValueError:
-        pool_size = 10
-    storage_default = min(8, pool_size)
-    command_default = scaled_dispatch_int(16, per_bot=2, cap=64)
+    config = get_ingress_dispatch_runtime_config()
     tool_default = scaled_dispatch_int(4, per_bot=1, cap=16)
-    chat_scaled = scaled_dispatch_int(32, per_bot=1, cap=48)
-    chat_default = cap_by_pg_pool(chat_scaled, workload_fraction=0.30)
-    remote_default = scaled_dispatch_int(4, per_bot=1, cap=16)
     return {
-        DispatchLane.COMMAND: _env_lane_limit(
-            "PALLAS_LANE_COMMAND", "PALLAS_LANE_COMMAND_EXACT", default=command_default
+        DispatchLane.COMMAND: config.lane_command,
+        DispatchLane.TOOL: dispatch_env_int_any(
+            ("PALLAS_LANE_TOOL",),
+            default=tool_default,
+            minimum=1,
+            maximum=64,
         ),
-        DispatchLane.TOOL: _env_lane_limit("PALLAS_LANE_TOOL", default=tool_default),
-        DispatchLane.CHAT: _env_lane_limit("PALLAS_LANE_CHAT", "PALLAS_LANE_PASSIVE_LIGHT", default=chat_default),
-        DispatchLane.STORAGE: _env_lane_limit("PALLAS_LANE_STORAGE", "PALLAS_LANE_PASSIVE_DB", default=storage_default),
-        DispatchLane.REMOTE: _env_lane_limit(
-            "PALLAS_LANE_REMOTE",
-            "PALLAS_LANE_PASSIVE_AI",
-            "PALLAS_LANE_PASSIVE_RENDER",
-            "PALLAS_LANE_PASSIVE_HTTP",
-            default=remote_default,
-        ),
+        DispatchLane.CHAT: config.lane_chat,
+        DispatchLane.STORAGE: config.lane_storage,
+        DispatchLane.REMOTE: config.lane_remote,
     }
 
 
 def clear_dispatch_lanes_cache() -> None:
-    global _LANES, _PLUGIN_LANE_CACHE
-    _LANES = None
+    """配置保存或插件元数据刷新：重置路由映射，并在原 controller 上同步上限。"""
+    global _PLUGIN_LANE_CACHE, _LAST_LIMIT_SNAPSHOT
     _PLUGIN_LANE_CACHE = None
+    _LAST_LIMIT_SNAPSHOT = None
     lane_for_matcher.cache_clear()
+    install_dispatch_lanes()
+
+
+def sync_dispatch_lane_limits() -> None:
+    """新快照出现时原地同步上限；保留 controller 身份/占用，不覆盖自适应扩容。"""
+    global _LAST_LIMIT_SNAPSHOT
+    if _LANES_RUNTIME_ENABLED is not True or not _LANES:
+        return
+    config = get_ingress_dispatch_runtime_config()
+    if config is _LAST_LIMIT_SNAPSHOT:
+        return
+    _LAST_LIMIT_SNAPSHOT = config
+    limits = default_lane_limits()
+    for lane, controller in _LANES.items():
+        controller.sync_configured_limit(limits.get(lane, controller.configured_limit))
 
 
 def plugin_lane_override(module_key: str) -> str | None:
@@ -217,26 +239,36 @@ def lane_for_matcher(matcher: type[Matcher]) -> str:
 
 
 def install_dispatch_lanes() -> None:
-    global _LANES
-    if _LANES is not None or not dispatch_lanes_enabled():
+    global _LANES, _LANES_RUNTIME_ENABLED
+    if _LANES_RUNTIME_ENABLED is None:
+        _LANES_RUNTIME_ENABLED = dispatch_lanes_enabled()
+        if not _LANES_RUNTIME_ENABLED:
+            _LANES = {}
+            logger.debug("Dispatch lanes disabled at startup; restart is required to enable them.")
+            return
+    if _LANES_RUNTIME_ENABLED is not True:
         return
-    limits = default_lane_limits()
-    _LANES = {lane: LaneController(lane, limit) for lane, limit in limits.items()}
-    logger.debug(
-        "Dispatch lanes initialized with command [{}], tool [{}], chat [{}], storage [{}], "
-        "remote [{}], and pool capacity [{}].",
-        limits[DispatchLane.COMMAND],
-        limits[DispatchLane.TOOL],
-        limits[DispatchLane.CHAT],
-        limits[DispatchLane.STORAGE],
-        limits[DispatchLane.REMOTE],
-        pg_pool_capacity(),
-    )
+    if not _LANES:
+        limits = default_lane_limits()
+        _LANES = {lane: LaneController(lane, limit) for lane, limit in limits.items()}
+        logger.debug(
+            "Dispatch lanes initialized with command [{}], tool [{}], chat [{}], storage [{}], "
+            "remote [{}], and pool capacity [{}].",
+            limits[DispatchLane.COMMAND],
+            limits[DispatchLane.TOOL],
+            limits[DispatchLane.CHAT],
+            limits[DispatchLane.STORAGE],
+            limits[DispatchLane.REMOTE],
+            pg_pool_capacity(),
+        )
+    sync_dispatch_lane_limits()
 
 
 def uninstall_dispatch_lanes() -> None:
-    global _LANES
+    global _LANES, _LANES_RUNTIME_ENABLED, _LAST_LIMIT_SNAPSHOT
     _LANES = None
+    _LANES_RUNTIME_ENABLED = None
+    _LAST_LIMIT_SNAPSHOT = None
 
 
 def lane_controller(lane: str) -> LaneController | None:
@@ -264,6 +296,9 @@ async def set_lane_limit(lane: str, limit: int) -> bool:
 
 async def acquire_lane(lane: str, *, wait_budget_sec: float | None = None) -> tuple[bool, float]:
     normalized = normalize_lane(lane) or lane
+    if not dispatch_lanes_runtime_enabled():
+        return True, 0.0
+    sync_dispatch_lane_limits()
     controller = lane_controller(normalized)
     if controller is None:
         return True, 0.0
@@ -318,7 +353,7 @@ async def check_and_run_matcher_with_lane(
 
     from pallas.core.platform.ingress.message_load import record_lane_wait
 
-    if not dispatch_lanes_enabled():
+    if not dispatch_lanes_runtime_enabled():
         await nb_message.check_and_run_matcher(matcher, bot, event, state, stack, dependency_cache)
         return MatcherLaneResult(acquired=True, lane_busy=False)
 

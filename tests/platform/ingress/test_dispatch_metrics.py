@@ -134,14 +134,16 @@ def test_merge_dispatch_metrics_aggregates_route_candidates() -> None:
 
 def test_merge_send_queue_snapshots_sums_fixed_failure_buckets() -> None:
     merged = dispatch_metrics.merge_send_queue_snapshots([
-        {"errors": 3, "errors_by_operation": {"message": 1, "interaction": 2, "other": 0}},
-        {"errors": 2, "errors_by_operation": {"message": 2, "interaction": 0, "other": 0}},
+        {"errors": 3, "errors_by_operation": {"message": 1, "interaction": 2, "other": 0}, "workers": 2},
+        {"errors": 2, "errors_by_operation": {"message": 2, "interaction": 0, "other": 0}, "workers_running": 1},
         {"errors": 1},
     ])
 
     assert merged["errors"] == 6
     assert merged["errors_by_operation"] == {"message": 3, "interaction": 2, "other": 1}
     assert sum(merged["errors_by_operation"].values()) == merged["errors"]
+    assert merged["workers"] == 2
+    assert merged["workers_running"] == 1
 
 
 def test_chatter_overload_degraded_counter() -> None:

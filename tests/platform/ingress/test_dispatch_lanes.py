@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from nonebot.internal.rule import Rule
 from nonebot.rule import command, to_me
 
-from pallas.core.foundation.db import pool_budget
-from pallas.core.platform.ingress import dispatch_lanes, message_load
+from pallas.core.platform.ingress import dispatch_lanes, dispatch_runtime_config, message_load
 from pallas.core.platform.ingress.dispatch_lanes import DispatchLane, LaneController
 
 
@@ -43,10 +43,12 @@ def reset_lanes(monkeypatch: pytest.MonkeyPatch) -> None:
         "pallas.core.platform.ingress.fleet_dispatch_scale.connected_bot_count",
         lambda: 1,
     )
+    dispatch_runtime_config.clear_ingress_dispatch_runtime_config_cache()
     dispatch_lanes.clear_dispatch_lanes_cache()
     dispatch_lanes.uninstall_dispatch_lanes()
     message_load.reset_message_load_for_tests()
     yield
+    dispatch_runtime_config.clear_ingress_dispatch_runtime_config_cache()
     dispatch_lanes.clear_dispatch_lanes_cache()
     dispatch_lanes.uninstall_dispatch_lanes()
     message_load.reset_message_load_for_tests()
@@ -91,38 +93,259 @@ def test_storage_limit_tightens_under_pool_pressure(monkeypatch: pytest.MonkeyPa
     assert controller.effective_limit() == 4
 
 
-def test_default_chat_limit_is_capped_by_pg_pool(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        "pallas.core.platform.ingress.fleet_dispatch_scale.connected_bot_count",
-        lambda: 7,
+def test_lane_limits_read_runtime_config_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = SimpleNamespace(
+        dispatch_lanes_enabled=False,
+        lane_acquire_timeout_sec=0.25,
+        lane_busy_reply=False,
+        lane_command=3,
+        lane_chat=5,
+        lane_storage=7,
+        lane_remote=9,
     )
-    env_values = {"PG_POOL_SIZE": "12", "PG_MAX_OVERFLOW": "8"}
-    with monkeypatch.context() as config_monkeypatch:
-        config_monkeypatch.setattr(dispatch_lanes, "repo_env_raw_value", env_values.get)
-        config_monkeypatch.setattr(pool_budget, "repo_env_raw_value", env_values.get)
-        pool_budget.clear_pool_budget_runtime_cache()
+    monkeypatch.setattr(dispatch_lanes, "get_ingress_dispatch_runtime_config", lambda: config)
 
-        try:
-            assert dispatch_lanes.default_lane_limits()[DispatchLane.CHAT] == 6
-        finally:
-            pool_budget.clear_pool_budget_runtime_cache()
+    assert dispatch_lanes.dispatch_lanes_enabled() is False
+    assert dispatch_lanes.lane_acquire_timeout_sec() == 0.25
+    assert dispatch_lanes.lane_busy_reply_enabled() is False
+    limits = dispatch_lanes.default_lane_limits()
+    assert limits[DispatchLane.COMMAND] == 3
+    assert limits[DispatchLane.CHAT] == 5
+    assert limits[DispatchLane.STORAGE] == 7
+    assert limits[DispatchLane.REMOTE] == 9
 
 
-def test_default_chat_limit_clears_pool_cache_when_assertion_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    clear_cache = MagicMock()
-    monkeypatch.setattr(pool_budget, "clear_pool_budget_runtime_cache", clear_cache)
+def test_install_dispatch_lanes_uses_snapshot_limits(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         dispatch_lanes,
         "default_lane_limits",
-        lambda: {DispatchLane.CHAT: 0},
+        lambda: {
+            DispatchLane.COMMAND: 12,
+            DispatchLane.TOOL: 4,
+            DispatchLane.CHAT: 9,
+            DispatchLane.STORAGE: 6,
+            DispatchLane.REMOTE: 3,
+        },
+    )
+    dispatch_lanes.install_dispatch_lanes()
+    controller = dispatch_lanes.lane_controller(DispatchLane.STORAGE)
+    assert controller is not None
+    assert controller.base_limit == 6
+    assert dispatch_lanes.lane_controller(DispatchLane.REMOTE).base_limit == 3
+
+
+@pytest.mark.asyncio
+async def test_config_refresh_keeps_lane_controller_identity_and_in_use(monkeypatch: pytest.MonkeyPatch) -> None:
+    limits = {
+        DispatchLane.COMMAND: 2,
+        DispatchLane.TOOL: 4,
+        DispatchLane.CHAT: 6,
+        DispatchLane.STORAGE: 8,
+        DispatchLane.REMOTE: 4,
+    }
+    monkeypatch.setattr(dispatch_lanes, "default_lane_limits", lambda: dict(limits))
+    dispatch_lanes.install_dispatch_lanes()
+    controller = dispatch_lanes.lane_controller(DispatchLane.COMMAND)
+    assert controller is not None
+    assert (await controller.acquire(0.01))[0] is True
+
+    limits[DispatchLane.COMMAND] = 1
+    dispatch_lanes.clear_dispatch_lanes_cache()
+
+    assert dispatch_lanes.lane_controller(DispatchLane.COMMAND) is controller
+    assert controller.in_use == 1
+    assert dispatch_lanes.lane_status()[DispatchLane.COMMAND] == {"limit": 1, "in_use": 1}
+    await controller.release()
+    assert controller.in_use == 0
+
+
+@pytest.mark.asyncio
+async def test_refresh_keeps_adaptive_chat_expansion(monkeypatch: pytest.MonkeyPatch) -> None:
+    limits = {
+        DispatchLane.COMMAND: 16,
+        DispatchLane.TOOL: 4,
+        DispatchLane.CHAT: 6,
+        DispatchLane.STORAGE: 8,
+        DispatchLane.REMOTE: 4,
+    }
+    monkeypatch.setattr(dispatch_lanes, "default_lane_limits", lambda: dict(limits))
+    dispatch_lanes.install_dispatch_lanes()
+    controller = dispatch_lanes.lane_controller(DispatchLane.CHAT)
+    assert controller is not None
+    assert await dispatch_lanes.set_lane_limit(DispatchLane.CHAT, 9) is True
+
+    dispatch_lanes.clear_dispatch_lanes_cache()
+
+    assert dispatch_lanes.lane_status()[DispatchLane.CHAT] == {"limit": 9, "in_use": 0}
+
+
+@pytest.mark.asyncio
+async def test_metadata_refresh_does_not_bypass_lane_admission(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        dispatch_lanes,
+        "default_lane_limits",
+        lambda: {
+            DispatchLane.COMMAND: 1,
+            DispatchLane.TOOL: 4,
+            DispatchLane.CHAT: 6,
+            DispatchLane.STORAGE: 8,
+            DispatchLane.REMOTE: 4,
+        },
+    )
+    dispatch_lanes.install_dispatch_lanes()
+    controller = dispatch_lanes.lane_controller(DispatchLane.COMMAND)
+    assert controller is not None
+    assert (await dispatch_lanes.acquire_lane(DispatchLane.COMMAND, wait_budget_sec=0.01))[0] is True
+
+    dispatch_lanes.clear_dispatch_lanes_cache()
+
+    acquired, _wait_ms = await dispatch_lanes.acquire_lane(DispatchLane.COMMAND, wait_budget_sec=0.01)
+    assert acquired is False
+    assert dispatch_lanes.lane_status()[DispatchLane.COMMAND] == {"limit": 1, "in_use": 1}
+    await dispatch_lanes.release_lane(DispatchLane.COMMAND)
+    assert controller.in_use == 0
+
+
+@pytest.mark.asyncio
+async def test_lowered_limit_blocks_new_acquisitions_until_released(monkeypatch: pytest.MonkeyPatch) -> None:
+    limits = {
+        DispatchLane.COMMAND: 2,
+        DispatchLane.TOOL: 4,
+        DispatchLane.CHAT: 6,
+        DispatchLane.STORAGE: 8,
+        DispatchLane.REMOTE: 4,
+    }
+    monkeypatch.setattr(dispatch_lanes, "default_lane_limits", lambda: dict(limits))
+    dispatch_lanes.install_dispatch_lanes()
+    controller = dispatch_lanes.lane_controller(DispatchLane.COMMAND)
+    assert controller is not None
+    assert (await controller.acquire(0.01))[0] is True
+    assert (await controller.acquire(0.01))[0] is True
+
+    limits[DispatchLane.COMMAND] = 1
+    dispatch_lanes.clear_dispatch_lanes_cache()
+
+    assert controller.in_use == 2
+    acquired, _wait_ms = await dispatch_lanes.acquire_lane(DispatchLane.COMMAND, wait_budget_sec=0.01)
+    assert acquired is False
+    await controller.release()
+    acquired, _wait_ms = await dispatch_lanes.acquire_lane(DispatchLane.COMMAND, wait_budget_sec=0.01)
+    assert acquired is False
+    await controller.release()
+    assert controller.in_use == 0
+    assert (await dispatch_lanes.acquire_lane(DispatchLane.COMMAND, wait_budget_sec=0.01))[0] is True
+    await dispatch_lanes.release_lane(DispatchLane.COMMAND)
+
+
+@pytest.mark.asyncio
+async def test_startup_disabled_lanes_require_restart_to_enable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(dispatch_lanes, "dispatch_lanes_enabled", lambda: False)
+    dispatch_lanes.install_dispatch_lanes()
+
+    assert dispatch_lanes.lane_controller(DispatchLane.COMMAND) is None
+    acquired, wait_ms = await dispatch_lanes.acquire_lane(DispatchLane.COMMAND, wait_budget_sec=0.0)
+    assert (acquired, wait_ms) == (True, 0.0)
+
+    monkeypatch.setattr(dispatch_lanes, "dispatch_lanes_enabled", lambda: True)
+    dispatch_lanes.clear_dispatch_lanes_cache()
+
+    assert dispatch_lanes.lane_controller(DispatchLane.COMMAND) is None
+    assert dispatch_lanes.dispatch_lanes_runtime_enabled() is False
+
+    dispatch_lanes.uninstall_dispatch_lanes()
+    dispatch_lanes.install_dispatch_lanes()
+
+    assert dispatch_lanes.lane_controller(DispatchLane.COMMAND) is not None
+    assert dispatch_lanes.dispatch_lanes_runtime_enabled() is True
+
+
+@pytest.mark.asyncio
+async def test_wrapper_and_acquire_use_stable_runtime_enabled_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    dispatch_lanes.install_dispatch_lanes()
+    controller = dispatch_lanes.lane_controller(DispatchLane.COMMAND)
+    assert controller is not None
+    assert (await controller.acquire(0.01))[0] is True
+
+    values = iter([True, False])
+    monkeypatch.setattr(dispatch_lanes, "dispatch_lanes_enabled", lambda: next(values, False))
+    run_mock = AsyncMock()
+    monkeypatch.setattr("nonebot.message.check_and_run_matcher", run_mock)
+
+    result = await dispatch_lanes.check_and_run_matcher_with_lane(
+        _CommandMatcher,
+        AsyncMock(),
+        MagicMock(),
+        {},
+        MagicMock(),
+        {},
+        command_traffic=True,
     )
 
-    with pytest.raises(AssertionError):
-        test_default_chat_limit_is_capped_by_pg_pool(monkeypatch)
+    assert result.acquired is True
+    run_mock.assert_awaited_once()
+    assert controller.in_use == 1
+    await controller.release()
+    assert controller.in_use == 0
 
-    assert clear_cache.call_count == 2
+
+@pytest.mark.asyncio
+async def test_new_config_revision_syncs_existing_controller_limits(monkeypatch: pytest.MonkeyPatch) -> None:
+    limits = {
+        DispatchLane.COMMAND: 4,
+        DispatchLane.TOOL: 4,
+        DispatchLane.CHAT: 6,
+        DispatchLane.STORAGE: 8,
+        DispatchLane.REMOTE: 4,
+    }
+    snapshot = SimpleNamespace()
+    monkeypatch.setattr(dispatch_lanes, "get_ingress_dispatch_runtime_config", lambda: snapshot)
+    monkeypatch.setattr(dispatch_lanes, "default_lane_limits", lambda: dict(limits))
+    monkeypatch.setattr(dispatch_lanes, "dispatch_lanes_enabled", lambda: True)
+    dispatch_lanes.install_dispatch_lanes()
+    controller = dispatch_lanes.lane_controller(DispatchLane.COMMAND)
+    assert controller is not None
+    assert (await controller.acquire(0.01))[0] is True
+    assert (await controller.acquire(0.01))[0] is True
+
+    limits[DispatchLane.COMMAND] = 1
+    monkeypatch.setattr(dispatch_lanes, "get_ingress_dispatch_runtime_config", lambda: SimpleNamespace())
+
+    acquired, _wait_ms = await dispatch_lanes.acquire_lane(DispatchLane.COMMAND, wait_budget_sec=0.01)
+
+    assert acquired is False
+    assert dispatch_lanes.lane_controller(DispatchLane.COMMAND) is controller
+    assert controller.in_use == 2
+    assert dispatch_lanes.lane_status()[DispatchLane.COMMAND] == {"limit": 1, "in_use": 2}
+    await controller.release()
+    await controller.release()
+    assert controller.in_use == 0
+    assert (await dispatch_lanes.acquire_lane(DispatchLane.COMMAND, wait_budget_sec=0.01))[0] is True
+    await dispatch_lanes.release_lane(DispatchLane.COMMAND)
+
+
+@pytest.mark.asyncio
+async def test_raising_limit_wakes_waiting_acquire_after_config_refresh(monkeypatch: pytest.MonkeyPatch) -> None:
+    limits = {
+        DispatchLane.COMMAND: 1,
+        DispatchLane.TOOL: 4,
+        DispatchLane.CHAT: 6,
+        DispatchLane.STORAGE: 8,
+        DispatchLane.REMOTE: 4,
+    }
+    monkeypatch.setattr(dispatch_lanes, "default_lane_limits", lambda: dict(limits))
+    dispatch_lanes.install_dispatch_lanes()
+    controller = dispatch_lanes.lane_controller(DispatchLane.COMMAND)
+    assert controller is not None
+    assert (await controller.acquire(0.01))[0] is True
+
+    waiting = asyncio.create_task(controller.acquire(0.5))
+    await asyncio.sleep(0)
+    limits[DispatchLane.COMMAND] = 2
+    dispatch_lanes.clear_dispatch_lanes_cache()
+
+    assert (await asyncio.wait_for(waiting, timeout=0.3))[0] is True
+    await controller.release()
+    await controller.release()
 
 
 @pytest.mark.asyncio
@@ -242,16 +465,6 @@ async def test_synthetic_llm_command_uses_dedicated_tool_lane(monkeypatch: pytes
     run_mock.assert_awaited_once()
     for _ in range(command_lane.base_limit):
         await command_lane.release()
-
-
-def test_install_dispatch_lanes_reads_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(dispatch_lanes, "repo_env_raw_value", lambda _key: None)
-    monkeypatch.setattr(dispatch_lanes, "pg_pool_capacity", lambda: 30)
-    dispatch_lanes.install_dispatch_lanes()
-    controller = dispatch_lanes.lane_controller(DispatchLane.STORAGE)
-    assert controller is not None
-    assert controller.base_limit == 8
-    assert dispatch_lanes.lane_controller(DispatchLane.REMOTE).base_limit == 4
 
 
 @pytest.mark.asyncio

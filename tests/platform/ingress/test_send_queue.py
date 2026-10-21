@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import time
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -466,6 +468,163 @@ async def test_patched_call_api_bypasses_for_non_send_api(monkeypatch: pytest.Mo
 
     assert result == {"groups": []}
     original.assert_awaited_once()
+
+
+def test_send_queue_readers_use_runtime_config_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = SimpleNamespace(
+        send_queue_enabled=False,
+        send_queue_workers=3,
+        send_queue_max_depth=40,
+        send_queue_min_interval_ms=120,
+        send_queue_enqueue_timeout_sec=1.5,
+    )
+    monkeypatch.setattr(send_queue, "get_ingress_dispatch_runtime_config", lambda: config)
+
+    assert send_queue.send_queue_enabled() is False
+    assert send_queue.send_queue_worker_count() == 3
+    assert send_queue.send_queue_max_depth() == 40
+    assert send_queue.send_queue_min_interval_sec() == pytest.approx(0.12)
+    assert send_queue.send_queue_enqueue_timeout_sec() == pytest.approx(1.5)
+
+
+@pytest.mark.asyncio
+async def test_same_account_adapter_calls_respect_min_interval_across_workers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    starts: list[float] = []
+
+    async def original(_adapter, _bot, _api, **_data):
+        starts.append(time.monotonic())
+        return "ok"
+
+    monkeypatch.setattr(send_queue, "_ORIGINAL_CALL_API", original)
+    monkeypatch.setattr(send_queue, "send_queue_worker_count", lambda: 3)
+    monkeypatch.setattr(send_queue, "send_queue_min_interval_sec", lambda: 0.08)
+    await send_queue.start_send_queue_workers()
+    try:
+        results = await asyncio.gather(*[
+            send_queue.enqueue_call_api(MagicMock(), MagicMock(self_id="42"), "send_group_msg", index=index)
+            for index in range(3)
+        ])
+        assert results == ["ok", "ok", "ok"]
+    finally:
+        await send_queue.stop_send_queue_workers()
+
+    assert len(starts) == 3
+    gaps = [later - earlier for earlier, later in zip(starts, starts[1:], strict=False)]
+    assert all(gap >= 0.06 for gap in gaps), gaps
+
+
+@pytest.mark.asyncio
+async def test_different_accounts_send_in_parallel(monkeypatch: pytest.MonkeyPatch) -> None:
+    first_started = asyncio.Event()
+    release_first = asyncio.Event()
+    second_started = asyncio.Event()
+
+    async def original(_adapter, bot, _api, **_data):
+        if str(bot.self_id) == "10001":
+            first_started.set()
+            await release_first.wait()
+        else:
+            second_started.set()
+        return str(bot.self_id)
+
+    monkeypatch.setattr(send_queue, "_ORIGINAL_CALL_API", original)
+    monkeypatch.setattr(send_queue, "send_queue_worker_count", lambda: 2)
+    monkeypatch.setattr(send_queue, "send_queue_min_interval_sec", lambda: 0.3)
+    await send_queue.start_send_queue_workers()
+    first = asyncio.create_task(send_queue.enqueue_call_api(MagicMock(), MagicMock(self_id="10001"), "send_group_msg"))
+    second = None
+    try:
+        await asyncio.wait_for(first_started.wait(), timeout=0.3)
+        second = asyncio.create_task(
+            send_queue.enqueue_call_api(MagicMock(), MagicMock(self_id="10002"), "send_group_msg")
+        )
+        await asyncio.wait_for(second_started.wait(), timeout=0.2)
+        release_first.set()
+        assert await first == "10001"
+        assert await second == "10002"
+    finally:
+        release_first.set()
+        await send_queue.stop_send_queue_workers()
+        await asyncio.gather(first, *([second] if second is not None else []), return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_stop_during_rate_limit_wait_allows_clean_restart(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    async def original(_adapter, _bot, _api, **_data):
+        calls.append("ok")
+        return "ok"
+
+    monkeypatch.setattr(send_queue, "_ORIGINAL_CALL_API", original)
+    monkeypatch.setattr(send_queue, "send_queue_worker_count", lambda: 1)
+    monkeypatch.setattr(send_queue, "send_queue_min_interval_sec", lambda: 0.5)
+    await send_queue.start_send_queue_workers()
+    assert await send_queue.enqueue_call_api(MagicMock(), MagicMock(self_id="77"), "send_group_msg") == "ok"
+    caller = asyncio.create_task(send_queue.enqueue_call_api(MagicMock(), MagicMock(self_id="77"), "send_group_msg"))
+    try:
+        for _ in range(100):
+            if send_queue._STATS["depth"] == 1:
+                break
+            await asyncio.sleep(0)
+        await asyncio.sleep(0.1)
+        assert len(calls) == 1
+
+        await send_queue.stop_send_queue_workers()
+        with pytest.raises(RuntimeError, match="stopped"):
+            await caller
+
+        await send_queue.start_send_queue_workers()
+        assert (
+            await asyncio.wait_for(
+                send_queue.enqueue_call_api(MagicMock(), MagicMock(self_id="77"), "send_group_msg"),
+                timeout=2.0,
+            )
+            == "ok"
+        )
+    finally:
+        await send_queue.stop_send_queue_workers()
+        if not caller.done():
+            caller.cancel()
+        await asyncio.gather(caller, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_status_reports_configured_and_running_workers(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(send_queue, "send_queue_worker_count", lambda: 2)
+    await send_queue.start_send_queue_workers()
+    try:
+        monkeypatch.setattr(send_queue, "send_queue_worker_count", lambda: 4)
+        status = send_queue.send_queue_status()
+        assert status["workers"] == 4
+        assert status["workers_running"] == 2
+    finally:
+        await send_queue.stop_send_queue_workers()
+
+    assert send_queue.send_queue_status()["workers_running"] == 0
+
+
+def test_account_locks_are_reusable_across_event_loops(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def original(_adapter, _bot, _api, **_data):
+        return "ok"
+
+    monkeypatch.setattr(send_queue, "_ORIGINAL_CALL_API", original)
+    monkeypatch.setattr(send_queue, "send_queue_worker_count", lambda: 3)
+    monkeypatch.setattr(send_queue, "send_queue_min_interval_sec", lambda: 0.01)
+
+    async def lifecycle() -> list[str]:
+        await send_queue.start_send_queue_workers()
+        try:
+            return await asyncio.gather(*[
+                send_queue.enqueue_call_api(MagicMock(), MagicMock(self_id="99"), "send_group_msg") for _ in range(3)
+            ])
+        finally:
+            await send_queue.stop_send_queue_workers()
+
+    assert asyncio.run(lifecycle()) == ["ok", "ok", "ok"]
+    assert asyncio.run(lifecycle()) == ["ok", "ok", "ok"]
 
 
 def test_install_and_uninstall_patch(monkeypatch: pytest.MonkeyPatch) -> None:

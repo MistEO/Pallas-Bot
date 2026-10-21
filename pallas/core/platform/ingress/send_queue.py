@@ -12,6 +12,7 @@ from nonebot.log import logger
 from pallas.core.foundation.config.repo_settings import repo_env_raw_value
 from pallas.core.foundation.logging.bridge import format_business_event
 from pallas.core.foundation.logging.throttle import log_rate_limited
+from pallas.core.platform.ingress.dispatch_runtime_config import get_ingress_dispatch_runtime_config
 
 _ORIGINAL_CALL_API = None
 _PATCHED = False
@@ -47,6 +48,7 @@ _ERRORS_BY_REASON: dict[str, int] = {}
 _LAST_ERROR: dict[str, Any] | None = None
 _LAST_ERROR_AT = 0.0
 _LAST_SEND_AT: dict[str, float] = {}
+_SEND_LOCKS: dict[str, asyncio.Lock] = {}
 _RISK_STREAK: dict[str, int] = {}
 _RISK_COOLDOWN_UNTIL: dict[str, float] = {}
 _RETRY_COUNTS: dict[str, int] = {}
@@ -79,53 +81,23 @@ class SendQueueItem:
 
 
 def send_queue_enabled() -> bool:
-    raw = repo_env_raw_value("PALLAS_SEND_QUEUE_ENABLED")
-    if raw is None:
-        return True
-    text = str(raw).strip().lower()
-    if text in ("0", "false", "no", "off"):
-        return False
-    return True
+    return get_ingress_dispatch_runtime_config().send_queue_enabled
 
 
 def send_queue_worker_count() -> int:
-    raw = repo_env_raw_value("PALLAS_SEND_QUEUE_WORKERS")
-    if raw is None:
-        return 2
-    try:
-        return max(1, min(16, int(str(raw).strip())))
-    except ValueError:
-        return 2
+    return get_ingress_dispatch_runtime_config().send_queue_workers
 
 
 def send_queue_max_depth() -> int:
-    raw = repo_env_raw_value("PALLAS_SEND_QUEUE_MAX_DEPTH")
-    if raw is None:
-        return 256
-    try:
-        return max(16, int(str(raw).strip()))
-    except ValueError:
-        return 256
+    return get_ingress_dispatch_runtime_config().send_queue_max_depth
 
 
 def send_queue_min_interval_sec() -> float:
-    raw = repo_env_raw_value("PALLAS_SEND_QUEUE_MIN_INTERVAL_MS")
-    if raw is None:
-        return 0.05
-    try:
-        return max(0.0, float(str(raw).strip()) / 1000.0)
-    except ValueError:
-        return 0.05
+    return get_ingress_dispatch_runtime_config().send_queue_min_interval_ms / 1000.0
 
 
 def send_queue_enqueue_timeout_sec() -> float:
-    raw = repo_env_raw_value("PALLAS_SEND_QUEUE_ENQUEUE_TIMEOUT_SEC")
-    if raw is None:
-        return 2.0
-    try:
-        return max(0.1, float(str(raw).strip()))
-    except ValueError:
-        return 2.0
+    return get_ingress_dispatch_runtime_config().send_queue_enqueue_timeout_sec
 
 
 def send_queue_retry_max() -> int:
@@ -195,7 +167,9 @@ def send_queue_status() -> dict[str, Any]:
         "installed": _PATCHED,
         "depth": depth,
         "max_depth": send_queue_max_depth(),
+        # 目标值来自当前配置；worker 任务只在启动时创建，改配置需重启才扩缩
         "workers": send_queue_worker_count(),
+        "workers_running": sum(1 for task in _WORKERS if not task.done()),
         "min_interval_ms": send_queue_min_interval_sec() * 1000.0,
         "retry_max": send_queue_retry_max(),
         "retry_backoff_base_sec": send_queue_retry_backoff_base_sec(),
@@ -228,6 +202,7 @@ def reset_send_queue_for_tests() -> None:
     _LAST_ERROR = None
     _LAST_ERROR_AT = 0.0
     _LAST_SEND_AT.clear()
+    _SEND_LOCKS.clear()
     _RISK_STREAK.clear()
     _RISK_COOLDOWN_UNTIL.clear()
     _RETRY_COUNTS.clear()
@@ -406,16 +381,23 @@ def note_send_risk_failure(bot_self_id: str) -> None:
         _RISK_STREAK[bot_self_id] = streak
 
 
+def send_account_lock(bot_self_id: str) -> asyncio.Lock:
+    lock = _SEND_LOCKS.get(bot_self_id)
+    if lock is None:
+        lock = _SEND_LOCKS[bot_self_id] = asyncio.Lock()
+    return lock
+
+
 async def _rate_limit_wait(bot_self_id: str) -> None:
     interval = send_queue_min_interval_sec()
     if interval <= 0:
         return
-    now = time.monotonic()
-    last = _LAST_SEND_AT.get(bot_self_id, 0.0)
-    delay = interval - (now - last)
-    if delay > 0:
-        await asyncio.sleep(delay)
-    _LAST_SEND_AT[bot_self_id] = time.monotonic()
+    # 每账号串行化等待与时间戳更新，跨账号仍并行；网络调用不持锁
+    async with send_account_lock(bot_self_id):
+        delay = interval - (time.monotonic() - _LAST_SEND_AT.get(bot_self_id, 0.0))
+        if delay > 0:
+            await asyncio.sleep(delay)
+        _LAST_SEND_AT[bot_self_id] = time.monotonic()
 
 
 def _finish_queue_item(item: SendQueueItem, *, result: Any = None, error: BaseException | None = None) -> None:
@@ -680,6 +662,8 @@ async def _finish_send_queue_stop(
                 else:
                     queue.task_done()
             await queue.join()
+        # 旧 workers/retries 已全部退出：账号节流锁绑定旧事件循环，重启前必须释放
+        _SEND_LOCKS.clear()
     finally:
         _STOPPING = False
         complete.set()

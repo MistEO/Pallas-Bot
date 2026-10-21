@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from pallas.core.foundation.db import pool_budget
@@ -67,3 +69,60 @@ def test_dispatch_env_float_applies_minimum(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(config, "dispatch_env_raw", lambda key: {"PALLAS_X": "0.25"}.get(key))
 
     assert config.dispatch_env_float("PALLAS_X", default=1.0, minimum=0.5) == 0.5
+
+
+def test_lane_defaults_follow_fleet_scale_and_pool_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    env_values = {"PG_POOL_SIZE": "12", "PG_MAX_OVERFLOW": "8"}
+    monkeypatch.setattr(config, "dispatch_env_raw", env_values.get)
+    monkeypatch.setattr(pool_budget, "repo_env_raw_value", env_values.get)
+    monkeypatch.setattr(
+        "pallas.core.platform.ingress.fleet_dispatch_scale.connected_bot_count",
+        lambda: 7,
+    )
+    pool_budget.clear_pool_budget_runtime_cache()
+
+    cfg = config.IngressDispatchRuntimeConfig.from_env()
+
+    assert cfg.lane_command == 16
+    assert cfg.lane_chat == 6
+    assert cfg.lane_storage == 8
+    assert cfg.lane_remote == 7
+
+
+def test_lane_limits_keep_legacy_alias_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        config,
+        "dispatch_env_raw",
+        lambda key: {
+            "PALLAS_LANE_COMMAND_EXACT": "11",
+            "PALLAS_LANE_PASSIVE_AI": "9",
+        }.get(key),
+    )
+
+    cfg = config.IngressDispatchRuntimeConfig.from_env()
+
+    assert cfg.lane_command == 11
+    assert cfg.lane_remote == 9
+
+
+def test_send_queue_max_depth_floor_is_32(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, "dispatch_env_raw", lambda key: {"PALLAS_SEND_QUEUE_MAX_DEPTH": "16"}.get(key))
+
+    assert config.IngressDispatchRuntimeConfig.from_env().send_queue_max_depth == 32
+
+
+def test_runtime_config_snapshot_rebuilds_when_disk_revision_changes(monkeypatch: pytest.MonkeyPatch) -> None:
+    state: dict[str, Any] = {"rev": ((1, 1),), "env": {}}
+    monkeypatch.setattr(config, "repo_settings_disk_revision", lambda: state["rev"])
+    monkeypatch.setattr(config, "dispatch_env_raw", lambda key: state["env"].get(key))
+
+    first = config.get_ingress_dispatch_runtime_config()
+    assert config.get_ingress_dispatch_runtime_config() is first
+
+    state["env"]["PALLAS_SEND_QUEUE_MAX_DEPTH"] = "1024"
+    assert config.get_ingress_dispatch_runtime_config() is first
+
+    state["rev"] = ((2, 2),)
+    rebuilt = config.get_ingress_dispatch_runtime_config()
+    assert rebuilt is not first
+    assert rebuilt.send_queue_max_depth == 1024

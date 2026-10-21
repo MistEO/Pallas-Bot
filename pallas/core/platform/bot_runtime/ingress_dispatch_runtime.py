@@ -43,7 +43,6 @@ from pallas.core.platform.message_runtime.lifecycle import (
 
 _HOOK_REGISTERED = False
 _ADAPTIVE_CAPACITY_TASK: asyncio.Task[None] | None = None
-_ADAPTIVE_CHAT_LANE_BASELINE: int | None = None
 
 
 async def adaptive_capacity_loop() -> None:
@@ -69,10 +68,9 @@ async def adaptive_capacity_loop() -> None:
             chat_lane = lanes.get(str(DispatchLane.CHAT))
             if chat_lane is not None:
                 chat_current = int(chat_lane.get("limit") or 1)
-                chat_baseline = _ADAPTIVE_CHAT_LANE_BASELINE or chat_current
                 chat_target = adaptive_chat_lane_target(
                     current=chat_current,
-                    baseline=chat_baseline,
+                    baseline=config.lane_chat,
                     maximum=config.lane_chat_adaptive_max,
                     scheduler=scheduler,
                     chat_lane=chat_lane,
@@ -85,18 +83,15 @@ async def adaptive_capacity_loop() -> None:
 
 
 def start_adaptive_capacity_loop() -> None:
-    global _ADAPTIVE_CAPACITY_TASK, _ADAPTIVE_CHAT_LANE_BASELINE
+    global _ADAPTIVE_CAPACITY_TASK
     if _ADAPTIVE_CAPACITY_TASK is None:
-        chat_lane = lane_status().get(str(DispatchLane.CHAT))
-        _ADAPTIVE_CHAT_LANE_BASELINE = int(chat_lane.get("limit") or 1) if chat_lane is not None else None
         _ADAPTIVE_CAPACITY_TASK = asyncio.create_task(adaptive_capacity_loop(), name="ingress_adaptive_capacity")
 
 
 async def stop_adaptive_capacity_loop() -> None:
-    global _ADAPTIVE_CAPACITY_TASK, _ADAPTIVE_CHAT_LANE_BASELINE
+    global _ADAPTIVE_CAPACITY_TASK
     task = _ADAPTIVE_CAPACITY_TASK
     _ADAPTIVE_CAPACITY_TASK = None
-    _ADAPTIVE_CHAT_LANE_BASELINE = None
     if task is None:
         return
     task.cancel()

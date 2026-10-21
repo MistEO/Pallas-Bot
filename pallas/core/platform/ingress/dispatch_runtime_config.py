@@ -6,11 +6,17 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field
 
 from pallas.console.webui.field_help import field_help
-from pallas.core.foundation.config.repo_settings import repo_env_raw_value, repo_layered_dotenv_files_exist
+from pallas.core.foundation.config.repo_settings import (
+    repo_env_raw_value,
+    repo_layered_dotenv_files_exist,
+    repo_settings_disk_revision,
+)
 from pallas.core.foundation.db.pool_budget import cap_by_pg_pool
+from pallas.core.platform.ingress.fleet_dispatch_scale import scaled_dispatch_int
 
 _config_lock = Lock()
 _cached: IngressDispatchRuntimeConfig | None = None
+_cached_rev: tuple[tuple[int, int], ...] | None = None
 
 
 def dispatch_env_raw(name_upper: str) -> str | None:
@@ -54,6 +60,19 @@ def dispatch_env_int(name_upper: str, *, default: int, minimum: int, maximum: in
         return max(minimum, min(maximum, int(raw)))
     except ValueError:
         return default
+
+
+def dispatch_env_int_any(names: tuple[str, ...], *, default: int, minimum: int, maximum: int) -> int:
+    """按顺序读取首个有效键，兼容档位的旧环境变量名。"""
+    for name in names:
+        raw = dispatch_env_raw(name)
+        if raw is None:
+            continue
+        try:
+            return max(minimum, min(maximum, int(raw)))
+        except ValueError:
+            continue
+    return default
 
 
 def dispatch_env_float(name_upper: str, *, default: float, minimum: float) -> float:
@@ -116,7 +135,7 @@ class IngressDispatchRuntimeConfig(BaseModel):
         description=field_help(
             "按命令、闲聊、数据库、外呼等档位限制同时运行的插件数量",
             "选开或关；一般保持开启",
-            "关闭后重命令可能占满数据库连接或拖慢整群回复",
+            "作为启动开关，变更后需重启 Bot；运行中保存不会切换已安装的档位",
         ),
     )
     conversation_scheduler_enabled: bool = Field(
@@ -281,7 +300,7 @@ class IngressDispatchRuntimeConfig(BaseModel):
         le=256,
         description=field_help(
             "同时执行多少条闲聊、接话类被动插件",
-            "填正整数，默认 32",
+            "填正整数，默认 32；连接池较小时按容量收紧",
             "保存后立即调整档位上限",
         ),
     )
@@ -369,6 +388,9 @@ class IngressDispatchRuntimeConfig(BaseModel):
         pool_size = dispatch_env_int("PG_POOL_SIZE", default=10, minimum=1, maximum=128)
         storage_default = min(8, pool_size)
         conversation_default = cap_by_pg_pool(8, workload_fraction=0.40)
+        command_default = scaled_dispatch_int(16, per_bot=2, cap=64)
+        chat_default = cap_by_pg_pool(scaled_dispatch_int(32, per_bot=1, cap=48), workload_fraction=0.30)
+        remote_default = scaled_dispatch_int(4, per_bot=1, cap=16)
         return cls(
             matcher_dispatch_enabled=dispatch_env_bool("PALLAS_MATCHER_DISPATCH_ENABLED", default=True),
             matcher_dispatch_overload_threshold=dispatch_env_int(
@@ -447,16 +469,41 @@ class IngressDispatchRuntimeConfig(BaseModel):
                 maximum=5000,
             ),
             lane_busy_reply=dispatch_env_bool("PALLAS_LANE_BUSY_REPLY", default=True),
-            lane_command=dispatch_env_int("PALLAS_LANE_COMMAND", default=16, minimum=1, maximum=128),
-            lane_chat=dispatch_env_int("PALLAS_LANE_CHAT", default=32, minimum=1, maximum=256),
+            lane_command=dispatch_env_int_any(
+                ("PALLAS_LANE_COMMAND", "PALLAS_LANE_COMMAND_EXACT"),
+                default=command_default,
+                minimum=1,
+                maximum=128,
+            ),
+            lane_chat=dispatch_env_int_any(
+                ("PALLAS_LANE_CHAT", "PALLAS_LANE_PASSIVE_LIGHT"),
+                default=chat_default,
+                minimum=1,
+                maximum=256,
+            ),
             lane_chat_adaptive_max=dispatch_env_int(
                 "PALLAS_LANE_CHAT_ADAPTIVE_MAX",
                 default=12,
                 minimum=1,
                 maximum=256,
             ),
-            lane_storage=dispatch_env_int("PALLAS_LANE_STORAGE", default=storage_default, minimum=1, maximum=64),
-            lane_remote=dispatch_env_int("PALLAS_LANE_REMOTE", default=4, minimum=1, maximum=64),
+            lane_storage=dispatch_env_int_any(
+                ("PALLAS_LANE_STORAGE", "PALLAS_LANE_PASSIVE_DB"),
+                default=storage_default,
+                minimum=1,
+                maximum=64,
+            ),
+            lane_remote=dispatch_env_int_any(
+                (
+                    "PALLAS_LANE_REMOTE",
+                    "PALLAS_LANE_PASSIVE_AI",
+                    "PALLAS_LANE_PASSIVE_RENDER",
+                    "PALLAS_LANE_PASSIVE_HTTP",
+                ),
+                default=remote_default,
+                minimum=1,
+                maximum=64,
+            ),
             send_queue_enabled=dispatch_env_bool("PALLAS_SEND_QUEUE_ENABLED", default=True),
             send_queue_workers=dispatch_env_int("PALLAS_SEND_QUEUE_WORKERS", default=2, minimum=1, maximum=16),
             send_queue_max_depth=dispatch_env_int("PALLAS_SEND_QUEUE_MAX_DEPTH", default=256, minimum=32, maximum=4096),
@@ -475,14 +522,17 @@ class IngressDispatchRuntimeConfig(BaseModel):
 
 
 def clear_ingress_dispatch_runtime_config_cache() -> None:
-    global _cached
+    global _cached, _cached_rev
     with _config_lock:
         _cached = None
+        _cached_rev = None
 
 
 def get_ingress_dispatch_runtime_config() -> IngressDispatchRuntimeConfig:
-    global _cached
+    global _cached, _cached_rev
+    rev = repo_settings_disk_revision()
     with _config_lock:
-        if _cached is None:
+        if _cached is None or _cached_rev != rev:
             _cached = IngressDispatchRuntimeConfig.from_env()
+            _cached_rev = rev
         return _cached
