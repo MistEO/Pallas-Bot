@@ -1,3 +1,5 @@
+import json
+import os
 from pathlib import Path
 
 import pytest
@@ -282,3 +284,137 @@ def test_log_level_patch_roundtrip(tmp_path, monkeypatch):
     data = json.loads(webui_file.read_text(encoding="utf-8"))
     assert data["env"]["LOG_LEVEL"] == "DEBUG"
     clear_webui_env_sections_cache()
+
+
+# control_plane / corpus_federation / service_gateways 走专用 payload/patch，message_scrub 视运行开关注册，
+# 均不套用通用段覆盖约束。
+_GENERIC_SECTION_BUILDERS = (
+    ("llm", "_llm_section"),
+    ("arknights_kb", "_arknights_kb_section"),
+    ("ingress_dispatch", "_ingress_dispatch_section"),
+    ("ingress_fanout", "_ingress_fanout_section"),
+    ("mail", "_mail_section"),
+    ("command_start", "_command_start_section"),
+    ("log_level", "_log_level_section"),
+)
+
+
+_GENERIC_SECTION_IDS = [sid for sid, _attr in _GENERIC_SECTION_BUILDERS]
+
+
+def _generic_section(attr: str):
+    from pallas.console.webui import env_sections
+
+    return getattr(env_sections, attr)()
+
+
+@pytest.mark.parametrize(
+    ("section_id", "attr"),
+    _GENERIC_SECTION_BUILDERS,
+    ids=_GENERIC_SECTION_IDS,
+)
+def test_section_field_mapping_covers_model(section_id: str, attr: str) -> None:
+    """通用段字段必须显式二选一：映射到 env，或列入 skip_fields。"""
+    section = _generic_section(attr)
+    model_fields = set(section.model_cls.model_fields)
+    mapped = set(section.field_to_env)
+    skipped = set(section.skip_fields)
+    assert section.id == section_id
+    assert mapped <= model_fields, f"{section_id} 映射了模型不存在的字段: {sorted(mapped - model_fields)}"
+    assert skipped <= model_fields, f"{section_id} 跳过了模型不存在的字段: {sorted(skipped - model_fields)}"
+    uncovered = sorted(model_fields - mapped - skipped)
+    assert not uncovered, f"{section_id} 字段既未映射也未声明跳过: {uncovered}"
+
+
+@pytest.mark.parametrize(
+    ("section_id", "attr"),
+    _GENERIC_SECTION_BUILDERS,
+    ids=_GENERIC_SECTION_IDS,
+)
+def test_exposed_section_fields_have_chinese_label_and_help(section_id: str, attr: str) -> None:
+    from pallas.console.webui.field_labels import webui_field_label
+
+    section = _generic_section(attr)
+    missing: list[str] = []
+    for key in sorted(set(section.field_to_env) - set(section.skip_fields)):
+        field = section.model_cls.model_fields[key]
+        if not webui_field_label(key) or not str(field.description or "").strip():
+            missing.append(key)
+    assert not missing, f"{section_id} 缺中文名或说明: {missing}"
+
+
+def test_llm_section_maps_memory_graph_and_affinity_fields() -> None:
+    from pallas.console.webui.env_sections import _llm_section
+
+    section = _llm_section()
+    expected = {
+        "llm_memory_graph_extract_enabled": "LLM_MEMORY_GRAPH_EXTRACT_ENABLED",
+        "llm_memory_graph_extract_on_write": "LLM_MEMORY_GRAPH_EXTRACT_ON_WRITE",
+        "llm_memory_graph_extract_daily_budget": "LLM_MEMORY_GRAPH_EXTRACT_DAILY_BUDGET",
+        "llm_memory_hiergraph_max_layers": "LLM_MEMORY_HIERGRAPH_MAX_LAYERS",
+        "llm_relationship_affinity_enabled": "LLM_RELATIONSHIP_AFFINITY_ENABLED",
+        "llm_relationship_affinity_silence_max_penalty": "LLM_RELATIONSHIP_AFFINITY_SILENCE_MAX_PENALTY",
+    }
+    for key, env_key in expected.items():
+        assert section.field_to_env.get(key) == env_key
+
+
+def test_llm_section_does_not_map_fields_outside_webui_model() -> None:
+    from pallas.console.webui.env_sections import _llm_section
+
+    section = _llm_section()
+    for stale in (
+        "llm_base_url",
+        "llm_api_key",
+        "llm_model",
+        "llm_knowledge_file_ingest_enabled",
+        "llm_memory_auto_person_facts_enabled",
+    ):
+        assert stale not in section.field_to_env
+        assert stale not in section.skip_fields
+
+
+@pytest.fixture
+def isolated_webui_settings(tmp_path, monkeypatch):
+    """把配置读写与导出都截到 tmp，且清掉进程内可能存在的密钥类环境变量。"""
+    from pallas.core.foundation.config import repo_settings as rs
+    from pallas.core.foundation.config import webui_export_toml
+    from pallas.product.llm.config import clear_llm_config_cache
+
+    baseline = dict(os.environ)
+    webui_file = tmp_path / "webui.json"
+    monkeypatch.setattr(rs, "repo_webui_settings_path", lambda: webui_file)
+    monkeypatch.setattr(rs, "repo_config_path", lambda: tmp_path / "pallas.toml")
+    monkeypatch.setattr(rs, "repo_env_path", lambda: tmp_path / ".env")
+    monkeypatch.setattr(rs, "_load_legacy_dotenv_upper", dict)
+    monkeypatch.setattr(webui_export_toml, "repo_webui_export_toml_path", lambda: tmp_path / "export.toml")
+    for key in list(os.environ):
+        if key.upper().startswith(("LLM_", "TAVILY_", "WEB_SEARCH_")):
+            monkeypatch.delenv(key, raising=False)
+    rs.clear_merged_repo_settings_cache()
+    clear_llm_config_cache()
+    yield webui_file
+    monkeypatch.undo()
+    os.environ.clear()
+    os.environ.update(baseline)
+    rs.clear_merged_repo_settings_cache()
+    clear_llm_config_cache()
+
+
+def test_llm_memory_ops_patch_roundtrip(isolated_webui_settings) -> None:
+    from pallas.console.webui import apply_webui_env_section_patch
+    from pallas.product.llm.ops_config import memory_ops_patch_dict
+
+    patch = memory_ops_patch_dict({
+        "llm_memory_graph_extract_enabled": False,
+        "llm_relationship_affinity_silence_max_penalty": 12,
+    })
+    payload = apply_webui_env_section_patch("llm", patch)
+
+    stored = json.loads(isolated_webui_settings.read_text(encoding="utf-8"))["env"]
+    assert stored["LLM_MEMORY_GRAPH_EXTRACT_ENABLED"] == "false"
+    assert stored["LLM_RELATIONSHIP_AFFINITY_SILENCE_MAX_PENALTY"] == "12"
+
+    fields = {f["name"]: f for f in payload["fields"]}
+    assert fields["llm_memory_graph_extract_enabled"]["current"] is False
+    assert fields["llm_relationship_affinity_silence_max_penalty"]["current"] == 12

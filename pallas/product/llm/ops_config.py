@@ -45,6 +45,7 @@ MEMORY_FIELD_NAMES = (
     "llm_memory_auto_ip_cooldown_sec",
     "llm_memory_graph_extract_enabled",
     "llm_memory_graph_extract_on_write",
+    "llm_memory_graph_extract_daily_budget",
     "llm_memory_hiergraph_max_layers",
     "llm_memory_decay_half_life_days",
     "llm_memory_decay_min_importance",
@@ -90,11 +91,16 @@ class LlmMemoryOpsConfig(BaseModel):
     llm_memory_rag_top_k: int = Field(default=3, ge=1, le=8)
     llm_memory_max_per_group: int = Field(default=200, ge=1, le=2000)
     llm_memory_content_max_len: int = Field(default=500, ge=64, le=4000)
-    llm_memory_auto_episode_enabled: bool = True
-    llm_memory_auto_episode_summary_enabled: bool = False
-    llm_memory_auto_episode_cooldown_sec: int = Field(default=120, ge=0, le=3600)
+    llm_memory_auto_episode_enabled: bool = False
+    llm_memory_auto_episode_summary_enabled: bool = True
+    llm_memory_auto_episode_cooldown_sec: int = Field(default=600, ge=0, le=3600)
+    llm_memory_auto_episode_daily_budget: int = Field(default=30, ge=0, le=100000)
+    llm_memory_auto_ip_enabled: bool = False
+    llm_memory_auto_ip_daily_budget: int = Field(default=100, ge=0, le=100000)
+    llm_memory_auto_ip_cooldown_sec: int = Field(default=1800, ge=0, le=86400)
     llm_memory_graph_extract_enabled: bool = True
     llm_memory_graph_extract_on_write: bool = False
+    llm_memory_graph_extract_daily_budget: int = Field(default=200, ge=0, le=100000)
     llm_memory_hiergraph_max_layers: int = Field(default=3, ge=1, le=6)
     llm_memory_decay_half_life_days: float = Field(default=30.0, ge=0.0, le=3650.0)
     llm_memory_decay_min_importance: float = Field(default=0.6, ge=0.0, le=1.0)

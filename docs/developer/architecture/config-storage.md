@@ -43,6 +43,18 @@ pallas.toml  →  .env / .env.{ENVIRONMENT}  →  webui.json
 | 插件页 | `install_hot_reload_config` → `get_config()` |
 | 业务侧禁止 | 散落 `os.environ` 当终值；私有「先 env 再文件」拼读；`pallas.core.foundation.config.dotenv`（已弃用兼容层） |
 
+## 通用配置段字段契约
+
+`pallas/console/webui/env_sections.py` 的 `WebuiEnvSection` 负责「通用配置」段的表单与保存映射，字段必须满足：
+
+- `field_to_env` 的键只能来自 `model_cls.model_fields`；模型已删除的旧键要同步移除，不能只留在映射里。
+- 模型字段显式二选一：映射到 `field_to_env`（可读写），或列入 `skip_fields`（有意不暴露 / 只读派生）。不要静默漏掉。
+- 暴露字段需在 `field_labels.py` 有中文名，并在模型 `Field(description=field_help(...))` 有说明。
+- 覆盖约束由 `tests/plugins/test_webui_env_sections.py` 守护。
+- `control_plane` / `corpus_federation` / `service_gateways` 等专用段有独立 payload / patch 实现，不套用该约束。
+
+LLM 的 session / memory 运维 API（`pallas/product/llm/ops_config.py`）以 `LlmWebuiConfig` 为准：DTO 字段与默认值须和模型一致，避免把完整 dump 交给通用段时出现未映射键。对应测试在 `tests/plugins/pb_webui/test_llm_ops_api.py`。
+
 ## 热载与分片
 
 - 插件在 `config.py` 末尾调用 `install_hot_reload_config`；业务通过 `get_*_config()` 读取。

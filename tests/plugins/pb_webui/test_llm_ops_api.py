@@ -203,3 +203,82 @@ def test_session_memory_config_subset_get(monkeypatch) -> None:
     memory = client.get("/pallas/api/common-config/llm/memory")
     assert memory.status_code == 200, memory.text
     assert memory.json()["data"]["llm_memory_rag_top_k"] == 5
+
+
+MEMORY_PATH = "/pallas/api/common-config/llm/memory"
+
+
+def _isolate_repo_settings(tmp_path, monkeypatch):
+    import os
+
+    from pallas.core.foundation.config import repo_settings as rs
+    from pallas.core.foundation.config import webui_export_toml
+    from pallas.product.llm.config import clear_llm_config_cache
+
+    baseline = dict(os.environ)
+    webui_file = tmp_path / "webui.json"
+    monkeypatch.setattr(rs, "repo_webui_settings_path", lambda: webui_file)
+    monkeypatch.setattr(rs, "repo_config_path", lambda: tmp_path / "pallas.toml")
+    monkeypatch.setattr(rs, "repo_env_path", lambda: tmp_path / ".env")
+    monkeypatch.setattr(rs, "_load_legacy_dotenv_upper", dict)
+    monkeypatch.setattr(webui_export_toml, "repo_webui_export_toml_path", lambda: tmp_path / "export.toml")
+    for key in list(os.environ):
+        if key.upper().startswith(("LLM_", "TAVILY_", "WEB_SEARCH_")):
+            monkeypatch.delenv(key, raising=False)
+    rs.clear_merged_repo_settings_cache()
+    clear_llm_config_cache()
+
+    def restore() -> None:
+        monkeypatch.undo()
+        os.environ.clear()
+        os.environ.update(baseline)
+        rs.clear_merged_repo_settings_cache()
+        clear_llm_config_cache()
+
+    return webui_file, restore
+
+
+def test_memory_ops_put_accepts_partial_body(monkeypatch, tmp_path) -> None:
+    import json
+
+    webui_file, restore = _isolate_repo_settings(tmp_path, monkeypatch)
+    try:
+        client = _build_client(monkeypatch)
+        response = client.put(
+            MEMORY_PATH,
+            json={
+                "llm_memory_graph_extract_enabled": False,
+                "llm_relationship_affinity_silence_max_penalty": 12,
+            },
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()["data"]
+        assert data["llm_memory_graph_extract_enabled"] is False
+        assert data["llm_relationship_affinity_silence_max_penalty"] == 12
+
+        stored = json.loads(webui_file.read_text(encoding="utf-8"))["env"]
+        assert stored["LLM_MEMORY_GRAPH_EXTRACT_ENABLED"] == "false"
+        assert stored["LLM_RELATIONSHIP_AFFINITY_SILENCE_MAX_PENALTY"] == "12"
+        assert "LLM_CHAT_ENABLED" not in stored
+
+        readback = client.get(MEMORY_PATH)
+        assert readback.status_code == 200, readback.text
+        assert readback.json()["data"]["llm_relationship_affinity_silence_max_penalty"] == 12
+    finally:
+        restore()
+
+
+def test_memory_ops_dto_covers_and_matches_llm_model_defaults() -> None:
+    from pallas.product.llm.ops_config import MEMORY_FIELD_NAMES, LlmMemoryOpsConfig
+    from pallas.product.llm.webui_config import LlmWebuiConfig
+
+    missing = [name for name in MEMORY_FIELD_NAMES if name not in LlmMemoryOpsConfig.model_fields]
+    assert not missing, f"memory DTO 缺字段: {missing}"
+
+    drift = []
+    for name in MEMORY_FIELD_NAMES:
+        dto_default = LlmMemoryOpsConfig.model_fields[name].get_default(call_default_factory=True)
+        model_default = LlmWebuiConfig.model_fields[name].get_default(call_default_factory=True)
+        if dto_default != model_default:
+            drift.append((name, dto_default, model_default))
+    assert not drift, f"memory DTO 默认值与 LlmWebuiConfig 不一致: {drift}"
