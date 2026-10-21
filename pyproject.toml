@@ -21,6 +21,7 @@ dependencies = [
     "nonebot-plugin-apscheduler>=0.5.0",
     "nonebot2[fastapi]>=2.4.4",
     "nvidia-ml-py>=13.595.45",
+    "pillow==13.0.0",
     "pillowmd>=0.7.3",
     "pypinyin>=0.55.0",
     "python-multipart>=0.0.20",
@@ -54,9 +55,11 @@ deploy-shard = []
 # 兼容旧构建参数；PG / Redis 均已在主依赖
 deploy-shard-pg = []
 # 可选本机 Embedding（fastembed）。有 editable 插件时请用
-# `uv pip install 'fastembed>=0.5'`，勿裸跑 `uv sync --extra embedding-local`（会裁掉环境外包装）。
+# `uv sync --inexact --extra embedding-local`（--inexact 保留额外依赖与 editable 插件）。
+# fastembed 0.8.0 官方声明 Pillow <13；项目固定 Pillow 13 并在 [tool.uv] 临时覆盖该上限，
+# 待上游放宽后复验并撤除。
 embedding-local = [
-    "fastembed>=0.5.0",
+    "fastembed==0.8.0",
 ]
 
 [project.scripts]
@@ -70,6 +73,11 @@ dev = [
     "pytest-asyncio>=0.24.0",
     "mongomock-motor>=0.0.30",
 ]
+
+[tool.uv]
+# 临时越过 fastembed 0.8.0 声明的 Pillow <13 上限。仅项目工具配置，不写入 wheel；
+# 裸 pip / uv pip 安装 embedding extra 仍会因官方元数据冲突解析失败。上游兼容后复验撤除。
+override-dependencies = ["pillow==13.0.0"]
 
 [[tool.uv.index]]
 name = "tuna"

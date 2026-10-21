@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import sys
+
+import pytest
+
 from pallas.product.llm.config import LlmConfig
 from pallas.product.llm.knowledge.embedding_client import (
     embedding_capability_trace,
@@ -172,3 +176,44 @@ def test_resolve_embedding_http_endpoint_prefers_catalog(monkeypatch) -> None:
     assert base == "https://embed.example/v1"
     assert key == "embed-key"
     assert source == "packy"
+
+
+def test_local_dependency_hint_uses_project_sync(monkeypatch) -> None:
+    import pallas.product.llm.knowledge.embedding_provider as ep
+    from pallas.product.llm.knowledge import embedding_client
+
+    monkeypatch.setattr(embedding_client, "_last_embedding_error", "")
+    monkeypatch.setattr(ep, "local_embedding_dependency_available", lambda: False)
+    cfg = LlmConfig(llm_embedding_model="stub", llm_embedding_provider="local")
+
+    trace = embedding_capability_trace(cfg)
+
+    assert "uv sync --inexact --extra embedding-local" in str(trace["embedding_error"])
+
+
+def test_build_embedding_status_dependency_hint_uses_project_sync(monkeypatch) -> None:
+    import pallas.product.llm.knowledge.embedding_provider as ep
+
+    cfg = LlmConfig(llm_embedding_model="stub", llm_embedding_provider="local")
+    monkeypatch.setattr(ep, "local_embedding_dependency_available", lambda: False)
+    monkeypatch.setattr(
+        "pallas.product.llm.knowledge.embedding_client.embedding_capability_trace",
+        lambda _cfg=None: {"embedding_error": None},
+    )
+    monkeypatch.setattr("pallas.product.llm.config.get_llm_config", lambda: cfg)
+    monkeypatch.setattr("pallas.product.llm.knowledge.embed_redis.redis_embed_available", lambda: True)
+
+    status = ep.build_embedding_status(probe=False)
+
+    assert "uv sync --inexact --extra embedding-local" in str(status["embedding_error"])
+
+
+def test_local_model_import_error_hint_uses_project_sync(monkeypatch) -> None:
+    import pallas.product.llm.knowledge.embedding_provider as ep
+
+    monkeypatch.setitem(sys.modules, "fastembed", None)
+
+    with pytest.raises(ImportError) as exc_info:
+        ep._load_local_fastembed_model("BAAI/bge-small-zh-v1.5")
+
+    assert "uv sync --inexact --extra embedding-local" in str(exc_info.value)
