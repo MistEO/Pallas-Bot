@@ -21,6 +21,21 @@ def test_prepare_sticker_vision_candidates_downscales_images() -> None:
         assert image.size == (384, 192)
 
 
+def test_prepare_sticker_image_survives_decompression_bomb(monkeypatch) -> None:
+    from io import BytesIO
+
+    from PIL import Image
+
+    from pallas.product.llm.delivery import prepare_sticker_image
+
+    source = BytesIO()
+    Image.new("RGB", (64, 64), "white").save(source, format="PNG")
+    payload = source.getvalue()
+
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 10)
+    assert prepare_sticker_image(payload) == payload
+
+
 def test_parse_sticker_vision_choice_accepts_json_index() -> None:
     assert parse_sticker_vision_choice('{"index":2}', candidate_count=4) == 1
 

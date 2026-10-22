@@ -92,6 +92,7 @@ def ensure_coord_redis_ready_for_sharding() -> None:
 
 @lru_cache(maxsize=1)
 def coord_redis_enabled() -> bool:
+    """协调当前可用：配置要求协调且 ping 健康（其他消费者据此做可用性降级）。"""
     mode = coord_redis_mode()
     if mode == "false":
         return False
@@ -99,6 +100,22 @@ def coord_redis_enabled() -> bool:
     if not url:
         return False
     return _redis_ping(url)
+
+
+def coord_redis_configured() -> bool:
+    """配置是否要求协调；只看配置（mode 与 URL），不探测健康。"""
+    if coord_redis_mode() == "false":
+        return False
+    return resolve_coord_redis_url() is not None
+
+
+def coord_redis_task_required() -> bool:
+    """AI 任务协调意图：配置要求协调，或当前已可用。
+
+    与 ``coord_redis_enabled()`` 分离：任务路径不得因 ping 失败退回本地权威，
+    故以配置意图决定是否必须走 Redis，健康只决定该次调用能否成功。
+    """
+    return coord_redis_configured() or coord_redis_enabled()
 
 
 def _redis_ping(url: str) -> bool:

@@ -1,4 +1,8 @@
-"""分片 hub：将 Pallas-Bot-AI 的 /callback 转发到登记 worker。"""
+"""分片 hub：将 Pallas-Bot-AI 的 /callback 转发到登记 worker。
+
+hub 先认证/校验/限字节（边界守卫与路由层已做）再转发；只构造必需 auth header，
+不转 Cookie/Forwarded 等，trust_env=False 且不跟随重定向；worker 侧同样校验 AI Bearer。
+"""
 
 from __future__ import annotations
 
@@ -8,7 +12,23 @@ import httpx
 from fastapi import HTTPException, UploadFile
 from nonebot import logger
 
-from pallas.core.platform.shard.coord.ai_task_registry import resolve_worker_port_for_task
+from pallas.core.platform.ai_callback.ai_bearer import ai_bearer_headers
+from pallas.core.platform.shard.coord.ai_task_registry import AiTaskRedisError, resolve_worker_port_for_task
+
+
+async def _read_bounded(file: UploadFile, limit: int) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(64 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > limit:
+            await file.close()
+            raise HTTPException(status_code=413, detail="file_too_large")
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 async def forward_ai_callback_to_worker(
@@ -24,7 +44,10 @@ async def forward_ai_callback_to_worker(
     history_keep_messages: int | None = None,
     file: UploadFile | None = None,
 ) -> dict[str, Any]:
-    port = resolve_worker_port_for_task(task_id)
+    try:
+        port = resolve_worker_port_for_task(task_id)
+    except AiTaskRedisError as exc:
+        raise HTTPException(status_code=503, detail="task_lookup_retry") from exc
     if port is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -46,20 +69,20 @@ async def forward_ai_callback_to_worker(
 
     files = None
     if file is not None:
-        body = await file.read()
+        from pallas.core.platform.ai_callback.boundary_limits import callback_max_file_bytes
+
+        body = await _read_bounded(file, callback_max_file_bytes())
         files = {"file": (file.filename or "audio", body, file.content_type or "application/octet-stream")}
 
     url = f"http://127.0.0.1:{port}/callback/{task_id}"
     timeout = httpx.Timeout(120.0, connect=10.0)
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(url, data=data, files=files)
+        async with httpx.AsyncClient(timeout=timeout, trust_env=False, follow_redirects=False) as client:
+            resp = await client.post(url, data=data, files=files, headers=ai_bearer_headers())
     except httpx.HTTPError as err:
         logger.warning("AI callback forwarding failed for task [{}] on port [{}]: [{}].", task_id, port, err)
         raise HTTPException(status_code=502, detail="分片节点回调不可达") from err
 
-    if resp.status_code == 404:
-        raise HTTPException(status_code=404, detail="分片节点上未找到任务")
     if resp.status_code >= 400:
         logger.warning(
             "AI callback forwarding for task [{}] on port [{}] returned status [{}] with body [{}].",
@@ -68,7 +91,8 @@ async def forward_ai_callback_to_worker(
             resp.status_code,
             resp.text[:200],
         )
-        raise HTTPException(status_code=502, detail="分片节点回调失败")
+        detail = "分片节点上未找到任务" if resp.status_code == 404 else "分片节点回调失败"
+        raise HTTPException(status_code=resp.status_code, detail=detail)
     try:
         return resp.json()
     except Exception:

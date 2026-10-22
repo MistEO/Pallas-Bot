@@ -583,7 +583,7 @@ class UserConfig(Config):
 class TaskManager:
     _tasks: dict[str, dict] = {}
     _lock: asyncio.Lock = asyncio.Lock()
-    _claim_events: dict[str, asyncio.Event] = {}
+    _terminal: dict[str, float] = {}
 
     @classmethod
     async def refresh(cls):
@@ -597,64 +597,103 @@ class TaskManager:
                 for task_id, task_status in cls._tasks.items()
                 if task_status.get("start_time", 0) + ttl >= current_time
             }
+            cls._terminal = {task_id: expiry for task_id, expiry in cls._terminal.items() if expiry >= current_time}
 
     @classmethod
-    async def add_task(cls, task_id: str, task_status: dict):
-        await cls.refresh()
-        async with cls._lock:
-            cls._tasks[task_id] = task_status
-        from pallas.core.platform.shard.coord.ai_task_registry import register_ai_task
+    def _binding(cls, task_status: dict) -> tuple[str, str, str, str, str]:
+        def _s(key: str) -> str:
+            value = task_status.get(key)
+            return "" if value is None else str(value).strip()
 
-        await asyncio.to_thread(register_ai_task, task_id, task_status)
+        return (_s("bot_id"), _s("group_id"), _s("user_id"), _s("task_type"), _s("start_time"))
+
+    @classmethod
+    async def add_task(cls, task_id: str, task_status: dict) -> str:
+        """登记任务；返回 ok / conflict / invalid。终态不复活，同绑定幂等，受保护内容变更冲突。"""
+        from pallas.core.platform.shard.coord.ai_task_registry import (
+            AiTaskRedisError,
+            ai_task_protected_signature,
+            normalize_ai_task_status,
+            register_ai_task,
+        )
+
+        await cls.refresh()
+        normalized = normalize_ai_task_status(task_status)
+        if normalized is None:
+            return "invalid"
+        binding = cls._binding(normalized)
+        async with cls._lock:
+            if task_id in cls._terminal:
+                return "conflict"
+            existing = cls._tasks.get(task_id)
+            if existing is not None:
+                if cls._binding(existing) != binding:
+                    return "conflict"
+                if ai_task_protected_signature(existing) != ai_task_protected_signature(normalized):
+                    return "conflict"
+            else:
+                cls._tasks[task_id] = normalized
+        try:
+            status = await asyncio.to_thread(register_ai_task, task_id, normalized)
+        except AiTaskRedisError:
+            async with cls._lock:
+                cls._tasks.pop(task_id, None)
+            raise
+        if status == "conflict":
+            async with cls._lock:
+                cls._tasks.pop(task_id, None)
+            return "conflict"
         if os.environ.get("PALLAS_BOT_ROLE", "").strip().lower() == "work":
             from pallas.core.platform.ai_callback.task_registration import register_ai_task_in_bot_process
 
-            await register_ai_task_in_bot_process(task_id, task_status)
+            await register_ai_task_in_bot_process(task_id, normalized)
+        return "ok"
 
     @classmethod
     async def get_task(cls, task_id: str) -> dict | None:
         await cls.refresh()
         async with cls._lock:
+            if task_id in cls._terminal:
+                return None
             return cls._tasks.get(task_id)
 
     @classmethod
     async def claim_task(cls, task_id: str) -> dict | None:
-        """原子取出并移除任务，避免并发回调重复投递。"""
-        await cls.refresh()
-        async with cls._lock:
-            pending_claim = cls._claim_events.get(task_id)
-            if pending_claim is None:
-                task = cls._tasks.pop(task_id, None)
-                if task is None:
-                    return None
-                pending_claim = asyncio.Event()
-                cls._claim_events[task_id] = pending_claim
-                owns_claim = True
-            else:
-                task = None
-                owns_claim = False
-        if not owns_claim:
-            await pending_claim.wait()
-            return None
-        from pallas.core.platform.shard.coord.ai_task_registry import remove_ai_task
+        """原子领取任务；配置要求协调时以 Redis 为唯一终态权威，不可用则报错不回退本地。"""
+        from pallas.core.platform.coord.redis_settings import coord_redis_task_required
+        from pallas.core.platform.shard.coord.ai_task_registry import ai_task_ttl_sec, remove_ai_task
 
-        try:
-            await asyncio.to_thread(remove_ai_task, task_id)
-        finally:
+        await cls.refresh()
+        if coord_redis_task_required():
+            from pallas.core.platform.shard.coord.ai_task_registry import claim_ai_task_record
+
+            record = await asyncio.to_thread(claim_ai_task_record, task_id)
             async with cls._lock:
-                cls._claim_events.pop(task_id, None)
-                pending_claim.set()
+                cls._tasks.pop(task_id, None)
+                if record is not None:
+                    cls._terminal[task_id] = time.time() + ai_task_ttl_sec()
+            return record
+        async with cls._lock:
+            if task_id in cls._terminal:
+                return None
+            task = cls._tasks.pop(task_id, None)
+            if task is None:
+                return None
+            # 领取即落终态：在途期间同绑定重登记与再次领取都被拒（at-most-once）
+            cls._terminal[task_id] = time.time() + ai_task_ttl_sec()
+        await asyncio.to_thread(remove_ai_task, task_id)
         return task
 
     @classmethod
     async def remove_task(cls, task_id: str):
-        await cls.refresh()
-        async with cls._lock:
-            if task_id in cls._tasks:
-                del cls._tasks[task_id]
-        from pallas.core.platform.shard.coord.ai_task_registry import remove_ai_task
+        """取消任务；共享终态提交成功后才落本地终态，失败抛 AiTaskRedisError 不宣称成功。"""
+        from pallas.core.platform.shard.coord.ai_task_registry import ai_task_ttl_sec, remove_ai_task
 
+        await cls.refresh()
         await asyncio.to_thread(remove_ai_task, task_id)
+        async with cls._lock:
+            cls._tasks.pop(task_id, None)
+            cls._terminal[task_id] = time.time() + ai_task_ttl_sec()
         if os.environ.get("PALLAS_BOT_ROLE", "").strip().lower() == "work":
             from pallas.core.platform.ai_callback.task_registration import unregister_ai_task_in_bot_process
 

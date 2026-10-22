@@ -75,19 +75,14 @@ def test_should_suppress_llm_duplicate_reply_for_recent_group_echo() -> None:
 
 
 @pytest.mark.asyncio
-async def test_run_ai_callback_falls_back_to_shared_registry(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_run_ai_callback_uses_redis_claim_authority(monkeypatch: pytest.MonkeyPatch) -> None:
     bot = MagicMock()
     bot.call_api = AsyncMock(return_value=None)
     monkeypatch.setattr(ai_callback_runner, "get_bot", lambda _bot_id: bot)
     monkeypatch.setattr(
         ai_callback_runner.TaskManager,
         "claim_task",
-        AsyncMock(return_value=None),
-    )
-    monkeypatch.setattr(
-        ai_callback_runner,
-        "claim_ai_task_record",
-        lambda _task_id: {"bot_id": "111", "group_id": 222},
+        AsyncMock(return_value={"bot_id": "111", "group_id": 222}),
     )
 
     result = await ai_callback_runner.run_ai_callback("task-1", status="success", text="hello")
@@ -943,16 +938,17 @@ async def test_run_ai_callback_sing_registry_fallback_uses_registered_bot(monkey
         return bot
 
     monkeypatch.setattr(ai_callback_runner, "get_bot", fake_get_bot)
-    monkeypatch.setattr(ai_callback_runner.TaskManager, "claim_task", AsyncMock(return_value=None))
     monkeypatch.setattr(
-        ai_callback_runner,
-        "claim_ai_task_record",
-        lambda _task_id: {
-            "bot_id": "2927116873",
-            "group_id": 626266902,
-            "user_id": 123456789,
-            "task_type": "sing",
-        },
+        ai_callback_runner.TaskManager,
+        "claim_task",
+        AsyncMock(
+            return_value={
+                "bot_id": "2927116873",
+                "group_id": 626266902,
+                "user_id": 123456789,
+                "task_type": "sing",
+            }
+        ),
     )
 
     mp3 = b"ID3" + (b"x" * 64)
@@ -970,42 +966,23 @@ async def test_run_ai_callback_sing_registry_fallback_uses_registered_bot(monkey
 
 
 @pytest.mark.asyncio
-async def test_resolve_callback_task_recovers_unified_task_after_memory_loss(monkeypatch) -> None:
-    import asyncio
-
+async def test_resolve_callback_task_uses_redis_claim_authority(monkeypatch) -> None:
     from pallas.core.platform.shard.coord import ai_task_registry
 
-    records: dict[str, dict] = {}
+    record = {
+        "task_id": "sing-task-unified-restart",
+        "bot_id": "2927116873",
+        "group_id": 626266902,
+        "user_id": 123456789,
+        "task_type": "chat_drunk",
+        "candidate_pool": ["第一条", "第二条"],
+        "want_tts": True,
+    }
+    records = {record["task_id"]: dict(record)}
 
-    def write_record(rec: dict, *, ttl_sec: int) -> bool:
-        assert ttl_sec > 0
-        records[str(rec["task_id"])] = dict(rec)
-        return True
-
-    monkeypatch.setattr(ai_task_registry, "write_ai_task_redis_sync", write_record)
-    monkeypatch.setattr(ai_task_registry, "read_ai_task_redis_sync", lambda task_id: records.get(task_id))
-    monkeypatch.setattr(ai_task_registry, "claim_ai_task_redis_sync", lambda task_id: records.pop(task_id, None))
-    monkeypatch.setattr(ai_task_registry, "remove_ai_task_redis_sync", lambda task_id: records.pop(task_id, None))
-    monkeypatch.setattr(ai_task_registry.shard_ctx, "sharding_active", lambda: False)
+    monkeypatch.setattr("pallas.core.platform.coord.redis_settings.coord_redis_enabled", lambda: True)
+    monkeypatch.setattr(ai_task_registry, "claim_ai_task_record", lambda task_id: records.pop(task_id, None))
     ai_callback_runner.TaskManager._tasks = {}
-    ai_callback_runner.TaskManager._lock = asyncio.Lock()
-    ai_task_registry.register_ai_task(
-        "sing-task-unified-restart",
-        {
-            "bot_id": "2927116873",
-            "group_id": 626266902,
-            "user_id": 123456789,
-            "task_type": "chat_drunk",
-            "user_text": "再来一杯",
-            "fallback_text": "语料原文",
-            "candidate_pool": ["第一条", "第二条"],
-            "llm_route": "repeater_polish",
-            "behavior_scene": "drunk_chat",
-            "last_reply_text": "上一条回复",
-            "recent_reply_texts": ["较早回复", "上一条回复"],
-            "want_tts": True,
-        },
-    )
 
     result = await ai_callback_runner.resolve_callback_task("sing-task-unified-restart")
 
@@ -1018,7 +995,7 @@ async def test_resolve_callback_task_recovers_unified_task_after_memory_loss(mon
 
 
 @pytest.mark.asyncio
-async def test_resolve_callback_task_does_not_claim_memory_and_registry_concurrently(monkeypatch) -> None:
+async def test_resolve_callback_task_local_claim_is_one_shot(monkeypatch) -> None:
     import asyncio
     import time
 
@@ -1029,25 +1006,22 @@ async def test_resolve_callback_task_does_not_claim_memory_and_registry_concurre
         "task_type": "sing",
         "start_time": time.time(),
     }
-    records = {"sing-task-race": dict(task)}
     remove_started = asyncio.Event()
     allow_remove = asyncio.Event()
-
-    def remove_record(task_id: str) -> None:
-        records.pop(task_id, None)
 
     async def deferred_to_thread(function, *args):
         remove_started.set()
         await allow_remove.wait()
         return function(*args)
 
+    monkeypatch.setattr("pallas.core.platform.coord.redis_settings.coord_redis_enabled", lambda: False)
     monkeypatch.setattr(
         "pallas.core.platform.shard.coord.ai_task_registry.remove_ai_task",
-        remove_record,
+        lambda _task_id: None,
     )
     monkeypatch.setattr("pallas.core.foundation.config.asyncio.to_thread", deferred_to_thread)
-    monkeypatch.setattr(ai_callback_runner, "claim_ai_task_record", lambda task_id: records.pop(task_id, None))
     ai_callback_runner.TaskManager._tasks = {"sing-task-race": dict(task)}
+    ai_callback_runner.TaskManager._terminal = {}
     ai_callback_runner.TaskManager._lock = asyncio.Lock()
 
     first = asyncio.create_task(ai_callback_runner.resolve_callback_task("sing-task-race"))
@@ -1090,7 +1064,6 @@ async def test_run_ai_callback_duplicate_claim_returns_404(monkeypatch: pytest.M
         "claim_task",
         AsyncMock(return_value=None),
     )
-    monkeypatch.setattr(ai_callback_runner, "claim_ai_task_record", lambda _task_id: None)
 
     with pytest.raises(HTTPException) as exc_info:
         await ai_callback_runner.run_ai_callback("task-dup-voice", status="success", text="ok")

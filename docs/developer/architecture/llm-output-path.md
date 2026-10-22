@@ -111,6 +111,17 @@ provider.task_models[task] / default_model → 该提供方下的具体模型
 
 群洞察的调度、8 个候选对的批量含义、持久化游标、预算和记忆层批量边界见[群洞察与语义风格指导器](group-insight-semantic-style.md)。
 
+## AI 回调与内部 IPC 鉴权边界
+
+- **服务身份**：AI→Bot 的 `/callback/*` 与受信工具入口 `/pallas/api/internal/llm/tools/execute` 复用同一 AI Bearer（`ai_extension.json` 的 token，或 `PALLAS_AI_API_TOKEN` / `TTS_API_TOKEN`）；空配置拒绝、常量时间比较。工具入口也接受维护者 `X-Pallas-Api-Key`。见 `pallas/core/platform/ai_callback/ai_bearer.py`。
+- **任务身份绑定**：工具执行只允许在已登记的 LLM 任务上下文内进行；`request_id` 必填且有界，上下文主体（bot/group/user/source_segments）一律由任务登记构造，body 身份仅作兼容断言，不一致拒绝；不接受 body 自授 `approved_tools`；工具名先经 registry 规范化再禁 `social.*`。
+- **内部 IPC**：work aux→Bot 的任务登记/删除（`/pallas/api/internal/ai/tasks*`）强制 `X-Pallas-Internal-Token`，由共享根密钥 `data/pallas_console/session_secret.bin` 按固定用途标签 HMAC-SHA256 派生（`internal_auth.py`），根密钥不下发 AI/浏览器；loopback 仅纵深防御。
+- **解析前有界**：`boundary_guard.py` 对上述入口先 header 鉴权、再按实际 ASGI receive 字节累计，超限 413（Content-Length 仅快速拒绝，chunked 同样有界）；JSON 2MiB、回调单文件 64MiB、字段/文本/trace/history 另有限额，初值可用 repo 设置覆盖。鉴权相关 header（`Authorization` / `X-Pallas-Internal-Token` / `X-Pallas-Api-Key`）重复出现视为歧义直接 400；畸形或超长 Content-Length 记 400/413，不做无界 `int()`。
+- **原子领取与终态**：有 Redis 协调时，登记、领取、取消各自用单个短 Lua 脚本原子完成——登记在同一次调用内检查终态、比较不可变绑定与受保护内容（`song_id`/来源消息段）后创建；领取一次完成取记录、删键与写终态（无独立门，空记录不触碰键）；取消写终态并删键。同一 ID 至多领取一次、终态在 TTL 内不得复活；协调已启用但不可用（client 缺失/读写异常）统一抛 `AiTaskRedisError` 映射 503，不静默降级。无协调 unified 仍在本地锁内领取并即落终态。
+- **协调意图与健康分离**：任务路径以配置意图判定是否必须走 Redis（`coord_redis_configured`：mode 非 `false` 且有 URL），ping 健康（`coord_redis_enabled`）只决定该次调用能否成功，不用它决定本地权威；要求协调而不可用时登记/领取/取消一律失败关闭，本地已有记录也不获胜。其他 coord 消费者仍按「配置 + ping」做可用性降级。
+- **pending 查询纯读**：待处理任务查询（song 绑定 peek、hub 路由、tools 上下文）缺失或过期返回「未找到」，不写终态、不取消该 ID；读取故障抛 `AiTaskRedisError`，在 song peek / hub / tools 边界映射 503（不降级为 404/500），且不产生写。取消只有在共享终态提交成功后才确认成功（DELETE 失败映射 503），失败后本地不落终态。
+- **hub→worker 转发**：hub 先认证/校验/限字节再转发，只构造必需 auth header、不转 Cookie/Forwarded，`trust_env=False` 且不跟随重定向；worker 侧同样校验 AI Bearer，保留 413 等不可重试状态。
+
 ## 约束
 
 - 怒气门控发生在 direct runtime 与 matcher 之前。静默不是丢弃入站消息：消息仍持久化并带 `suppressed_by_rage=true`，但不会被视为 Bot 已回复，也不会进入 LLM、工具或 Repeater 处理。

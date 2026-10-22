@@ -353,6 +353,21 @@ def test_image_bytes_to_data_uri_sniffs_mime_and_ignores_over_size() -> None:
     assert image_bytes_to_data_uri(b"not an image") is None
 
 
+def test_image_bytes_to_data_uri_returns_none_on_decompression_bomb(monkeypatch) -> None:
+    from io import BytesIO
+
+    from PIL import Image
+
+    from pallas.product.llm.vision_messages import image_bytes_to_data_uri
+
+    source = BytesIO()
+    Image.new("RGB", (64, 64), "white").save(source, format="PNG")
+    payload = source.getvalue()
+
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 10)
+    assert image_bytes_to_data_uri(payload) is None
+
+
 @pytest.mark.asyncio
 async def test_fetch_image_data_uri_passthrough_data_uri_and_rejects_other_schemes() -> None:
     from pallas.product.llm import vision_messages as vm

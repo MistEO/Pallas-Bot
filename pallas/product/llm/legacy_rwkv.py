@@ -21,6 +21,8 @@ async def submit_rwkv_drunk_chat(
     c = cfg or get_llm_config()
     base = llm_server_base_url(c)
     url = f"{base}{chat_endpoint}/{request_id}"
+    from pallas.core.platform.ai_callback.ai_bearer import ai_bearer_headers
+
     try:
         response = await HTTPXClient.post(
             url,
@@ -30,6 +32,7 @@ async def submit_rwkv_drunk_chat(
                 "token_count": 50,
                 "tts": tts,
             },
+            headers=ai_bearer_headers(),
             timeout=timeout_sec,
         )
     except Exception:
@@ -56,8 +59,10 @@ async def delete_rwkv_chat_session(
     c = cfg or get_llm_config()
     base = llm_server_base_url(c)
     url = f"{base}{del_session_endpoint}/{session_id}"
+    from pallas.core.platform.ai_callback.ai_bearer import ai_bearer_headers
+
     try:
-        response = await HTTPXClient.delete(url, timeout=timeout_sec)
+        response = await HTTPXClient.delete(url, headers=ai_bearer_headers(), timeout=timeout_sec)
     except Exception:
         logger.warning("RWKV chat session deletion failed for session [{}]", session_id)
         return False

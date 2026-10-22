@@ -18,6 +18,7 @@ from typing import Any
 from nonebot import logger
 
 from pallas.core.foundation.paths import plugin_data_dir
+from pallas.core.foundation.secret_file import SecretFileError, ensure_private_bytes, write_private_bytes
 
 _http_request_var: ContextVar[Any] = ContextVar("_pallas_http_request", default=None)
 
@@ -38,7 +39,7 @@ _SCRYPT_DKLEN = 64
 
 
 def console_auth_dir() -> Path:
-    return plugin_data_dir("pallas_console")
+    return plugin_data_dir("pallas_console", create=False)
 
 
 def auth_state_path() -> Path:
@@ -63,18 +64,7 @@ def invalidate_shared_console_login_token_cache() -> None:
 
 
 def _atomic_write_bytes(path: Path, data: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_bytes(data)
-    try:
-        tmp.chmod(0o600)
-    except OSError:
-        pass
-    tmp.replace(path)
-    try:
-        path.chmod(0o600)
-    except OSError:
-        pass
+    write_private_bytes(path, data, overwrite=True)
 
 
 def _atomic_write_text(path: Path, text: str) -> None:
@@ -106,12 +96,7 @@ def _unlink_default_login_password_plain() -> None:
 
 
 def _load_session_secret() -> bytes:
-    p = session_secret_path()
-    if p.is_file() and p.stat().st_size >= 32:
-        return p.read_bytes()
-    key = secrets.token_bytes(32)
-    _atomic_write_bytes(p, key)
-    return key
+    return ensure_private_bytes(session_secret_path(), length=32, min_bytes=32)
 
 
 def _hash_password(plain: str, salt: bytes) -> bytes:
@@ -364,7 +349,7 @@ def register_console_session_invalidation_hook(fn: Callable[[], None]) -> None:
 
 def invalidate_console_sessions() -> None:
     """密钥变更后轮换会话密钥，使已签发令牌全部失效。"""
-    _atomic_write_bytes(session_secret_path(), secrets.token_bytes(32))
+    write_private_bytes(session_secret_path(), secrets.token_bytes(32), overwrite=True)
     for hook in tuple(_SESSION_INVALIDATION_HOOKS):
         try:
             hook()
@@ -388,7 +373,10 @@ def verify_session_token(token: str | None) -> bool:
     if not t.startswith("v1.") or t.count(".") != 2:
         return False
     _, pl_b64, sig_b64 = t.split(".", 2)
-    secret = _load_session_secret()
+    try:
+        secret = _load_session_secret()
+    except SecretFileError:
+        return False
     expect_sig = hmac.new(secret, pl_b64.encode("ascii"), hashlib.sha256).digest()
     try:
         got_sig = base64.urlsafe_b64decode(sig_b64 + "=" * (-len(sig_b64) % 4))

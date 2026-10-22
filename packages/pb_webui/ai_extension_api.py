@@ -99,6 +99,32 @@ def _save_ai_extension_config(data: dict[str, Any]) -> dict[str, Any]:
     return clean
 
 
+def _same_origin(url_a: str, url_b: str) -> bool:
+    import urllib.parse
+
+    a = urllib.parse.urlparse(url_a)
+    b = urllib.parse.urlparse(url_b)
+    return (a.scheme, a.hostname, a.port) == (b.scheme, b.hostname, b.port)
+
+
+def build_same_origin_opener(base_url: str):
+    """禁止跨 origin 重定向（避免 Authorization 随重定向泄漏到其它主机）。"""
+    import urllib.parse
+    import urllib.request
+
+    class _SameOriginRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, N802
+            if not _same_origin(req.full_url, newurl):
+                return None
+            return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+    handlers: list[Any] = [_SameOriginRedirect()]
+    host = urllib.parse.urlparse(base_url).hostname or ""
+    if host in {"127.0.0.1", "::1", "localhost"}:
+        handlers.append(urllib.request.ProxyHandler({}))
+    return urllib.request.build_opener(*handlers)
+
+
 async def ai_extension_http_json(
     *,
     method: Literal["GET", "POST"],
@@ -123,7 +149,7 @@ async def ai_extension_http_json(
     req = urllib.request.Request(url, method=method, headers=headers, data=data_b)
 
     def _do() -> tuple[int, str]:
-        with urllib.request.urlopen(req, timeout=float(cfg["timeout_sec"])) as resp:
+        with build_same_origin_opener(base).open(req, timeout=float(cfg["timeout_sec"])) as resp:
             status_code = int(getattr(resp, "status", 200) or 200)
             txt = resp.read().decode("utf-8", errors="ignore")
             return status_code, txt
@@ -264,11 +290,9 @@ def register_ai_extension_router(
     async def _ai_extension_test() -> dict[str, Any]:
         import json
         import urllib.error
-        import urllib.parse
         import urllib.request
 
         from packages.pb_webui import extended_api as ext
-        from pallas.console.cli.ai_supervisor import is_loopback_host
 
         cfg = ext._load_ai_extension_config()
         tried_urls: list[str] = []
@@ -285,12 +309,7 @@ def register_ai_extension_router(
         last_image_circuit: dict[str, object] | None = None
         last_llm_health: dict[str, object] | None = None
         last_tts_health: dict[str, object] | None = None
-        base_host = urllib.parse.urlparse(base).hostname or ""
-        health_opener = (
-            urllib.request.build_opener(urllib.request.ProxyHandler({}))
-            if is_loopback_host(base_host)
-            else urllib.request.build_opener()
-        )
+        health_opener = build_same_origin_opener(base)
 
         def parse_health_payload(
             payload: object,
@@ -455,7 +474,7 @@ def register_ai_extension_router(
         req = urllib.request.Request(url, method=method, headers=headers, data=data_b)
 
         def _do() -> tuple[int, str]:
-            with urllib.request.urlopen(req, timeout=float(cfg["timeout_sec"])) as resp:
+            with build_same_origin_opener(base).open(req, timeout=float(cfg["timeout_sec"])) as resp:
                 status_code = int(getattr(resp, "status", 200) or 200)
                 txt = resp.read().decode("utf-8", errors="ignore")
                 return status_code, txt
