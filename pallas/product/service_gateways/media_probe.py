@@ -151,9 +151,11 @@ async def probe_ai_media_task_runtime(
     if not base:
         return None
     url = f"{base}/api/media/tasks/runtime"
+    from pallas.core.platform.ai_callback.ai_bearer import ai_bearer_headers
+
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(url, timeout=timeout_sec)
+            response = await client.get(url, headers=ai_bearer_headers(), timeout=timeout_sec)
         latency_ms = int(response.elapsed.total_seconds() * 1000) if response.elapsed else None
         if response.status_code != 200:
             return build_runtime_probe_result(

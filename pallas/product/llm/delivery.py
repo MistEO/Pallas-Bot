@@ -185,7 +185,8 @@ def prepare_sticker_image(image_bytes: bytes, *, max_side: int = STICKER_IMAGE_M
             else:
                 resized.save(output, format=image.format)
             return output.getvalue()
-    except (OSError, UnidentifiedImageError):
+    except (OSError, UnidentifiedImageError, Image.DecompressionBombError):
+        # 群图片不可信：解码炸弹等异常按无法处理降级，避免打断消息处理
         return image_bytes
 
 

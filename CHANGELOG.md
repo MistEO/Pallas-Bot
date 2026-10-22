@@ -45,6 +45,8 @@
 * fix(llm): 不再推荐模型复刻最近的结尾，减少重复收尾
 * fix(llm): 「您」「继续聊」「想聊」不再作为内置硬屏蔽词；软性过滤词命中时保留气泡，硬屏蔽与安全保护仍然优先
 * fix(deps): 固定 Pillow 13.0.0，临时覆盖 fastembed 0.8.0 的 Pillow 上限以消除已知漏洞
+* fix(auth): AI 回调与内部任务接口强制 Bearer / 内部令牌，工具执行限定在已登记的 LLM 任务上下文
+* fix(deps): 运行时安全下限写入发布元数据（multidict / pymongo / certifi / urllib3 / PyJWT / virtualenv，aiohttp 抬至 3.14.4），Docker 固定 uv 0.13.4 与 python 3.12.15-slim
 
 ## [4.4.4] - 2026-10-04
 

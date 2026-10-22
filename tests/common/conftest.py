@@ -255,6 +255,9 @@ def fake_coord_redis(monkeypatch):
         def get(self, key: str):
             return store.get(key)
 
+        def getdel(self, key: str):
+            return store.pop(key, None)
+
         def setex(self, key: str, ttl: int, val: str) -> bool:
             store[key] = val
             return True
@@ -292,6 +295,48 @@ def fake_coord_redis(monkeypatch):
 
         def expire(self, key: str, ttl: int) -> bool:
             return True
+
+        def eval(self, script: str, numkeys: int, *args: Any):
+            """复刻 ai_task_registry 三个原子脚本（单次调用内完成检查与写入）。"""
+            keys = list(args[:numkeys])
+            argv = list(args[numkeys:])
+            if "pallas:ai_task:register" in script:
+                terminal_key, task_key = keys
+                body, _ttl, binding_sig, content_sig = argv
+                if terminal_key in store:
+                    return "conflict"
+                existing = store.get(task_key)
+                if existing is not None:
+                    import json as _json
+
+                    def _s(value: Any) -> str:
+                        return "" if value is None else str(value).strip()
+
+                    try:
+                        dec = _json.loads(existing)
+                    except (TypeError, ValueError):
+                        return "conflict"
+                    if not isinstance(dec, dict):
+                        return "conflict"
+                    if _s(dec.get("_binding_sig")) != binding_sig or _s(dec.get("_content_sig")) != content_sig:
+                        return "conflict"
+                    return "ok"
+                store[task_key] = body
+                return "ok"
+            if "pallas:ai_task:claim" in script:
+                task_key, terminal_key = keys
+                raw = store.get(task_key)
+                if raw is None:
+                    return None
+                store.pop(task_key, None)
+                store[terminal_key] = "1"
+                return raw
+            if "pallas:ai_task:terminal_remove" in script:
+                terminal_key, task_key = keys
+                store[terminal_key] = "1"
+                store.pop(task_key, None)
+                return 1
+            raise AssertionError(f"unexpected script: {script[:40]}")
 
     client = FakeRedis()
     monkeypatch.setattr("pallas.core.platform.coord.redis_settings.coord_redis_enabled", lambda: True)

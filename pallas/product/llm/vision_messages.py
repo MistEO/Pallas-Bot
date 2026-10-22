@@ -71,7 +71,7 @@ def image_bytes_to_data_uri(data: bytes) -> str | None:
 
         with Image.open(BytesIO(data)) as image:
             fmt = str(image.format or "").lower()
-    except (OSError, UnidentifiedImageError):
+    except (OSError, UnidentifiedImageError, Image.DecompressionBombError):
         return None
     mime = {
         "jpeg": "image/jpeg",

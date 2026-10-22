@@ -29,7 +29,7 @@ dependencies = [
     "psutil>=6.1.0",
     "tenacity>=9.1.2",
     "curl-cffi>=0.9.0",
-    "aiohttp>=3.13.5",
+    "aiohttp>=3.14.4",
     "nonebot-plugin-localstore>=0.7",
     "nonebot-plugin-htmlrender>=0.7,<0.8",
     "githubkit>=0.13,<0.14",
@@ -40,6 +40,14 @@ dependencies = [
     "asyncpg>=0.29",
     # 多机协同 coord / 分片 claim；新装默认需要，勿再藏进 optional
     "redis>=5.2,<6",
+    # 安全下限：传递依赖无法在 dependencies 里自然表达，按已修复版本直接钉下限，
+    # 使 wheel 元数据（PyPI / pip 安装路径）同样受保护，而非仅 [tool.uv] 约束。
+    "multidict>=6.9.1",
+    "pymongo>=4.18.2",
+    "certifi>=2026.10.19",
+    "urllib3>=2.8.0",
+    "pyjwt>=2.15.1",
+    "virtualenv>=21.14.7",
 ]
 
 [project.optional-dependencies]

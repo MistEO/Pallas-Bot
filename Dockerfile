@@ -1,7 +1,7 @@
 # 基础镜像默认 Docker Hub；国内/弱网拉 registry-1.docker.io 失败时：
-#   docker build --build-arg BASE_IMAGE=docker.m.daocloud.io/library/python:3.12-slim -t pallasbot:local .
+#   docker build --build-arg BASE_IMAGE=docker.m.daocloud.io/library/python:3.12.15-slim -t pallasbot:local .
 #（镜像站域名以当时可用为准；部署说明见 docs/deploy/docker.md）
-ARG BASE_IMAGE=python:3.12-slim
+ARG BASE_IMAGE=python:3.12.15-slim
 FROM ${BASE_IMAGE}
 
 WORKDIR /app
@@ -26,10 +26,10 @@ RUN apt-get update && \
     fi && \
     if [ -n "$UV_DEFAULT_INDEX" ]; then \
         pip install --index-url "$UV_DEFAULT_INDEX" --upgrade pip && \
-        pip install --index-url "$UV_DEFAULT_INDEX" uv; \
+        pip install --index-url "$UV_DEFAULT_INDEX" "uv==0.13.4"; \
     else \
         pip install --upgrade pip && \
-        pip install uv; \
+        pip install "uv==0.13.4"; \
     fi && \
     rm -rf /var/lib/apt/lists/*
 

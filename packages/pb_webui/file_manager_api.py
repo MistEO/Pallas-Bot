@@ -163,7 +163,10 @@ def register_file_manager_router(router: APIRouter, *, x: str, plugin_config: Co
         size = int(target.stat().st_size)
         if size > _MAX_TEXT_BYTES:
             raise HTTPException(status_code=413, detail=f"文件过大（{size} 字节），文本查看仅支持 ≤1MB，请下载")
-        data = target.read_bytes()
+        with target.open("rb") as fh:
+            data = fh.read(_MAX_TEXT_BYTES + 1)
+        if len(data) > _MAX_TEXT_BYTES:
+            raise HTTPException(status_code=413, detail=f"文件过大（{size} 字节），文本查看仅支持 ≤1MB，请下载")
         if b"\x00" in data:
             raise HTTPException(status_code=400, detail="二进制文件不支持文本查看，请下载")
         try:
@@ -256,9 +259,18 @@ def register_file_manager_router(router: APIRouter, *, x: str, plugin_config: Co
             raise HTTPException(status_code=400, detail="目标目录不存在")
         filename = str(file.filename or "").strip()
         _validate_name(filename)
-        content = await file.read()
-        if len(content) > _MAX_UPLOAD_BYTES:
-            raise HTTPException(status_code=413, detail="上传文件过大（≤20MB）")
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = await file.read(64 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > _MAX_UPLOAD_BYTES:
+                await file.close()
+                raise HTTPException(status_code=413, detail="上传文件过大（≤20MB）")
+            chunks.append(chunk)
+        content = b"".join(chunks)
         dest = target_dir / filename
         dest.write_bytes(content)
         return _FilesOkResponse(data=_FilesOkData(path=_rel_text(dest), size=len(content)))

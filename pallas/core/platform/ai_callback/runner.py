@@ -20,7 +20,6 @@ from pallas.core.platform.ai_callback.task_types import (
     DRAW_IMAGE_TASK_TYPE,
     VOICE_TASK_TYPES,
 )
-from pallas.core.platform.shard.coord.ai_task_registry import claim_ai_task_record
 from pallas.product.llm.delivery import (
     deliver_llm_callback_success,
     emit_turn_delivery_telemetry,
@@ -51,14 +50,74 @@ def __getattr__(name: str):
 
 
 async def resolve_callback_task(task_id: str) -> dict | None:
-    """原子领取回调任务；重复回调将拿不到任务（404），避免重复发语音/图。"""
-    task = await TaskManager.claim_task(task_id)
-    if task:
-        return task
-    rec = claim_ai_task_record(task_id)
-    if not rec:
-        return None
-    return dict(rec)
+    """原子领取回调任务；有 Redis 协调时以其为唯一终态权威，Redis 异常返回可重试错误。"""
+    from pallas.core.platform.shard.coord.ai_task_registry import AiTaskRedisError
+
+    try:
+        return await TaskManager.claim_task(task_id)
+    except AiTaskRedisError as exc:
+        raise HTTPException(status_code=503, detail="task_claim_retry") from exc
+
+
+def validate_callback_payload(
+    *,
+    status: str,
+    text: str | None = None,
+    agent_trace: str | None = None,
+    song_id: str | None = None,
+    chunk_index: int | None = None,
+    key: int | None = None,
+    history_summary: str | None = None,
+    history_keep_messages: int | None = None,
+    file: UploadFile | None = None,
+) -> None:
+    """claim 之前的字段/大小校验：无效请求不得消费任务。"""
+    from pallas.core.platform.ai_callback.boundary_limits import (
+        callback_history_max_bytes,
+        callback_max_file_bytes,
+        callback_text_max_bytes,
+        callback_trace_max_bytes,
+    )
+
+    if status not in {"success", "failed"}:
+        raise HTTPException(status_code=400, detail="invalid_status")
+    if text and len(text.encode("utf-8")) > callback_text_max_bytes():
+        raise HTTPException(status_code=413, detail="text_too_large")
+    if agent_trace and len(agent_trace.encode("utf-8")) > callback_trace_max_bytes():
+        raise HTTPException(status_code=413, detail="trace_too_large")
+    if history_summary and len(history_summary.encode("utf-8")) > callback_history_max_bytes():
+        raise HTTPException(status_code=413, detail="history_too_large")
+    if song_id is not None and len(str(song_id)) > 128:
+        raise HTTPException(status_code=400, detail="song_id_too_long")
+    # key 为音调半音，沿用 sing 命令既有 -12..12 范围
+    if key is not None and not -12 <= key <= 12:
+        raise HTTPException(status_code=400, detail="invalid_key")
+    for value in (chunk_index, history_keep_messages):
+        if value is not None and (value < 0 or value > 10_000_000):
+            raise HTTPException(status_code=400, detail="invalid_numeric_field")
+    file_size = getattr(file, "size", None)
+    if file is not None and isinstance(file_size, int) and file_size > callback_max_file_bytes():
+        raise HTTPException(status_code=413, detail="file_too_large")
+
+
+def _verify_song_binding(task: dict, song_id: str | None) -> None:
+    bound = str(task.get("song_id") or "").strip()
+    if bound and song_id is not None and str(song_id).strip() != bound:
+        raise HTTPException(status_code=400, detail="song_id_binding_mismatch")
+
+
+async def _peek_callback_task(task_id: str) -> dict | None:
+    """非破坏读取待处理任务，用于 claim 之前校验受保护绑定（不消费）。"""
+    from pallas.core.platform.coord.redis_settings import coord_redis_task_required
+
+    if coord_redis_task_required():
+        from pallas.core.platform.shard.coord.ai_task_registry import AiTaskRedisError, get_ai_task_record
+
+        try:
+            return get_ai_task_record(task_id)
+        except AiTaskRedisError as exc:
+            raise HTTPException(status_code=503, detail="task_lookup_retry") from exc
+    return await TaskManager.get_task(task_id)
 
 
 async def run_ai_callback(
@@ -74,9 +133,16 @@ async def run_ai_callback(
     history_summary: str | None = None,
     history_keep_messages: int | None = None,
 ) -> dict[str, str]:
+    if song_id is not None:
+        # 受保护绑定在 claim 之前非破坏校验：错 song_id 不得消费任务
+        pending = await _peek_callback_task(task_id)
+        if not pending:
+            raise HTTPException(status_code=404, detail="Task not found")
+        _verify_song_binding(pending, song_id)
     task = await resolve_callback_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    _verify_song_binding(task, song_id)
     parsed_agent_trace: dict | None = None
     if agent_trace:
         try:
