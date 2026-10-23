@@ -39,7 +39,18 @@ def load_snapshot() -> dict[str, Any]:
     except (TypeError, ValueError):
         logger.warning("Plugin store asset snapshot at path [{}] is corrupt and will be ignored", path)
         return {}
-    return data if isinstance(data, dict) else {}
+    if not isinstance(data, dict):
+        return {}
+    from pallas.core.platform.bot_runtime.plugin_matrix import (
+        EXTRA_PACKAGE_MODULES,
+        OFFICIAL_EXTENSION_REPOS,
+    )
+
+    official = data.get("official")
+    if isinstance(official, dict):
+        retired_packages = EXTRA_PACKAGE_MODULES.keys() - OFFICIAL_EXTENSION_REPOS.keys()
+        data["official"] = {package: entry for package, entry in official.items() if package not in retired_packages}
+    return data
 
 
 def snapshot_has_assets_for_kind(kind: str) -> bool:
@@ -259,13 +270,13 @@ async def collect_store_asset_targets() -> dict[str, list[dict[str, Any]]]:
     from pallas.console.webui.community_plugin_index import load_community_plugin_index_safe
     from pallas.console.webui.community_plugin_registry import resolve_community_plugin_avatar
     from pallas.core.platform.bot_runtime.plugin_matrix import (
-        EXTRA_PLUGIN_PACKAGES,
+        OFFICIAL_EXTENSION_REPOS,
         official_extension_repo_url,
         official_extension_visuals,
     )
 
     official: list[dict[str, Any]] = []
-    for package in sorted(set(EXTRA_PLUGIN_PACKAGES.values())):
+    for package in sorted(OFFICIAL_EXTENSION_REPOS):
         repo_url = official_extension_repo_url(package)
         visuals = official_extension_visuals(package)
         official.append({

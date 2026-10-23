@@ -7,7 +7,7 @@
 ## 适用范围
 
 - 适用于已有历史数据、准备升级到 `3.0` 的实例。
-- 核心变化：`3.0` 引入 `pallas_protocol` 与 `pallas_webui`，并支持 PostgreSQL 数据后端。
+- 核心变化：`3.0` 引入协议端与 WebUI 插件，并支持 PostgreSQL 数据后端。
 
 ## 升级前检查
 

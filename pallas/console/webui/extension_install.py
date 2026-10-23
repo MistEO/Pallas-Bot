@@ -193,7 +193,11 @@ async def uninstall_official_extension(
     *,
     on_progress: ProgressReporter | None = None,
 ) -> dict[str, str | bool]:
-    pkg = resolve_official_extension_package(package)
+    pkg = (package or "").strip()
+    if not pkg:
+        raise ExtensionInstallError("缺少 package")
+    if pkg not in EXTRA_PACKAGE_MODULES:
+        raise ExtensionInstallError(f"非官方插件包：{pkg}")
     _report(on_progress, 5, "准备卸载…")
     if not pip_package_installed(pkg):
         _report(on_progress, 100, "无需卸载")

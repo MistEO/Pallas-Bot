@@ -6,9 +6,7 @@
 | --- | --- | --- |
 | GET | `/instances` | Bot 进程、协议端快照（NapCat/Snowluma）、分片角色 |
 
-响应合并 `pallas_protocol` 状态与控制台元信息；WebUI 对 `/instances` 有 45s 内存缓存，写操作后应 `invalidateInstancesCache`。
-
-协议账号的启停/二维码等走 **协议子服务** HTTP（非本 API），见 WebUI `protocolApi.ts`。
+响应合并协议端快照与控制台元信息；WebUI 对 `/instances` 有 45s 内存缓存，写操作后应 `invalidateInstancesCache`。
 
 ## Bot / 群 / 用户配置表
 

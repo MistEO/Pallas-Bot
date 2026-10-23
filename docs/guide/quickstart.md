@@ -80,7 +80,7 @@ systemd 日志用于查看守护进程状态；Bot 业务日志仍按自身配�
 
 ## 第 3 步：连接 QQ 并完成验收
 
-按 [连接 QQ](connect-qq.md) 的指引，在协议端管理页（`http://<主机>:8088/pallas/protocol`）新建 NapCat 实例并扫码登录。
+按 [连接 QQ](connect-qq.md) 的指引，自备一个兼容 OneBot V11 的协议端并登录 QQ。
 
 协议端显示“在线”后，把 Bot 拉进测试群并发送：
 

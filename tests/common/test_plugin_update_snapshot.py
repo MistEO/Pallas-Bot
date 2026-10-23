@@ -1,10 +1,31 @@
 from __future__ import annotations
 
+import json
 import subprocess
 
 import pytest
 
 from pallas.console.webui import plugin_update_snapshot as snapshot
+
+
+def test_load_snapshot_ignores_retired_package_without_rewriting_file(monkeypatch, tmp_path):
+    path = tmp_path / "snapshot.json"
+    path.write_text(
+        json.dumps({
+            "official": {
+                "pallas-plugin-protocol": {"has_update": True},
+                "pallas-plugin-duel": {"has_update": False},
+            },
+        }),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(snapshot, "_snapshot_path", lambda: path)
+
+    loaded = snapshot.load_snapshot()
+
+    assert "pallas-plugin-protocol" not in loaded["official"]
+    assert "pallas-plugin-duel" in loaded["official"]
+    assert "pallas-plugin-protocol" in json.loads(path.read_text(encoding="utf-8"))["official"]
 
 
 @pytest.mark.asyncio
@@ -85,6 +106,31 @@ async def test_check_community_reports_unknown_when_remote_command_raises(monkey
 
     assert result["has_update"] is None
     assert result["error"] == "远端版本获取失败"
+
+
+@pytest.mark.asyncio
+async def test_refresh_plugin_update_snapshot_skips_retired_protocol_package(monkeypatch):
+    checked_packages: list[str] = []
+
+    async def fake_index():
+        return {"plugins": []}
+
+    async def fake_check_official(package: str):
+        checked_packages.append(package)
+        return package, {"has_update": None}
+
+    monkeypatch.setattr(
+        "pallas.console.webui.community_plugin_index.load_community_plugin_index_safe",
+        fake_index,
+    )
+    monkeypatch.setattr(snapshot, "_check_official", fake_check_official)
+    monkeypatch.setattr(snapshot, "_save_snapshot", lambda _snapshot: None)
+
+    result = await snapshot.refresh_plugin_update_snapshot()
+
+    assert "pallas-plugin-protocol" not in checked_packages
+    assert "pallas-plugin-protocol" not in result["official"]
+    assert "pallas-plugin-duel" in result["official"]
 
 
 @pytest.mark.asyncio

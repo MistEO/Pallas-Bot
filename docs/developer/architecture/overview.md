@@ -44,7 +44,7 @@ Pallas-Bot 的可执行边界是：主仓承载运行时与产品语义；WebUI�
 | 路径 | 作用 |
 | --- | --- |
 | `pallas/` | 内核、平台、产品、console |
-| `packages/` | 内置插件：core（`CORE_PLUGIN_NAMES`）、bundled play（`BUNDLED_PLAY_PLUGIN_NAMES`）、以及 `EXTRA_PLUGIN_PACKAGES` 对应的官方 extra |
+| `packages/` | 内置插件：core（`CORE_PLUGIN_NAMES`）、bundled play（`BUNDLED_PLAY_PLUGIN_NAMES`）、以及 `EXTRA_PLUGIN_PACKAGES` 对应的 extra 运行时映射；公开分发范围见 `OFFICIAL_EXTENSION_REPOS` |
 | `tests/` | 内核 / 平台 / 插件 / 分片回归 |
 | `docs/` | maintainer + developer 主线 |
 | `local/plugins/` | 站点私有插件（不入库） |

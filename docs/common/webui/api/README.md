@@ -79,5 +79,3 @@ npm run sync:console-openapi-types
 ```
 
 改 `packages/pb_webui/` 时 Bot pre-commit 会跑同步；合并建议先合 Bot（含 openspec）再合 WebUI。细则见 [webui.md](../../../developer/webui.md#openapi-契约)。
-
-协议端（NapCat/Snowluma）另有独立 HTTP API，由 `pb_protocol` 挂载，不在 `/pallas/api` 下；见 [pb_protocol 文档](../../../plugins/pb_protocol/README.md)。

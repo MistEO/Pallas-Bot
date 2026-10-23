@@ -29,7 +29,7 @@
 | --- | --- |
 | import 副作用 | 模块级全局单例、缓存、订阅者 |
 | 子进程 / MCP | `mcp_bootstrap` 已注册工具是否残留 |
-| 协议端连接 | `pb_protocol` 类扩展通常需 `full-restart` |
+| 协议端连接 | 连接类扩展通常需 `full-restart` |
 | hub 挂载 | 仅 hub 注册的 API/静态资源需全栈重启 |
 
 控制台按 `activation_policy` 展示：

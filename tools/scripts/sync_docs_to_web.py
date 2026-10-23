@@ -184,11 +184,9 @@ PLUGIN_NAMES = [
     "help",
     "maa",
     "draw",
-    "pb_protocol",
     "pb_webui",
     "pb_core",
     "pb_stats",
-    "relogin_bot",
     "repeater",
     "request_handler",
     "roulette",
@@ -205,7 +203,6 @@ for name in PLUGIN_NAMES:
 
 # 历史站内路径别名（Docs 仓旧链接）
 FILE_MAP["plugins/pb_webui/README.md"] = "plugins/pb_webui.md"
-FILE_MAP["plugins/pb_protocol/README.md"] = "plugins/pb_protocol.md"
 
 GITHUB_SRC = "https://github.com/PallasBot/Pallas-Bot/tree/main/pallas/"
 
@@ -407,11 +404,6 @@ def transform_for_vitepress(text: str) -> str:
     text = re.sub(
         r"\]\(\./VISUAL\.md([^)]*)\)",
         r"](https://github.com/PallasBot/Pallas-Bot/blob/main/docs/plugins/help/VISUAL.md\1)",
-        text,
-    )
-    text = re.sub(
-        r"\]\(\.\./(?:pallas_protocol|pb_protocol)/README\.md([^)]*)\)",
-        r"](/plugins/pb_protocol\1)",
         text,
     )
     text = re.sub(r"\]\(Deployment\.md([^)]*)\)", r"](/maintainer/deploy/deployment\1)", text)

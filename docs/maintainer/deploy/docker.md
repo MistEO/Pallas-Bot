@@ -101,7 +101,7 @@ docker compose --env-file ./pallas-bot/config/compose.env logs pallasbot | head 
 
 ## 接下来：登录控制台并连接 QQ
 
-先在 [网页控制台](/guide/web-console) 登录并完成首次设置。随后可在协议端管理中托管 NapCat / SnowLuma，或让已有 OneBot V11 协议端反向连接。群里发 **牛牛帮助**，应能出图。
+先在 [网页控制台](/guide/web-console) 登录并完成首次设置。随后让自备的 OneBot V11 协议端反向连接。群里发 **牛牛帮助**，应能出图。
 
 完整说明见 [连接 QQ](/guide/connect-qq)。
 
@@ -176,7 +176,7 @@ Bot 启动后可在控制台的 **更新管理 → 镜像源** 或 **插件商�
 
 控制台可以更新 Bot 正式 Release、WebUI 和插件。Bot Release 会覆盖当前容器，普通 `docker compose restart` 不会丢失；容器重建后会恢复为镜像版本。持久更新仍使用上面的 `pull` + `up -d`。
 
-官方镜像默认包含 Docker CLI。只有让协议端管理 NapCat / SnowLuma 容器时，才按 `docker-compose.yml` 注释挂载 `/var/run/docker.sock`；该 socket 接近宿主机 root 权限，不用于管理 Bot 自身、AI、数据库、Redis 或 Ollama。自建镜像可用 `--build-arg INSTALL_DOCKER_CLI=0` 移除 CLI。
+官方镜像默认包含 Docker CLI。新部署无需挂载 `/var/run/docker.sock`；若仍按 `docker-compose.yml` 注释挂载，该 socket 接近宿主机 root 权限，不用于管理 Bot 自身、AI、数据库、Redis 或 Ollama。自建镜像可用 `--build-arg INSTALL_DOCKER_CLI=0` 移除 CLI。
 
 AI Runtime、Redis、Ollama 和数据库始终由 Compose 或外部运维负责。控制台不会因为拥有 Docker socket 而创建、更新或重建这些服务。
 

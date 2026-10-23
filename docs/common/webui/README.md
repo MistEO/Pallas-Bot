@@ -70,7 +70,7 @@ get_my_config = plugin_webui.get
 | `repeater_learn` | 复读：后台语料学习 | |
 | `message_scrub` | 消息审查与入站过滤 | V4 默认开启 |
 | `service_gateways` | 外部服务地址 | 画画 / MAA / 点歌 + 连通检测 |
-| `pallas_webui` / `pallas_protocol` / `help` | 各插件子集 | |
+| `pallas_webui` / `help` | 各插件子集 | |
 
 在线统计配置在插件页 **`pb_stats`**（不再占用通用配置段；旧 `community_stats` 入口会重定向）。见 [在线统计与社区主站](/common/community_stats)。
 

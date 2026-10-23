@@ -129,13 +129,13 @@ A: **`docker`**：请用镜像更新；**`release_tag`** / **`release_tag_dirty`
 
 ### 启动后不回复查什么？
 
-A: 先按 [排障](/maintainer/operate/troubleshooting) 的前三项检查部署形态、配置覆盖与连接路径；随后检查数据库连通性、`OneBot WebSocket` 是否已连上（Docker 默认 Compose 无独立 NapCat，需在 **`/pallas/protocol`** 创建实例并配置 WS），以及控制台是否有持续报错。
+A: 先按 [排障](/maintainer/operate/troubleshooting) 的前三项检查部署形态、配置覆盖与连接路径；随后检查数据库连通性、`OneBot WebSocket` 是否已连上（Docker 默认 Compose 不带协议端，需自备 OneBot V11 协议端并配置反向 WS，见 [连接 QQ](/guide/connect-qq)），以及控制台是否有持续报错。
 
-### 控制台 / 协议端管理页的登录密钥在哪里配？
+### 控制台的登录密钥在哪里配？
 
-A: 不再从 `.env` 读取密钥。首次启动在日志里打印随机密钥，哈希保存在 `data/pallas_console/auth_state.json`；浏览器访问 `/pallas/login` 或协议端登录页登录。仅本机开发可在 `pallas_webui` 配置中开启 `pallas_webui_dev_mode` 跳过控制台鉴权。
+A: 不再从 `.env` 读取密钥。首次启动在日志里打印随机密钥，哈希保存在 `data/pallas_console/auth_state.json`；浏览器访问 `/pallas/login` 登录。仅本机开发可在 `pallas_webui` 配置中开启 `pallas_webui_dev_mode` 跳过控制台鉴权。
 
-### 遗忘了控制台 / 协议端管理页的登录密钥怎么办？ {#forgot-console-password}
+### 遗忘了控制台的登录密钥怎么办？ {#forgot-console-password}
 
 A: 磁盘上只有哈希，**没有「忘记密码」邮件或在线找回**；需能访问 Bot 的数据目录或历史日志。
 
@@ -181,9 +181,9 @@ A: **不用。** 仓库 [`docker-compose.yml`](https://github.com/PallasBot/Pall
 
 A: Compose 把宿主机 **`./pallas-bot/config/pallas.toml`** 挂到容器 **`/app/config/pallas.toml`**，两边都必须是**同一个文件**。若宿主机上该路径被建成了**文件夹**（例如在还没有配置文件时就启动过，或手动建错），就会报这类错。请删除错误目录，从仓库复制 [`config/pallas.example.toml`](https://github.com/PallasBot/Pallas-Bot/tree/main/config/pallas.example.toml) 为**文件**放到该路径，再重新 `docker compose up`。详见 [Docker 部署](/maintainer/deploy/docker) 中「排障」与配置步骤里的说明。
 
-### 协议端管理里反向 WebSocket 要不要写成「主机为 `pallasbot`」？和 Compose 的 `pallasbot` 是什么关系？
+### 协议端反向 WebSocket 要不要写成「主机为 `pallasbot`」？和 Compose 的 `pallasbot` 是什么关系？
 
-A: **`pallasbot` 只是 Compose 服务名**，DNS 只在**同一 Compose 网络里的容器**之间有效。协议端在 **Linux Docker 模式**下用 `docker run` 起的 NapCat **默认不在**该网络里；若把客户端地址写成 **`ws://pallasbot:<PORT>/onebot/v11/ws`**（明文 WebSocket、主机填服务名），在默认桥接场景下**往往连不上**。插件会把 **主机** 改成解析后的 **`PALLAS_PROTOCOL_DOCKER_ONEBOT_HOST`**（留空时 Linux **`bridge`** 多为**默认网关 IP** 或 **`172.17.0.1`**；**`host` 网络为 `127.0.0.1`**）再写入 **`onebot*.json`**，**不会**自动替你填 `pallasbot`。一般不必为此去「取消」Compose 自定义网络；只有当你**自行**把 NapCat 做成与 Bot **同一 Compose 网络**的 service 时，才适合继续用 **`ws://pallasbot:<PORT>/onebot/v11/ws`** 这类内网写法。详见 [Docker 部署](/maintainer/deploy/docker) 与 [`pb_protocol` 插件说明](/plugins/pb_protocol) 中「Docker 与反向 WebSocket」一节。
+A: **`pallasbot` 只是 Compose 服务名**，DNS 只在**同一 Compose 网络里的容器**之间有效。自备的协议端若不在该网络内，把客户端地址写成 **`ws://pallasbot:<PORT>/onebot/v11/ws`** 往往连不上。应填写协议端实际能访问到的 Bot 地址：与 Bot 同主机可用 `127.0.0.1`，跨容器或跨主机用宿主 IP 或可解析域名。一般不必为此去「取消」Compose 自定义网络。详见 [Docker 部署](/maintainer/deploy/docker) 与 [连接 QQ](/guide/connect-qq)。
 
 ## V4 布局与迁移问题
 
@@ -203,4 +203,4 @@ A: 使用 PyPI 包 **`pallas-core`**（也可本地构建 wheel：`./scripts/bui
 
 ### WebUI 首次登录为什么要走 Setup Wizard？
 
-A: 默认密钥仅用于首次启动；改密后 `setup_state.json` 标记完成，路由守卫才放行其它页面。向导还推荐配置**协议端**与**插件扩展**。需要智能对话时再到侧栏 **AI 配置** 配 Provider 并打开对话总闸。详见 WebUI「首次 Setup Wizard」页。
+A: 默认密钥仅用于首次启动；改密后 `setup_state.json` 标记完成，路由守卫才放行其它页面。向导还会提示接入**协议端**与**插件扩展**。需要智能对话时再到侧栏 **AI 配置** 配 Provider 并打开对话总闸。详见 WebUI「首次 Setup Wizard」页。

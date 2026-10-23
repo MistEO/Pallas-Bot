@@ -58,7 +58,6 @@ uv sync --extra deploy-all
 也可以按需要分别安装：
 
 ```bash
-uv run pallas ext install pallas-plugin-protocol
 uv run pallas ext install pallas-plugin-duel
 uv run pallas ext install pallas-plugin-who-is-spy
 uv run pallas ext install pallas-plugin-maa
@@ -76,7 +75,6 @@ uv run pallas ext install pallas-plugin-draw
 | `pallas-plugin-dream` | 做梦 |
 | `pallas-plugin-draw` | 画画 |
 | `pallas-plugin-ai-media` | 牛牛唱歌 |
-| `pallas-plugin-protocol` | 协议端、上号 |
 | `pallas-plugin-bot-status` | 在吗、报数 |
 
 随时 @ LLM 对话（`llm_chat`）和社区统计（`pb_stats`）已在 **core**，不用再装。
@@ -84,7 +82,6 @@ uv run pallas ext install pallas-plugin-draw
 ::: details 参考：Docker extras 对照
 | extra | 包含 |
 | --- | --- |
-| `plugins-protocol` | NapCat 协议端、重登 |
 | `plugins-game` | 决斗 + 谁是卧底 |
 | `plugins-maa` | MAA |
 | `plugins-ai-media` | 唱歌 |

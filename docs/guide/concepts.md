@@ -16,7 +16,7 @@
 ![通信路径：QQ ↔ 协议端 ↔ Pallas-Bot ↔ 数据库，网页控制台与 Bot 同进程](/assets/concepts-topology.svg)
 
 - 协议端与 Pallas-Bot 通过 **OneBot WebSocket** 通信。
-- 网页控制台与协议端管理页由 **同一 Bot 进程** 提供，无需另起服务。
+- 网页控制台与 Bot 由 **同一进程** 提供，无需另起服务。
 - 日常改插件配置：控制台保存即可；装 / 卸官方插件需重启 Bot。
 - 端口、超管、数据库连接写在 `config/pallas.toml`；插件项写入 `data/pallas_config/webui.json`。
 

@@ -1,6 +1,6 @@
 # 协议端
 
-QQ 账号通过**协议端**接入 Pallas-Bot：协议端负责登录 QQ、维护账号实例，向 Bot 发起反向 WebSocket。V4 一般通过官方插件 `pallas-plugin-protocol` 管理，并在 WebUI 提供控制台页。
+QQ 账号通过**协议端**接入 Pallas-Bot：协议端负责登录 QQ、维护账号实例，向 Bot 发起反向 WebSocket。Pallas 控制台首页显示 Bot 在线状态，好友、群列表等现有功能仍保留。
 
 ## 两层职责
 
@@ -9,7 +9,7 @@ QQ 账号通过**协议端**接入 Pallas-Bot：协议端负责登录 QQ、维�
 | `Pallas-Bot` | 接收 OneBot 事件、运行插件、WebUI 与治理 |
 | 协议端 | 登录 QQ、维护账号实例、向 Bot 发起反向 WebSocket |
 
-协议端可由 `pb_protocol` 托管 NapCat / SnowLuma，也可完全外置。任意兼容 OneBot V11 的外置实现连接后，WebUI 会自动将账号显示为“外置账号”。
+新部署请自备兼容 OneBot V11 的协议端，通过反向 WS 接入 Pallas。
 
 记住三点：
 
@@ -19,7 +19,7 @@ QQ 账号通过**协议端**接入 Pallas-Bot：协议端负责登录 QQ、维�
 
 ## 何时查协议端
 
-- 新号接入后，控制台显示账号不在线
+- 新号接入后，Pallas 控制台首页显示 Bot 未在线
 - 协议端实例能启动，但 Bot 不收消息
 - 分片切换后，部分账号连错 worker
 - Docker 下反向 WS 一直连不上
@@ -36,7 +36,7 @@ QQ / 协议端实例
 ::: warning 注意：分片协议
 分片时：
 
-- hub：WebUI、注册表、协议端管理与部分回调
+- hub：WebUI、注册表与部分回调
 - worker：接消息、跑大部分插件逻辑
 - 协议端实例里每个账号的 `ws_url` 必须指向所属 worker 端口
 :::
@@ -44,14 +44,12 @@ QQ / 协议端实例
 ## 接入顺序
 
 1. 确认本体与 WebUI 已启动
-2. 安装并启用 `pallas-plugin-protocol`
-3. 在协议端管理页创建或导入实例
-4. 核对实例程序目录、实例根目录和登录方式
-5. 让账号连到正确的反向 WS 地址
-6. 在 Bot 侧确认 `/pallas/api/bots` 或控制台在线状态已更新
+2. 准备兼容 OneBot V11 的协议端（如 [SnowLuma](https://github.com/SnowLuma/SnowLuma)、[NapCat](https://github.com/NapNeko/NapCatQQ)），并遵守其许可证
+3. 配置协议端向正确的 Bot / worker 地址发起反向 WS
+4. 在 Pallas 控制台首页确认 Bot 在线状态；好友、群列表等现有功能仍可使用
 
 ::: warning
-分片部署不要跳过第 5 步。账号连到 hub 端口时，通常拿不到预期的群消息处理结果。
+分片部署不要跳过第 3 步。账号连到 hub 端口时，通常拿不到预期的群消息处理结果。
 :::
 
 ## 常查三项
@@ -79,7 +77,7 @@ QQ / 协议端实例
 ### 3. Bot 侧是否收到连接
 
 - hub / worker 日志
-- 控制台账号在线状态
+- Pallas 控制台首页在线状态
 - 分片 registry 与协议端同步结果
 
 日志里没有连接建立记录时，继续查协议端与网络，不要先改插件逻辑。
@@ -91,7 +89,7 @@ QQ / 协议端实例
 - Compose 服务名在协议端侧不可达，却被写成对外地址
 - Bot 容器虽有 Docker CLI，但未挂载 `/var/run/docker.sock`，或当前用户无权访问 socket
 
-Docker socket 只授权协议端托管 NapCat / SnowLuma。不要让协议插件管理 Bot、AI、Redis、Ollama 或数据库容器。
+若既有本地部署仍启用协议端容器托管，Docker socket 只授权该协议端操作；不要让协议插件管理 Bot、AI、Redis、Ollama 或数据库容器。
 
 ::: tip
 先确认协议端容器或宿主机能访问目标 worker 端口，再确认写入实例配置的地址与实际网络拓扑一致。
@@ -113,7 +111,6 @@ Docker socket 只授权协议端托管 NapCat / SnowLuma。不要让协议插件
 
 ## 相关阅读
 
-- [协议端管理插件](/plugins/pb_protocol)
 - [连接 QQ](/guide/connect-qq)
 - [分片部署](/maintainer/deploy/sharded)
 - [排障](/maintainer/operate/troubleshooting)

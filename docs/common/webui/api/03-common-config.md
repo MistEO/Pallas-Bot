@@ -22,7 +22,7 @@ WebUI「通用配置」各段通过统一 REST 暴露；段定义在 `pallas/con
 | `repeater_learn` | 复读后台学习 |
 | `message_scrub` | 消息审查 |
 | `service_gateways` | 画画 / MAA / 点歌等网关 URL |
-| `pallas_webui` / `pallas_protocol` / `help` | 对应插件控制台子集 |
+| `pallas_webui` / `help` | 对应插件控制台子集 |
 
 在线统计已迁至插件页 **`pb_stats`**（旧段 ID `community_stats` 在前端会重定向）。见 [在线统计与社区主站](/common/community_stats)。
 

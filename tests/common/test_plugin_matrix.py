@@ -110,13 +110,50 @@ def test_should_load_bundled_plugin_auto_mode(monkeypatch):
     assert should_load_bundled_plugin("draw", load_bundled_extra="auto") is True
 
 
-def test_protocol_extension_status_not_installed():
-    from pallas.core.platform.bot_runtime.plugin_matrix import protocol_extension_status
+def test_protocol_extension_status_hides_public_install_hints(monkeypatch):
+    from pallas.core.platform.bot_runtime import plugin_matrix
 
-    row = protocol_extension_status()
+    monkeypatch.setattr(plugin_matrix, "protocol_plugin_loaded", lambda: False)
+
+    row = plugin_matrix.protocol_extension_status()
+    assert row["installed"] is False
     assert row["package"] == "pallas-plugin-protocol"
-    assert row["install_cli"] == "uv run pallas ext install pallas-plugin-protocol"
+    assert row["install_cli"] is None
+    assert row["repository_url"] is None
     assert row["activation_policy"] == "full-restart"
+
+
+def test_protocol_extension_status_keeps_dynamic_loaded_state(monkeypatch):
+    from pallas.core.platform.bot_runtime import plugin_matrix
+
+    monkeypatch.setattr(plugin_matrix, "protocol_plugin_loaded", lambda: True)
+
+    row = plugin_matrix.protocol_extension_status()
+
+    assert row["installed"] is True
+    assert row["package"] == "pallas-plugin-protocol"
+    assert row["install_cli"] is None
+    assert row["repository_url"] is None
+
+
+def test_retired_protocol_modules_remain_runtime_discoverable(monkeypatch):
+    from pallas.core.platform.bot_runtime import plugin_matrix
+
+    modules = {
+        "pallas_plugin_protocol",
+        "pallas_plugin_relogin_bot",
+        "pallas_plugin_relogin_forward",
+    }
+    monkeypatch.setattr(plugin_matrix, "pip_module_installed", lambda module: module in modules)
+
+    assert set(plugin_matrix.installed_extra_plugin_modules()) == modules
+    assert set(plugin_matrix.installed_extra_plugin_modules(hub=True)) == {
+        "pallas_plugin_protocol",
+        "pallas_plugin_relogin_bot",
+    }
+    assert set(plugin_matrix.installed_extra_plugin_modules(hub=False)) == {
+        "pallas_plugin_relogin_forward",
+    }
 
 
 def test_is_core_and_extra_helpers():
@@ -193,8 +230,12 @@ def test_community_stats_canonical_alias():
 
 def test_official_extension_description_prefers_readme_summary():
     assert official_extension_description("pallas-plugin-draw") == "按文字描述生图，或带参考图改图。"
+
+
+def test_retired_protocol_extension_falls_back_to_static_description():
+    """已下架的协议端插件不再有 README，描述回退到静态表。"""
     assert official_extension_description("pallas-plugin-protocol") == (
-        "管理 NapCat / SnowLuma 协议端实例与连接配置，也展示反向连接进来的外置 OneBot V11 账号。"
+        "协议端管理（NapCat / SnowLuma）与 牛牛重新上号（含分片 worker 转发）。"
     )
 
 

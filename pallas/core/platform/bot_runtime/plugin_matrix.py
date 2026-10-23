@@ -78,7 +78,6 @@ EXTRA_PACKAGE_PRIORITY: dict[str, str] = {
 }
 
 OFFICIAL_EXTENSION_REPOS: dict[str, str] = {
-    "pallas-plugin-protocol": "https://github.com/PallasBot/Plugin-Protocol",
     "pallas-plugin-duel": "https://github.com/PallasBot/Plugin-Duel",
     "pallas-plugin-maa": "https://github.com/PallasBot/Plugin-Maa",
     "pallas-plugin-who-is-spy": "https://github.com/PallasBot/Plugin-Who-Is-Spy",
@@ -124,7 +123,6 @@ OFFICIAL_EXTENSION_DESCRIPTIONS: dict[str, str] = {
 }
 
 OFFICIAL_EXTENSION_README_PATHS: dict[str, str] = {
-    "pallas-plugin-protocol": "docs/plugins/pb_protocol/README.md",
     "pallas-plugin-duel": "docs/plugins/duel/README.md",
     "pallas-plugin-maa": "docs/plugins/maa/README.md",
     "pallas-plugin-who-is-spy": "docs/plugins/who_is_spy/README.md",
@@ -432,11 +430,12 @@ def protocol_plugin_loaded() -> bool:
 def protocol_extension_status() -> dict[str, str | bool | None]:
     pkg = "pallas-plugin-protocol"
     uv_extra = uv_extra_for_package(pkg)
+    repo_url = official_extension_repo_url(pkg)
     return {
         "installed": protocol_plugin_loaded(),
         "package": pkg,
         "uv_extra": uv_extra,
-        "install_cli": ext_install_cli_for_package(pkg),
+        "install_cli": ext_install_cli_for_package(pkg) if repo_url else None,
         "activation_policy": official_extension_activation_policy(pkg),
-        "repository_url": official_extension_repo_url(pkg),
+        "repository_url": repo_url,
     }

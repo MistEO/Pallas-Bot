@@ -41,7 +41,18 @@ def load_snapshot() -> dict[str, Any]:
     except (ValueError, TypeError):
         logger.warning("Plugin update snapshot at path [{}] is corrupt and will be ignored", path)
         return {}
-    return data if isinstance(data, dict) else {}
+    if not isinstance(data, dict):
+        return {}
+    from pallas.core.platform.bot_runtime.plugin_matrix import (
+        EXTRA_PACKAGE_MODULES,
+        OFFICIAL_EXTENSION_REPOS,
+    )
+
+    official = data.get("official")
+    if isinstance(official, dict):
+        retired_packages = EXTRA_PACKAGE_MODULES.keys() - OFFICIAL_EXTENSION_REPOS.keys()
+        data["official"] = {package: entry for package, entry in official.items() if package not in retired_packages}
+    return data
 
 
 def _save_snapshot(data: dict[str, Any]) -> None:
@@ -240,11 +251,11 @@ async def _gather_limited(coros: list) -> list:
 async def refresh_plugin_update_snapshot() -> dict[str, Any]:
     """重新比对全部商店插件的版本，落盘并返回新快照。"""
     from pallas.console.webui.community_plugin_index import load_community_plugin_index_safe
-    from pallas.core.platform.bot_runtime.plugin_matrix import EXTRA_PLUGIN_PACKAGES
+    from pallas.core.platform.bot_runtime.plugin_matrix import OFFICIAL_EXTENSION_REPOS
 
     index = await load_community_plugin_index_safe()
     community_entries = [e for e in (index.get("plugins") or []) if isinstance(e, dict) and e.get("plugin_id")]
-    packages = sorted(set(EXTRA_PLUGIN_PACKAGES.values()))
+    packages = sorted(OFFICIAL_EXTENSION_REPOS)
 
     community_results, official_results = await asyncio.gather(
         _gather_limited([_check_community(e) for e in community_entries]),

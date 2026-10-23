@@ -76,6 +76,8 @@ def build_official_extension_rows() -> list[dict[str, Any]]:
     official_updates = update_snapshot.get("official") or {}
     by_package: dict[str, list[str]] = {}
     for plugin_id, package in sorted(EXTRA_PLUGIN_PACKAGES.items()):
+        if official_extension_repo_url(package) is None:
+            continue
         by_package.setdefault(package, []).append(plugin_id)
 
     rows: list[dict[str, Any]] = []

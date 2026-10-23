@@ -34,7 +34,7 @@ packages/<name>/   # 或 local/plugins/<name>/
 | --- | --- | --- | --- | --- |
 | **core** | `CORE_PLUGIN_NAMES`（`pallas/core/platform/bot_runtime/plugin_matrix.py`） | slim 也加载 | `core` | `repeater`、`pb_stats`、`pb_core`、`llm_chat` |
 | **bundled play** | `BUNDLED_PLAY_PLUGIN_NAMES` | 是（随主仓 `packages/`） | `bundled` | `drink`、`greeting`、`roulette`、`take_name` |
-| **extra** | `EXTRA_PLUGIN_PACKAGES` | 需 `load_bundled_extra` 或 pip | 视包而定 | `duel`、`pb_protocol` |
+| **extra** | `EXTRA_PLUGIN_PACKAGES` | 需 `load_bundled_extra` 或 pip | 视包而定 | `duel`、`draw` |
 
 在线统计已升格为 core **`pb_stats`**（业务在 `pallas/product/community_stats/`；配置在插件页，落盘兼容 ID 仍可能为 `community_stats`）。
 

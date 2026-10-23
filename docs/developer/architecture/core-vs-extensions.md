@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | Core | 全部署形态依赖的运行时；cmd_perm / help / 热载 / 分片；产品底盘（语料、ingress、多牛协同等） | 独立玩法、可按需安装的媒体能力、强垂直外部集成 |
 | Bundled play | 主仓 `packages/` 默认随发行版加载的轻量玩法（`BUNDLED_PLAY_PLUGIN_NAMES`：drink、greeting、roulette、take_name）；identity/catalog kind 为 **`bundled`**，**不是** core | 平台共性（应回 core）；与 official extra 混称 |
-| Official Extension | 官方长期维护、可独立 PyPI 安装的玩法或能力包（`EXTRA_PLUGIN_PACKAGES`） | 平台共性（应回 core） |
+| Official Extension | 官方公开目录中的可独立安装扩展（`OFFICIAL_EXTENSION_REPOS`） | 平台共性（应回 core） |
 | Community Extension | 第三方、站点定制、实验功能 | 伪装成平台默认能力 |
 
 ## Core 准入（满足任一条 → 优先 core）
@@ -32,7 +32,9 @@
 - 可按需安装 / 升级
 - 需要独立 semver、README、PyPI
 
-示例包：`duel`、`who_is_spy`、`maa`、`draw`、`dream`、`ai_media` 及协议相关扩展包。
+示例包：`duel`、`who_is_spy`、`maa`、`draw`、`dream`、`ai_media`。
+
+`EXTRA_PLUGIN_PACKAGES` 是运行时模块到发行包的映射，不等同于公开分发目录；官方商店与安装白名单以 `OFFICIAL_EXTENSION_REPOS` 为准。`pallas-plugin-protocol` 仍保留运行时映射，以兼容已安装本地模块，但不再进入公开目录；保留映射不代表获得上游额外授权。
 
 ## Community 准入
 
@@ -64,7 +66,7 @@
 | --- | --- | --- |
 | Core | Golden Plugin + 强元数据 | 随主仓 |
 | Bundled play | 与 core 同目录约定；catalog kind `bundled` | 随主仓 `packages/` |
-| Official | 元数据 + `activation_policy` + PyPI | 独立仓 |
+| Official | 公开目录内的元数据 + `activation_policy` + PyPI | 独立仓 |
 | Community | 公开 `pallas.api.*` + README / 索引 | Git / 本地 / 商店 |
 
 顺序：归属层 → 目录与发布路径 → 代码。

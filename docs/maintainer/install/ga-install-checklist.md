@@ -62,7 +62,7 @@ curl -s http://127.0.0.1:8088/pallas/api/health | python3 -m json.tool
 
 ### A5. 协议端与群（可选）
 
-- [ ] `http://<宿主机>:8088/pallas/protocol` 可创建 / 管理协议端实例
+- [ ] 自备的 OneBot V11 协议端已接入，账号出现在控制台 **实例与连接**
 - [ ] QQ 连上后群内 **牛牛帮助** 有响应
 - [ ] 打开 `LLM_CHAT_ENABLED` 后，`@牛牛` 或智能对话有一条成功回复（首次可能较慢）
 

@@ -91,7 +91,7 @@ get_config = plugin_webui.get
 
 | 类型 | 约定 |
 | --- | --- |
-| 维护者向（`pb_webui`、`pb_protocol`、`pb_stats` 等） | 可无群命令；`help_audience: maintainer`；说明落在 WebUI / 通用配置段 |
+| 维护者向（`pb_webui`、`pb_stats` 等） | 可无群命令；`help_audience: maintainer`；说明落在 WebUI / 通用配置段 |
 | 群命令插件 | `handlers.py` + 完整 `menu_data` / 权限 / 冷却 |
 
 ## 存储与路径

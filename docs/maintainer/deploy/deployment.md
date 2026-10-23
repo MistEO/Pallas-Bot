@@ -79,7 +79,6 @@ sudo journalctl -u pallas-bot -f
 ## 常用地址
 
 - 网页控制台：`http://<主机>:8088/pallas/`
-- 协议端管理：`http://<主机>:8088/pallas/protocol`
 
 自定义 `host`、`port` 或路径时，以 `config/pallas.toml` 与插件配置为准。
 

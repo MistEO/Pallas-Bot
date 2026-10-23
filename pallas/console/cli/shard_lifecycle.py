@@ -778,7 +778,6 @@ def cmd_start(opts: ShardOptions) -> int:
     if hub_ok:
         hub_url = f"http://127.0.0.1:{resolve_hub_port(opts)}"
         print(f"  WebUI      {hub_url}/pallas/")
-        print(f"  协议端     {hub_url}/pallas/protocol/")
     return 0 if hub_ok else 1
 
 

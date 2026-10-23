@@ -20,6 +20,29 @@ def test_build_official_extension_rows_excludes_core_social_party():
     assert official_extension_for_plugin("llm_chat") is None
 
 
+def test_protocol_extension_is_hidden_from_public_rows_but_keeps_runtime_mapping():
+    from pallas.core.platform.bot_runtime.plugin_matrix import (
+        EXTRA_PACKAGE_MODULES,
+        EXTRA_PLUGIN_PACKAGES,
+        PIP_MODULE_LOAD_ROLE,
+    )
+
+    rows = build_official_extension_rows()
+    assert "pallas-plugin-protocol" not in {row["package"] for row in rows}
+    assert official_extension_for_plugin("pb_protocol") is None
+    assert EXTRA_PLUGIN_PACKAGES["pb_protocol"] == "pallas-plugin-protocol"
+    assert EXTRA_PLUGIN_PACKAGES["relogin_bot"] == "pallas-plugin-protocol"
+    assert EXTRA_PLUGIN_PACKAGES["relogin_forward"] == "pallas-plugin-protocol"
+    assert EXTRA_PACKAGE_MODULES["pallas-plugin-protocol"] == (
+        "pallas_plugin_protocol",
+        "pallas_plugin_relogin_bot",
+        "pallas_plugin_relogin_forward",
+    )
+    assert PIP_MODULE_LOAD_ROLE["pallas_plugin_protocol"] == "hub"
+    assert PIP_MODULE_LOAD_ROLE["pallas_plugin_relogin_bot"] == "hub"
+    assert PIP_MODULE_LOAD_ROLE["pallas_plugin_relogin_forward"] == "worker"
+
+
 def test_build_official_extension_rows_marks_bundled_duel():
     rows = build_official_extension_rows()
     duel = next(r for r in rows if r["package"] == "pallas-plugin-duel")
@@ -73,7 +96,7 @@ def test_build_official_extension_rows_prefers_cached_asset_urls(monkeypatch):
 def test_build_official_extension_rows_p0_repo_urls():
     rows = build_official_extension_rows()
     by_pkg = {r["package"]: r["repository_url"] for r in rows}
-    assert by_pkg["pallas-plugin-protocol"] == "https://github.com/PallasBot/Plugin-Protocol"
+    assert "pallas-plugin-protocol" not in by_pkg
     assert by_pkg["pallas-plugin-maa"] == "https://github.com/PallasBot/Plugin-Maa"
     assert by_pkg["pallas-plugin-who-is-spy"] == "https://github.com/PallasBot/Plugin-Who-Is-Spy"
     assert by_pkg.get("pallas-plugin-draw") == "https://github.com/PallasBot/Plugin-Draw"

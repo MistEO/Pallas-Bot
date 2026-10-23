@@ -2,7 +2,7 @@
 
 本目录是各插件的用户 / 维护者说明。每个插件只保留一篇正文：有目录时看 `docs/plugins/<name>/README.md`；否则看扁平 `docs/plugins/<name>.md`。同名扁平文件若存在，只作指向正文的指针。
 
-官方玩法（决斗、MAA、谁是卧底等）默认 slim 不加载，需单独安装。步骤见 [安装插件](/guide/install-plugins)。也可在控制台 **插件商店** 安装，或执行 `uv run pallas ext install pallas-plugin-<name>`。
+官方扩展（决斗、MAA、谁是卧底等）默认 slim 不加载，需单独安装。步骤见 [安装插件](/guide/install-plugins)。也可在控制台 **插件商店** 安装，或执行 `uv run pallas ext install pallas-plugin-<name>`。
 
 ## 本体 core（默认加载）
 
@@ -29,8 +29,6 @@
 | [唱歌 sing](/plugins/sing) | `pallas-plugin-ai-media` | 点歌、翻唱（需 AI Runtime） |
 | [牛牛说 tts](/plugins/tts) | `pallas-plugin-ai-media` | 文字转语音（需 AI Runtime） |
 | [MAA maa](/plugins/maa) | `pallas-plugin-maa` | 远控排队回图 |
-| [协议端 pb_protocol](/plugins/pb_protocol) | `pallas-plugin-protocol` | NapCat / SnowLuma |
-| [上号 relogin_bot](/plugins/relogin_bot) | `pallas-plugin-protocol` | 重新登录 |
 | [状态 bot_status](/plugins/bot_status) | `pallas-plugin-bot-status` | 在吗、报数与邮件测试 |
 
 酒后对话已并入本体 [llm_chat](/plugins/llm_chat)；旧 [chat](/plugins/chat) 页仅作跳转。

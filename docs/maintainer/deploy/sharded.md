@@ -45,7 +45,7 @@ flowchart LR
 
 | 角色 | 职责 |
 | --- | --- |
-| `hub` | WebUI、协议端管理、注册表、部分协调、媒体 / RWKV callback 入口 |
+| `hub` | WebUI、注册表、部分协调、媒体 / RWKV callback 入口 |
 | `worker` | 消息处理、群聊玩法、绝大多数业务插件 |
 | `Redis` | 跨 worker claim、活动协调、部分广播与状态同步 |
 | `Protocol` | QQ 协议接入；反向连接到对应 **worker**（不是 hub） |

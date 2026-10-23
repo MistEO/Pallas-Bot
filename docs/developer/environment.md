@@ -29,19 +29,19 @@ uv sync --dev
 
 `uv sync` 会在虚拟环境中注册 **`pallas`** 命令。PostgreSQL 驱动已在主依赖，无需 `--extra pg`。
 
-## uv sync 与官方插件
+## uv sync 与扩展
 
 `uv sync` 把 `.venv` 严格对齐 lockfile，并卸载不在本次 sync 范围内的包。下列内容不在默认 `uv sync` 里，裸跑 sync 可能被清掉：
 
 | 类别 | 典型包 | 如何装 |
 | --- | --- | --- |
-| 官方插件（8 个） | `pallas-plugin-protocol`、`pallas-plugin-duel` 等 | `uv run pallas ext install <package>` 或 WebUI 插件商店 |
+| 官方扩展（7 个） | `pallas-plugin-duel`、`pallas-plugin-maa` 等 | `uv run pallas ext install <package>` 或 WebUI 插件商店 |
 | 分片 / 多机协同 Redis 客户端 | `redis` | 已在主依赖；`uv sync` 即可 |
 | PostgreSQL 驱动 | `sqlalchemy`、`asyncpg` | 已在主依赖；`uv sync` 即可 |
 
 约束：
 
-- 已装官方插件时，勿反复执行裸 `uv sync` / `uv sync --frozen`（会卸掉扩展包；sync 后再 `pallas ext install`）。
+- 已装扩展时，勿反复执行裸 `uv sync` / `uv sync --frozen`（会卸掉扩展包；sync 后再安装所需官方扩展）。
 - 仅注册 `pallas` CLI、不动其它 pip 包：
   ```bash
   uv pip install -e . --no-deps
@@ -49,10 +49,8 @@ uv sync --dev
 - 须 sync 本体依赖时，sync 后再补扩展：
   ```bash
   uv sync
-  uv run pallas ext list                   # 查看应装的官方插件
-  # 对 listed 里 installed=no 的逐个：
-  uv run pallas ext install pallas-plugin-protocol
-  # …
+  uv run pallas ext list                   # 查看可安装的官方扩展
+  uv run pallas ext install pallas-plugin-duel
   ```
 - **只补单个依赖、不想动扩展**时，优先 `uv pip install …`，不要用 sync。
 

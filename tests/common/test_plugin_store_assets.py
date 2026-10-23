@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 import pytest
@@ -74,6 +75,26 @@ def test_snapshot_has_assets_for_kind_detects_ready_bucket(monkeypatch, tmp_path
 
     assert mod.snapshot_has_assets_for_kind("official") is True
     assert mod.snapshot_has_assets_for_kind("community") is False
+
+
+def test_load_snapshot_ignores_retired_package_without_rewriting_file(monkeypatch, tmp_path: Path) -> None:
+    path = tmp_path / "snapshot.json"
+    path.write_text(
+        json.dumps({
+            "official": {
+                "pallas-plugin-protocol": {"assets": {"icon": {"public_url": "/old.png"}}},
+                "pallas-plugin-duel": {"assets": {}},
+            },
+        }),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(mod, "snapshot_path", lambda: path)
+
+    snapshot = mod.load_snapshot()
+
+    assert "pallas-plugin-protocol" not in snapshot["official"]
+    assert "pallas-plugin-duel" in snapshot["official"]
+    assert "pallas-plugin-protocol" in json.loads(path.read_text(encoding="utf-8"))["official"]
 
 
 def test_resolve_readme_request_id_accepts_official_plugin_id() -> None:
@@ -158,6 +179,20 @@ def test_collect_store_asset_targets_uses_author_avatar_for_community(monkeypatc
     community = targets["community"][0]
 
     assert community["assets"]["avatar"] == "https://avatars.githubusercontent.com/acme?s=64"
+
+
+def test_collect_store_asset_targets_excludes_retired_protocol_package(monkeypatch) -> None:
+    async def fake_index():
+        return {"plugins": []}
+
+    monkeypatch.setattr(
+        "pallas.console.webui.community_plugin_index.load_community_plugin_index_safe",
+        fake_index,
+    )
+
+    targets = mod.run_async(mod.collect_store_asset_targets())
+
+    assert "pallas-plugin-protocol" not in {row["id"] for row in targets["official"]}
 
 
 @pytest.mark.asyncio
