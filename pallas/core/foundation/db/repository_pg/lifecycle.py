@@ -161,6 +161,19 @@ def _ensure_pg_group_config_disabled_plugins_audit(connection) -> None:
     )
 
 
+def _ensure_pg_group_config_message_scrub_extra(connection) -> None:
+    """旧库 group_config 缺群追加屏蔽词列时补列。"""
+    insp = _repo.inspect(connection)
+    if not insp.has_table("group_config"):
+        return
+    names = {c["name"] for c in insp.get_columns("group_config")}
+    if "message_scrub_extra" in names:
+        return
+    connection.execute(
+        text("ALTER TABLE group_config ADD COLUMN message_scrub_extra JSONB NOT NULL DEFAULT '[]'::jsonb")
+    )
+
+
 def _ensure_pg_bot_config_disabled_plugins_audit(connection) -> None:
     """旧库 bot_config 缺审计列时补列。"""
     insp = _repo.inspect(connection)
@@ -543,6 +556,7 @@ PG_SCHEMA_ENSURE_STEPS: list[tuple[str, Any]] = [
     ("ddl.group_config_style_profile", _ensure_pg_group_config_style_profile),
     ("ddl.group_config_plugin_storage", _ensure_pg_group_config_plugin_storage),
     ("ddl.group_config_disabled_plugins_audit", _ensure_pg_group_config_disabled_plugins_audit),
+    ("ddl.group_config_message_scrub_extra", _ensure_pg_group_config_message_scrub_extra),
     ("ddl.bot_config_disabled_plugins_audit", _ensure_pg_bot_config_disabled_plugins_audit),
     ("ddl.bot_config_community_roster_show_qq", _ensure_pg_bot_config_community_roster_show_qq),
     ("ddl.bot_config_group_style_enabled", _ensure_pg_bot_config_group_style_enabled),

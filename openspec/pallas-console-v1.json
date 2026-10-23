@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Pallas-Bot 控制台 API",
-    "version": "v4.4.3-26-g80d664ff-dirty",
+    "version": "v4.4.4-18-ge2cc635b-dirty",
     "description": "仅包含控制台 API 前缀下的接口。"
   },
   "paths": {
@@ -36997,6 +36997,22 @@
               }
             ],
             "title": "Blocked User Ids"
+          },
+          "message_scrub_extra": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                "type": "array",
+                "maxItems": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Scrub Extra"
           }
         },
         "additionalProperties": false,

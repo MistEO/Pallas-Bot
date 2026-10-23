@@ -80,6 +80,7 @@ class GroupConfigModule(Document):
     blocked_user_ids: list[int] = Field(default_factory=list)
     style_profile: dict | None = Field(default=None)
     plugin_storage: dict = Field(default_factory=dict)
+    message_scrub_extra: list[str] = Field(default_factory=list)
 
     class Settings:
         name = "group_config"

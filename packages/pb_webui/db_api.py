@@ -65,6 +65,13 @@ def _normalize_table_name(raw: str) -> str:
     return aliases.get(name, "")
 
 
+def _clear_group_scrub_snapshot(group_id: int) -> None:
+    """删除 group_config 成功后清掉本进程内存快照，并递增版本号挡住在途 refresh。"""
+    from pallas.product.message_scrub.group_extra import apply_group_scrub_extra_local
+
+    apply_group_scrub_extra_local(int(group_id), [])
+
+
 async def _get_db_table_row_public(table: str, row_id: int) -> dict[str, Any] | None:
     from pallas.core.foundation.db import (
         make_bot_config_repository,
@@ -155,10 +162,21 @@ async def _upsert_db_table_row(table: str, row_id: int, data: dict[str, Any]) ->
         from pallas.core.foundation.db.blacklist_audit import record_blacklist_audit
 
         repo = make_group_config_repository()
-        allowed = {"disabled_plugins", "roulette_mode", "banned", "sing_progress", "blocked_user_ids"}
+        allowed = {
+            "disabled_plugins",
+            "roulette_mode",
+            "banned",
+            "sing_progress",
+            "blocked_user_ids",
+            "message_scrub_extra",
+        }
         for k in payload:
             if k not in allowed:
                 raise ValueError(f"group_config 不允许字段: {k}")
+        if "message_scrub_extra" in payload:
+            from pallas.product.message_scrub.group_extra import normalize_group_scrub_extra
+
+            payload["message_scrub_extra"] = normalize_group_scrub_extra(payload["message_scrub_extra"])
         await repo.get_or_create(int(row_id), disabled_plugins=[])
         current = await repo.get(int(row_id))
         previous_banned = bool(getattr(current, "banned", False))
@@ -168,6 +186,10 @@ async def _upsert_db_table_row(table: str, row_id: int, data: dict[str, Any]) ->
         for k, v in payload.items():
             await repo.upsert_field(int(row_id), k, v)
         await repo.invalidate_cache()
+        if "message_scrub_extra" in payload:
+            from pallas.product.message_scrub.group_extra import apply_group_scrub_extra_local
+
+            apply_group_scrub_extra_local(int(row_id), payload["message_scrub_extra"])
         if "banned" in payload and bool(payload["banned"]) != previous_banned:
             await record_blacklist_audit(
                 target_type="group",
@@ -329,8 +351,12 @@ async def _delete_db_table_row(table: str, row_id: int) -> bool:
         model, key = model_map[t]
         doc = await model.find_one({key: int(row_id)})
         if doc is None:
+            if t == "group_config":
+                _clear_group_scrub_snapshot(int(row_id))
             return False
         await doc.delete()
+        if t == "group_config":
+            _clear_group_scrub_snapshot(int(row_id))
         return True
     if backend in ("postgres", "postgresql", "pg"):
         from sqlalchemy import delete
@@ -346,7 +372,10 @@ async def _delete_db_table_row(table: str, row_id: int) -> bool:
         async with get_session() as session:
             result = await session.execute(delete(row_class).where(getattr(row_class, key) == int(row_id)))
             await session.commit()
-            return bool(int(result.rowcount or 0) > 0)
+            deleted = bool(int(result.rowcount or 0) > 0)
+        if t == "group_config":
+            _clear_group_scrub_snapshot(int(row_id))
+        return deleted
     raise ValueError(f"不支持的 DB 后端: {backend}")
 
 

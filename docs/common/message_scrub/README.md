@@ -29,6 +29,18 @@
 
 完整字段见 WebUI 或 [`config.py`](https://github.com/PallasBot/Pallas-Bot/blob/main/pallas/product/message_scrub/config.py)。
 
+### 群级追加屏蔽词
+
+除全局词库外，可给单个群追加屏蔽词（WebUI 群配置的 `message_scrub_extra`，或直接编辑 `group_config` 行）：
+
+- **只追加、不替代**：全局关键词、词表文件与内置下流词表照常生效，群词只做叠加。
+- **仅群作用**：只在该群命中；私聊或未带群上下文的消息不受影响。
+- **受总开关约束**：`PALLAS_MESSAGE_SCRUB_ENABLED=false` 时，群追加词一并失效。
+- **生效范围**：保存后**当前进程立即**生效；多进程 / 分片部署其他进程最多约 30 秒由周期快照收敛。
+- 词表上限 200 词、每词 64 字符；写入前会 strip、去空、大小写不敏感去重，超限或非字符串会被拒绝。
+- 群内可用 `添加屏蔽词` / `删除屏蔽词` / `查看屏蔽词` 命令增删查看本群词（默认群管/群主，可被控制台「命令权限」覆盖）；也可在 WebUI 群配置的 `message_scrub_extra` 或直接编辑 `group_config` 行维护。
+- 命中仅做入站拦截，**不撤回**已发送消息。
+
 ## 使用场景
 
 | 目标 | 做法 |

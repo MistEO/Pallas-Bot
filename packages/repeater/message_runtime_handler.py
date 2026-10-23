@@ -124,6 +124,7 @@ class RepeaterDirectHandler:
             scrub_blocked = await is_message_scrub_blocked_async(
                 plain_text=repeater_context.plain_body,
                 raw_message=repeater_context.norm_raw,
+                group_id=int(event.group_id),
             )
         finally:
             record_stage_duration("repeater_scrub", (time.perf_counter() - scrub_started) * 1000.0)

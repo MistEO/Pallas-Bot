@@ -245,6 +245,7 @@ class GroupConfigRow(Base):
     blocked_user_ids: Mapped[Any] = mapped_column(_JsonB, nullable=False, default=list)
     style_profile: Mapped[Any] = mapped_column(_JsonB, nullable=True)
     plugin_storage: Mapped[Any] = mapped_column(_JsonB, nullable=False, default=dict)
+    message_scrub_extra: Mapped[Any] = mapped_column(_JsonB, nullable=False, default=list)
 
 
 class UserConfigRow(Base):

@@ -514,13 +514,19 @@ async def patched_handle_event_now(bot: Bot, event: Event) -> None:
                 nb_message.TrieRule.get_value(bot, event, state)
 
             apply_dispatch = isinstance(event, GroupMessageEvent)
-            if apply_dispatch and await _apply_rage_gate(bot, event):
+            marked_command_id = None
+            if apply_dispatch:
+                from pallas.product.message_scrub.scrub_command import marked_scrub_command_id
+
+                marked_command_id = marked_scrub_command_id(event)
+            # 已授权屏蔽词命令：跳过 rage 静默与 direct runtime，避免原参数入库或聊天。
+            if apply_dispatch and marked_command_id is None and await _apply_rage_gate(bot, event):
                 return
             resolution = resolve_route_for_event(event) if apply_dispatch else None
             command_traffic = event_command_traffic(event, state, resolution=resolution) if apply_dispatch else True
             traffic_token = command_traffic_ctx.set(bool(apply_dispatch and command_traffic))
             dispatch_duration_ms = None
-            if apply_dispatch:
+            if apply_dispatch and marked_command_id is None:
                 direct_matcher_exclude_modules = frozenset()
                 direct_outcome = None
                 direct_runtime = direct_runtime_for_group(int(getattr(event, "group_id", 0) or 0))
@@ -564,6 +570,7 @@ async def patched_handle_event_now(bot: Bot, event: Event) -> None:
                             direct_matcher_exclude_modules = direct_outcome.matcher_exclude_modules
             else:
                 direct_matcher_exclude_modules = frozenset()
+                direct_outcome = None
             if apply_dispatch and resolution is not None:
                 record_route_index_decision(
                     index_hit=resolution.index_hit,
@@ -616,6 +623,15 @@ async def patched_handle_event_now(bot: Bot, event: Event) -> None:
                     nb_message.logger.debug("Checking for matchers completed")
 
                 def select_matchers(priority_matchers: list[type]) -> list[type]:
+                    if marked_command_id is not None:
+                        # 标记事件只派发准确目标 matcher；其余由围栏兜底跳过。
+                        from pallas.product.message_scrub.scrub_command import matcher_scrub_command_id
+
+                        return [
+                            matcher
+                            for matcher in priority_matchers
+                            if matcher_scrub_command_id(matcher) == marked_command_id
+                        ]
                     selected = (
                         select_priority_matchers(
                             priority_matchers,

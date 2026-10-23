@@ -11,7 +11,14 @@ def test_parse_command_limits_stub_reads_command_limit_list_rows() -> None:
     stub = parse_command_limits_stub(init_path)
     assert stub is not None
     ids = [row.id for row in stub["command_limits"]]
-    assert ids == ["blacklist.add", "blacklist.remove", "blacklist.list"]
+    assert ids == [
+        "blacklist.add",
+        "blacklist.remove",
+        "blacklist.list",
+        "blacklist.scrub_add",
+        "blacklist.scrub_remove",
+        "blacklist.scrub_list",
+    ]
 
 
 def test_parse_plugin_metadata_extra_stub_reads_command_perm_list_rows() -> None:

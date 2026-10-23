@@ -101,6 +101,7 @@ def group_config_to_public(doc_or_row: Any, *, include_audit: bool = False) -> d
         "sing_progress": _jsonable_sing_progress(sp),
         "disabled_plugins": list(doc_or_row.disabled_plugins or []),
         "blocked_user_ids": sorted(set(blocked)),
+        "message_scrub_extra": list(getattr(doc_or_row, "message_scrub_extra", None) or []),
         "style_profile_snapshot": snapshot,
     }
     if include_audit:

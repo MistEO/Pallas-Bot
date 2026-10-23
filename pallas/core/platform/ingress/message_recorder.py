@@ -69,6 +69,11 @@ class MessageRecorder:
 
         if not isinstance(event, GroupMessageEvent):
             return
+        from pallas.product.message_scrub.scrub_command import match_scrub_command
+
+        # 严格合法的群屏蔽词命令（无论是否授权）不入库，避免原参数落 message 表。
+        if match_scrub_command(bot, event) is not None:
+            return
         try:
             message = build_message(event, bot)
         except Exception:

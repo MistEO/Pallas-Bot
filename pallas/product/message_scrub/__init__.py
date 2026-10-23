@@ -7,6 +7,15 @@ from .config import (
     get_message_scrub_config,
     is_message_scrub_enabled,
 )
+from .group_extra import (
+    apply_group_scrub_extra_local,
+    group_scrub_extra_hits,
+    init_group_scrub_snapshot,
+    normalize_group_scrub_extra,
+    reset_group_scrub_snapshot,
+    start_group_scrub_refresh_loop,
+    stop_group_scrub_refresh_loop,
+)
 from .local_lexicon import local_lexicon_hits, reload_local_lexicon_caches
 from .startup_log import install_message_scrub_startup_log
 
@@ -24,29 +33,50 @@ def reload_message_scrub_caches() -> None:
     clear_remote_review_caches()
 
 
-def is_message_scrub_blocked_sync(*, plain_text: str, raw_message: str) -> bool:
-    """仅本地词库。"""
-    if not is_message_scrub_enabled():
-        return False
-    return local_lexicon_hits(plain_text=plain_text, raw_message=raw_message)
-
-
-async def is_message_scrub_blocked_async(*, plain_text: str, raw_message: str) -> bool:
-    """本地词库优先；未命中后按审查链调用远程 API。"""
+def is_message_scrub_blocked_sync(
+    *,
+    plain_text: str,
+    raw_message: str,
+    group_id: int | None = None,
+) -> bool:
+    """全局本地词库 + 该群追加词（内存快照）。"""
     if not is_message_scrub_enabled():
         return False
     if local_lexicon_hits(plain_text=plain_text, raw_message=raw_message):
+        return True
+    return group_scrub_extra_hits(group_id=group_id, plain_text=plain_text, raw_message=raw_message)
+
+
+async def is_message_scrub_blocked_async(
+    *,
+    plain_text: str,
+    raw_message: str,
+    group_id: int | None = None,
+) -> bool:
+    """本地词库 + 该群追加词优先；未命中后按审查链调用远程 API。"""
+    if not is_message_scrub_enabled():
+        return False
+    if local_lexicon_hits(plain_text=plain_text, raw_message=raw_message):
+        return True
+    if group_scrub_extra_hits(group_id=group_id, plain_text=plain_text, raw_message=raw_message):
         return True
     return await run_review_chain(plain_text=plain_text, raw_message=raw_message)
 
 
 __all__ = [
     "MessageScrubConfig",
+    "apply_group_scrub_extra_local",
     "build_review_providers",
     "get_message_scrub_config",
+    "group_scrub_extra_hits",
+    "init_group_scrub_snapshot",
     "is_message_scrub_blocked_async",
     "is_message_scrub_blocked_sync",
     "is_message_scrub_enabled",
+    "normalize_group_scrub_extra",
     "reload_message_scrub_caches",
+    "reset_group_scrub_snapshot",
+    "start_group_scrub_refresh_loop",
     "start_message_scrub_if_enabled",
+    "stop_group_scrub_refresh_loop",
 ]

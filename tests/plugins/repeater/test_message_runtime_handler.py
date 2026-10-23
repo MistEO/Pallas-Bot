@@ -209,7 +209,7 @@ async def test_repeater_native_handler_records_stage_when_prepare_raises(monkeyp
         await RepeaterDirectHandler().build_fanout_plan(
             _context(),
             bot=type("Bot", (), {"self_id": 10})(),
-            event=type("Event", (), {})(),
+            event=type("Event", (), {"group_id": 2})(),
         )
 
     assert stage_durations == ["repeater_event_gate", "repeater_scrub", "repeater_prepare"]

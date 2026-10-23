@@ -399,32 +399,55 @@ async def log_ingress_gate_startup() -> None:
         logger.debug("federate peer bots: startup sync skipped: {}", e)
 
 
+async def message_scrub_global_hook(bot, event) -> None:
+    from nonebot.adapters.onebot.v11 import MessageEvent
+
+    from pallas.core.perm.check import satisfies_command_permission
+    from pallas.product.message_scrub import is_message_scrub_blocked_sync
+    from pallas.product.message_scrub.scrub_command import (
+        clear_scrub_command_marker,
+        mark_scrub_command,
+        match_scrub_command,
+    )
+
+    if not isinstance(event, MessageEvent):
+        return
+
+    # 每次重置并重验标记：只对「严格合法 + 已授权」的群屏蔽词命令做隔离放行。
+    clear_scrub_command_marker(event)
+    match = match_scrub_command(bot, event)
+    if match is not None and await satisfies_command_permission(bot, event, match.command_id):
+        mark_scrub_command(event, match.command_id)
+        return
+
+    plain = (event.get_plaintext() or "").strip()
+    raw_group_id = getattr(event, "group_id", None)
+    group_id = int(raw_group_id) if raw_group_id is not None else None
+    if is_message_scrub_blocked_sync(plain_text=plain, raw_message=event.raw_message, group_id=group_id):
+        raise IgnoredException("message scrub globally blocked")
+
+
 def register_ingress_gate_runtime() -> None:
     global _GATE_REGISTERED
     from nonebot import get_driver
     from nonebot.message import event_preprocessor
 
     from pallas.core.platform.bot_runtime.roles import is_hub_role
+    from pallas.core.platform.ingress.scrub_command_fence import install_scrub_command_fence
 
     if _GATE_REGISTERED or is_hub_role():
         return
 
     driver = get_driver()
+    install_scrub_command_fence()
 
     @event_preprocessor
     async def ingress_notice_preprocess_hook(bot, event) -> None:
         await ingress_notice_preprocess(bot, event)
 
     @event_preprocessor
-    async def message_scrub_global_hook(bot, event) -> None:
-        from nonebot.adapters.onebot.v11 import MessageEvent
-
-        from pallas.product.message_scrub import is_message_scrub_blocked_sync
-
-        if isinstance(event, MessageEvent):
-            plain = (event.get_plaintext() or "").strip()
-            if is_message_scrub_blocked_sync(plain_text=plain, raw_message=event.raw_message):
-                raise IgnoredException("message scrub globally blocked")
+    async def message_scrub_global_preprocessor(bot, event) -> None:
+        await message_scrub_global_hook(bot, event)
 
     @event_preprocessor
     async def ingress_group_message_gate_hook(bot, event) -> None:

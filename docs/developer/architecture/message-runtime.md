@@ -25,6 +25,8 @@ flowchart LR
 
 黑名单快照停止或重置时取消后台任务，并等待已提交的 Redis 线程操作结束；生命周期世代校验阻止旧刷新覆盖新快照。线程中的同步操作不能强制取消，线程池排队与 Redis 超时可能延长停止等待，3 秒的后台任务等待不是整个停止过程的总时限。
 
+入站 message_scrub 在全局本地词库之外叠加**群级追加屏蔽词**：门控只读进程内快照，命中即拦，不查 DB、不发远程请求。群配置保存后当前进程立即 patch，其他进程最多约 30 秒由周期刷新收敛；加载期间发生的本地 patch 以版本号挡住旧快照回写。全局总开关 `PALLAS_MESSAGE_SCRUB_ENABLED` 关闭时，群追加词一并失效。群内 `添加屏蔽词` / `删除屏蔽词` / `查看屏蔽词` 命令（`packages/blacklist`，默认群管/群主）读写同一 `group_config.message_scrub_extra` 字段，写后同样 patch 本进程快照，并受每群锁序列化以避免并发丢词（仅同进程；多 worker / 多部署与 WebUI 整数组保存为后写覆盖）。严格合法且已授权的命令在入站即被标记，只放行准确目标 matcher，并在 run_preprocessor 围栏跳过其余 matcher，避免落入 LLM / 复读 / direct runtime。
+
 ## 规划与执行
 
 direct 路径按以下顺序工作：

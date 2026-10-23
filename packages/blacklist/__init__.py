@@ -6,12 +6,14 @@ from pallas.api.metadata import (
     PLUGIN_HOMEPAGE,
     PLUGIN_MENU_TEMPLATE,
     SCENE_BOTH,
+    SCENE_GROUP,
     join_usage,
     usage_line,
 )
 
 from . import commands as _commands  # noqa: F401
 from . import gate_block as _gate_block  # noqa: F401
+from . import scrub_commands as _scrub_commands  # noqa: F401
 from .ban_gate import (
     apply_group_banned_change,
     apply_group_blocked_users_change,
@@ -42,6 +44,14 @@ from .helpers import (
     event_actor_user_id,
     format_id_list,
 )
+from .scrub_commands import (
+    add_scrub_cmd,
+    handle_scrub_add,
+    handle_scrub_list,
+    handle_scrub_remove,
+    list_scrub_cmd,
+    remove_scrub_cmd,
+)
 
 __plugin_meta__ = PluginMetadata(
     name="牛牛黑名单",
@@ -52,6 +62,9 @@ __plugin_meta__ = PluginMetadata(
         usage_line("牛牛解禁 / 牛牛取消拉黑 + 目标", "解除用户拉黑"),
         usage_line("牛牛解禁群 / 牛牛取消拉黑群 + 群号", "解除群拉黑"),
         usage_line("牛牛黑名单 / 牛牛查看黑名单", "查看全局或本群拉黑名单"),
+        usage_line("添加屏蔽词 + 词", "在本群追加一个消息屏蔽词（可含空格）"),
+        usage_line("删除屏蔽词 + 词", "移除本群的一个追加屏蔽词"),
+        usage_line("查看屏蔽词 [页码]", "分页查看本群追加的屏蔽词"),
     ),
     type="application",
     homepage=PLUGIN_HOMEPAGE,
@@ -61,15 +74,22 @@ __plugin_meta__ = PluginMetadata(
         "version": PLUGIN_EXTRA_VERSION,
         "menu_template": PLUGIN_MENU_TEMPLATE,
         "reload_policy": "metadata",
+        "command_prefixes": ["添加屏蔽词", "删除屏蔽词", "查看屏蔽词"],
         "command_permissions": command_perm_list(
             command_perm_row("blacklist.add", "牛牛拉黑 / 牛牛屏蔽 / 牛牛拉黑群", "staff"),
             command_perm_row("blacklist.remove", "牛牛解禁 / 牛牛解禁群", "staff"),
             command_perm_row("blacklist.list", "牛牛黑名单 / 牛牛查看黑名单", "staff"),
+            command_perm_row("blacklist.scrub_add", "添加屏蔽词", "group_moderator"),
+            command_perm_row("blacklist.scrub_remove", "删除屏蔽词", "group_moderator"),
+            command_perm_row("blacklist.scrub_list", "查看屏蔽词", "group_moderator"),
         ),
         "command_limits": command_limit_list(
             command_limit_row("blacklist.add", 3),
             command_limit_row("blacklist.remove", 3),
             command_limit_row("blacklist.list", 3),
+            command_limit_row("blacklist.scrub_add", 3),
+            command_limit_row("blacklist.scrub_remove", 3),
+            command_limit_row("blacklist.scrub_list", 3),
         ),
         "menu_data": [
             {
@@ -103,6 +123,36 @@ __plugin_meta__ = PluginMetadata(
                 "detail_des": "可按群号屏蔽或恢复某个群；在群里可直接作用当前群。",
             },
             {
+                "func": "查看屏蔽词",
+                "group": "消息屏蔽词",
+                "trigger_method": "on_cmd",
+                "trigger_scene": SCENE_GROUP,
+                "trigger_condition": "查看屏蔽词 [页码]",
+                "command_permission": "blacklist.scrub_list",
+                "brief_des": "查看本群追加屏蔽词",
+                "detail_des": "每页 20 条，显示本群追加的屏蔽词与总数；只影响本群。",
+            },
+            {
+                "func": "添加屏蔽词",
+                "group": "消息屏蔽词",
+                "trigger_method": "on_cmd",
+                "trigger_scene": SCENE_GROUP,
+                "trigger_condition": "添加屏蔽词 + 词",
+                "command_permission": "blacklist.scrub_add",
+                "brief_des": "为本群追加一个屏蔽词",
+                "detail_des": "词可含空格；命中即拦截本群消息，不区分大小写。只作用于本群。",
+            },
+            {
+                "func": "删除屏蔽词",
+                "group": "消息屏蔽词",
+                "trigger_method": "on_cmd",
+                "trigger_scene": SCENE_GROUP,
+                "trigger_condition": "删除屏蔽词 + 词",
+                "command_permission": "blacklist.scrub_remove",
+                "brief_des": "移除本群的一个追加屏蔽词",
+                "detail_des": "只删本群追加的词，不影响全局词库；不区分大小写。",
+            },
+            {
                 "func": "事件门禁",
                 "group": "系统拦截",
                 "trigger_method": "event_preprocessor",
@@ -116,6 +166,7 @@ __plugin_meta__ = PluginMetadata(
 )
 
 __all__ = [
+    "add_scrub_cmd",
     "apply_group_banned_change",
     "apply_group_blocked_users_change",
     "apply_user_banned_change",
@@ -135,9 +186,14 @@ __all__ = [
     "handle_blacklist_list",
     "handle_blacklist_remove",
     "handle_blacklist_remove_group",
+    "handle_scrub_add",
+    "handle_scrub_list",
+    "handle_scrub_remove",
     "invalidate_group_ban_gate_cache",
     "invalidate_user_ban_gate_cache",
+    "list_scrub_cmd",
     "query_user_ban_status_for_gate",
+    "remove_scrub_cmd",
     "reset_group_ban_gate_cache",
     "reset_user_ban_gate_cache",
 ]

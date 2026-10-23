@@ -30,7 +30,9 @@ async def execute_repeater_message(bot: Bot, event: GroupMessageEvent) -> None:
     if ctx is None:
         return
 
-    if await is_message_scrub_blocked_async(plain_text=ctx.plain_body, raw_message=ctx.norm_raw):
+    if await is_message_scrub_blocked_async(
+        plain_text=ctx.plain_body, raw_message=ctx.norm_raw, group_id=int(event.group_id)
+    ):
         pv = scrub_intercept_log_preview(ctx.plain_body, ctx.norm_raw)
         logger.info(
             f"bot [{event.self_id}] repeater capture skipped (message_scrub) in group [{event.group_id}] "

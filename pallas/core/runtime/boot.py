@@ -64,6 +64,13 @@ def boot() -> nonebot.Driver:
 
         install_loop_exception_logging()
         await init_db()
+        from pallas.product.message_scrub.group_extra import (
+            init_group_scrub_snapshot,
+            start_group_scrub_refresh_loop,
+        )
+
+        await init_group_scrub_snapshot()
+        start_group_scrub_refresh_loop()
         await start_ban_gate_snapshot()
         schedule_ensure_voices()
         from pallas.core.platform.multi_bot.connected_roster import install_shutdown_signal_forwarder
@@ -84,6 +91,9 @@ def boot() -> nonebot.Driver:
         mark_process_shutting_down()
         t1 = time.monotonic()
         await stop_ban_gate_snapshot()
+        from pallas.product.message_scrub.group_extra import stop_group_scrub_refresh_loop
+
+        await stop_group_scrub_refresh_loop()
         logger.debug(
             "[ShutDown] on_shutdown 收尾完成：置位标记耗时 [{:.1f}]s、ban gate 停止耗时 [{:.1f}]s、总计 [{:.1f}]s",
             t1 - t0,

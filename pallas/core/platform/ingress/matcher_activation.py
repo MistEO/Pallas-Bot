@@ -161,6 +161,12 @@ def matcher_permission_prefilter_should_skip(matcher: type[Matcher], event: Even
     if meta is None:
         return False
     command_id, scene = meta
+    # 已授权标记事件：跳过 group_moderator 的 sender.role 粗筛（superuser/ACL 可能不在
+    # owner/admin），但 matcher 完整 permission 仍会跑。
+    from pallas.product.message_scrub.scrub_command import marked_scrub_command_id, matcher_scrub_command_id
+
+    if marked_scrub_command_id(event) == command_id and matcher_scrub_command_id(matcher) == command_id:
+        return False
     is_group_event = getattr(event, "group_id", None) is not None
     if scene == "private" and is_group_event:
         return True

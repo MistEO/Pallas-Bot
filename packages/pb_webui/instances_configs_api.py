@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 from nonebot import logger
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from pallas.product.persona.account_profile import AccountPersonaProfile  # noqa: TC001
 
@@ -134,6 +134,10 @@ async def _apply_group_config_patch(group_id: int, body: _GroupConfigPatch) -> d
         elif field_name == "blocked_user_ids" and raw is not None:
             # blocked_user_ids 逐项 int 转换
             fields[field_name] = [int(x) for x in raw]
+        elif field_name == "message_scrub_extra":
+            from pallas.product.message_scrub.group_extra import normalize_group_scrub_extra
+
+            fields[field_name] = normalize_group_scrub_extra(raw)
         else:
             fields[field_name] = raw
     if "disabled_plugins" in fields:
@@ -146,6 +150,10 @@ async def _apply_group_config_patch(group_id: int, body: _GroupConfigPatch) -> d
             operator="webui",
         )
     await repo.upsert_fields(group_id, fields)
+    if "message_scrub_extra" in fields:
+        from pallas.product.message_scrub.group_extra import apply_group_scrub_extra_local
+
+        apply_group_scrub_extra_local(group_id, fields["message_scrub_extra"])
     if "banned" in fields and bool(fields["banned"]) != previous_banned:
         await record_blacklist_audit(
             target_type="group",
@@ -243,6 +251,22 @@ class _BotConfigPatch(BaseModel):
     group_style_enabled: bool | None = None
 
 
+def _normalize_group_scrub_extra_before(value: Any) -> Any:
+    if value is None:
+        return None
+    from pallas.product.message_scrub.group_extra import normalize_group_scrub_extra
+
+    return normalize_group_scrub_extra(value)
+
+
+# 发布 maxItems 200 / item maxLength 64 到 OpenAPI；None 表示 no-op（省略字段不清空）。
+_GroupScrubExtra = Annotated[
+    list[Annotated[str, Field(max_length=64)]] | None,
+    Field(default=None, max_length=200),
+    BeforeValidator(_normalize_group_scrub_extra_before),
+]
+
+
 class _GroupConfigPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -250,6 +274,7 @@ class _GroupConfigPatch(BaseModel):
     roulette_mode: int | None = Field(default=None, ge=0, le=1)
     banned: bool | None = None
     blocked_user_ids: list[int] | None = None
+    message_scrub_extra: _GroupScrubExtra = None
 
 
 class _UserConfigPatch(BaseModel):
@@ -377,6 +402,7 @@ def register_instances_configs_router(
                             "sing_progress": None,
                             "disabled_plugins": [],
                             "blocked_user_ids": [],
+                            "message_scrub_extra": [],
                         },
                     )
                     rows_inner.append({

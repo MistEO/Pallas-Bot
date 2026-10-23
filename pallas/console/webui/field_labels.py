@@ -153,6 +153,7 @@ FIELD_LABELS: dict[str, str] = {
     "maa_seen_ttl_seconds": "未绑定设备保留（秒）",
     "merge_order": "接话查找顺序",
     "merge_strategy": "重复句如何合并",
+    "message_scrub_extra": "群追加屏蔽词",
     "model": "备线模型名",
     "name": "备线显示名",
     "llm_chat_enable": "启用 LLM 对话（已弃用，请用 LLM_CHAT_ENABLED）",

@@ -65,6 +65,7 @@ from pallas.core.foundation.db.repository_pg.lifecycle import (
     _ensure_pg_context_answer_reply_index,
     _ensure_pg_group_config_blocked_user_ids,
     _ensure_pg_group_config_disabled_plugins_audit,
+    _ensure_pg_group_config_message_scrub_extra,
     _ensure_pg_group_config_plugin_storage,
     _ensure_pg_group_config_style_profile,
     _ensure_pg_image_cache_blob_data,
