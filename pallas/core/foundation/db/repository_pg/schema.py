@@ -231,6 +231,7 @@ class BotConfigRow(Base):
     persona: Mapped[Any] = mapped_column(_JsonB, nullable=True)
     group_style_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     plugin_storage: Mapped[Any] = mapped_column(_JsonB, nullable=False, default=dict)
+    message_scrub_extra: Mapped[Any] = mapped_column(_JsonB, nullable=False, default=list)
 
 
 class GroupConfigRow(Base):

@@ -25,7 +25,7 @@ flowchart LR
 
 黑名单快照停止或重置时取消后台任务，并等待已提交的 Redis 线程操作结束；生命周期世代校验阻止旧刷新覆盖新快照。线程中的同步操作不能强制取消，线程池排队与 Redis 超时可能延长停止等待，3 秒的后台任务等待不是整个停止过程的总时限。
 
-入站 message_scrub 在全局本地词库之外叠加**群级追加屏蔽词**：门控只读进程内快照，命中即拦，不查 DB、不发远程请求。群配置保存后当前进程立即 patch，其他进程最多约 30 秒由周期刷新收敛；加载期间发生的本地 patch 以版本号挡住旧快照回写。全局总开关 `PALLAS_MESSAGE_SCRUB_ENABLED` 关闭时，群追加词一并失效。群内 `添加屏蔽词` / `删除屏蔽词` / `查看屏蔽词` 命令（`packages/blacklist`，默认群管/群主）读写同一 `group_config.message_scrub_extra` 字段，写后同样 patch 本进程快照，并受每群锁序列化以避免并发丢词（仅同进程；多 worker / 多部署与 WebUI 整数组保存为后写覆盖）。严格合法且已授权的命令在入站即被标记，只放行准确目标 matcher，并在 run_preprocessor 围栏跳过其余 matcher，避免落入 LLM / 复读 / direct runtime。
+入站 message_scrub 在全局本地词库之外叠加**群级追加屏蔽词**与**Bot 级追加屏蔽词**：门控只读进程内快照，命中即拦，不查 DB、不发远程请求。群快照与 Bot 快照各自独立（数字 id 相同也不串），保存后当前进程立即 patch，其他进程正常约 30 秒由周期刷新同步一次（加载失败保留旧快照，故障期间不保证硬期限）；加载期间发生的本地 patch 以版本号挡住旧快照回写，清空也增版本以免旧 load 复活。全局总开关 `PALLAS_MESSAGE_SCRUB_ENABLED` 关闭时，群词与 Bot 词一并失效。群内 `添加屏蔽词` / `删除屏蔽词` / `查看屏蔽词` 命令（`packages/blacklist`，默认群管/群主）读写 `group_config.message_scrub_extra`；私聊同命令字读写 `bot_config.message_scrub_extra`，作用于该 Bot 所有群与私聊，仅**当前 Bot 号主**可管理（除可配置命令权限外另有号主硬条件，其它 Bot 号主、未绑定的超管、群管、ACL 与 everyone 覆盖都不能越过；群临时会话不能管理）。两条命令路径写后同样 patch 本进程对应快照，并受每群 / 每 Bot 锁序列化以避免并发丢词（仅同进程；多 worker / 多部署与 WebUI 整数组保存为后写覆盖）。严格合法且已授权的命令在入站即被标记，只放行准确目标 matcher（群与私聊同命令字互不串号），并在 run_preprocessor 围栏跳过其余 matcher，避免落入 LLM / 复读 / direct runtime。
 
 ## 规划与执行
 

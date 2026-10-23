@@ -61,6 +61,7 @@ class BotConfigModule(Document):
     persona: dict | None = Field(default=None)
     group_style_enabled: bool = Field(default=True)
     plugin_storage: dict = Field(default_factory=dict)
+    message_scrub_extra: list[str] = Field(default_factory=list)
 
     class Settings:
         name = "config"

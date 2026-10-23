@@ -514,11 +514,11 @@ async def patched_handle_event_now(bot: Bot, event: Event) -> None:
                 nb_message.TrieRule.get_value(bot, event, state)
 
             apply_dispatch = isinstance(event, GroupMessageEvent)
-            marked_command_id = None
-            if apply_dispatch:
-                from pallas.product.message_scrub.scrub_command import marked_scrub_command_id
+            from pallas.product.message_scrub.scrub_command import marked_scrub_command_id
 
-                marked_command_id = marked_scrub_command_id(event)
+            # 群与私聊都读取标记，使私聊 Bot 级命令也精确只派发目标 matcher；
+            # rage 静默与 direct runtime 仍只对群生效（见下方 apply_dispatch 守卫）。
+            marked_command_id = marked_scrub_command_id(event)
             # 已授权屏蔽词命令：跳过 rage 静默与 direct runtime，避免原参数入库或聊天。
             if apply_dispatch and marked_command_id is None and await _apply_rage_gate(bot, event):
                 return

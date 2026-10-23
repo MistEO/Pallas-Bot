@@ -198,6 +198,17 @@ def _ensure_pg_bot_config_persona(connection) -> None:
     connection.execute(text("ALTER TABLE bot_config ADD COLUMN persona JSONB"))
 
 
+def _ensure_pg_bot_config_message_scrub_extra(connection) -> None:
+    """旧库 bot_config 缺 Bot 追加屏蔽词列时补列。"""
+    insp = _repo.inspect(connection)
+    if not insp.has_table("bot_config"):
+        return
+    names = {c["name"] for c in insp.get_columns("bot_config")}
+    if "message_scrub_extra" in names:
+        return
+    connection.execute(text("ALTER TABLE bot_config ADD COLUMN message_scrub_extra JSONB NOT NULL DEFAULT '[]'::jsonb"))
+
+
 def _ensure_pg_bot_config_community_roster_show_qq(connection) -> None:
     """旧库 bot_config 缺列时补列。"""
     insp = _repo.inspect(connection)
@@ -562,6 +573,7 @@ PG_SCHEMA_ENSURE_STEPS: list[tuple[str, Any]] = [
     ("ddl.bot_config_group_style_enabled", _ensure_pg_bot_config_group_style_enabled),
     ("ddl.bot_config_persona", _ensure_pg_bot_config_persona),
     ("ddl.bot_config_plugin_storage", _ensure_pg_bot_config_plugin_storage),
+    ("ddl.bot_config_message_scrub_extra", _ensure_pg_bot_config_message_scrub_extra),
     ("ddl.user_config_maa_devices", _ensure_pg_user_config_maa_devices),
     ("ddl.user_config_ban_audit", _ensure_pg_user_config_ban_audit),
     ("ddl.llm_memory_embedding_columns", _ensure_pg_llm_memory_embedding_columns),

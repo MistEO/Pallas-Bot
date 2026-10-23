@@ -1,7 +1,8 @@
-"""群级 message_scrub 追加屏蔽词：进程内快照 + 周期刷新。
+"""群级 / Bot 级 message_scrub 追加屏蔽词：进程内快照 + 周期刷新。
 
-仅「追加」全局词库；全局总开关 ``PALLAS_MESSAGE_SCRUB_ENABLED`` 关闭时群词同样失效。
-消息路径只读内存快照，不查 DB、不发远程请求。
+仅「追加」全局词库；全局总开关 ``PALLAS_MESSAGE_SCRUB_ENABLED`` 关闭时同样失效。
+消息路径只读内存快照，不查 DB、不发远程请求。群作用域与 Bot 作用域各自独立快照，
+数字 id 相同也不会串（如群 5 与 Bot 5）。
 """
 
 from __future__ import annotations
@@ -21,6 +22,8 @@ GROUP_SCRUB_REFRESH_INTERVAL_SEC = 30.0
 _lock = Lock()
 _snapshot: dict[int, tuple[str, ...]] = {}
 _version = 0
+_bot_snapshot: dict[int, tuple[str, ...]] = {}
+_bot_version = 0
 _refresh_task: asyncio.Task | None = None
 
 
@@ -83,12 +86,33 @@ def _build_snapshot(rows: Any) -> dict[int, tuple[str, ...]]:
     return out
 
 
+def _build_bot_snapshot(rows: Any) -> dict[int, tuple[str, ...]]:
+    out: dict[int, tuple[str, ...]] = {}
+    for row in rows or []:
+        try:
+            account = int(getattr(row, "account", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        words = _safe_words(getattr(row, "message_scrub_extra", None))
+        if account and words:
+            out[account] = words
+    return out
+
+
 def reset_group_scrub_snapshot() -> None:
-    """清空快照与版本号（供测试与重载使用）。"""
+    """清空群快照与版本号（供测试与重载使用）。"""
     global _snapshot, _version
     with _lock:
         _snapshot = {}
         _version = 0
+
+
+def reset_bot_scrub_snapshot() -> None:
+    """清空 Bot 快照与版本号（供测试与重载使用）。"""
+    global _bot_snapshot, _bot_version
+    with _lock:
+        _bot_snapshot = {}
+        _bot_version = 0
 
 
 def apply_group_scrub_extra_local(group_id: int, words: list[str]) -> None:
@@ -104,12 +128,38 @@ def apply_group_scrub_extra_local(group_id: int, words: list[str]) -> None:
             _snapshot.pop(int(group_id), None)
 
 
+def apply_bot_scrub_extra_local(bot_id: int, words: list[str]) -> None:
+    """本进程保存成功后立即 patch Bot 快照；清空时移除 key 并递增版本，避免旧 load 复活。"""
+    global _bot_version
+    normalized = normalize_group_scrub_extra(list(words))
+    lowered = tuple(w.lower() for w in normalized)
+    with _lock:
+        _bot_version += 1
+        if lowered:
+            _bot_snapshot[int(bot_id)] = lowered
+        else:
+            _bot_snapshot.pop(int(bot_id), None)
+
+
 def group_scrub_extra_hits(*, group_id: int | None, plain_text: str, raw_message: str) -> bool:
-    """仅查内存快照；未传 group_id（私聊 / 未知群）时恒 False。"""
+    """仅查群内存快照；未传 group_id（私聊 / 未知群）时恒 False。"""
     if group_id is None:
         return False
     with _lock:
         words = _snapshot.get(int(group_id))
+    if not words:
+        return False
+    plain = (plain_text or "").lower()
+    raw = (raw_message or "").lower()
+    return any(word in plain or word in raw for word in words)
+
+
+def bot_scrub_extra_hits(*, bot_id: int | None, plain_text: str, raw_message: str) -> bool:
+    """仅查 Bot 内存快照；未传 bot_id 时不选任意 Bot，恒 False。"""
+    if bot_id is None:
+        return False
+    with _lock:
+        words = _bot_snapshot.get(int(bot_id))
     if not words:
         return False
     plain = (plain_text or "").lower()
@@ -123,9 +173,20 @@ async def _load_rows() -> list[Any]:
     return await make_group_config_repository().list_all()
 
 
+async def _load_bot_rows() -> list[Any]:
+    from pallas.core.foundation.db import make_bot_config_repository
+
+    return await make_bot_config_repository().list_all()
+
+
 async def init_group_scrub_snapshot() -> None:
     """启动首载：与周期刷新同路径，失败保留旧（启动时为空白）快照，不阻断启动。"""
     await refresh_group_scrub_snapshot_once()
+
+
+async def init_bot_scrub_snapshot() -> None:
+    """启动首载 Bot 快照：失败保留旧（启动时为空白）快照，不阻断启动。"""
+    await refresh_bot_scrub_snapshot_once()
 
 
 async def refresh_group_scrub_snapshot_once() -> None:
@@ -150,21 +211,44 @@ async def refresh_group_scrub_snapshot_once() -> None:
         _snapshot = _build_snapshot(rows)
 
 
+async def refresh_bot_scrub_snapshot_once() -> None:
+    """周期刷新 Bot 快照：失败只保留 Bot 快照，不影响群快照；版本变化丢弃本次结果。"""
+    global _bot_snapshot
+    with _lock:
+        start_version = _bot_version
+    try:
+        rows = await _load_bot_rows()
+    except Exception as exc:  # noqa: BLE001
+        log_rate_limited(
+            logger,
+            "warning",
+            "message_scrub.bot_extra.refresh",
+            "Message scrub bot extras refresh failed, kept current snapshot: [{}]",
+            exc,
+        )
+        return
+    with _lock:
+        if _bot_version != start_version:
+            return
+        _bot_snapshot = _build_bot_snapshot(rows)
+
+
 async def _refresh_loop() -> None:
     while True:
         await asyncio.sleep(GROUP_SCRUB_REFRESH_INTERVAL_SEC)
-        try:
-            await refresh_group_scrub_snapshot_once()
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:  # noqa: BLE001
-            log_rate_limited(
-                logger,
-                "warning",
-                "message_scrub.group_extra.loop",
-                "Message scrub group extras refresh loop error: [{}]",
-                exc,
-            )
+        for refresh in (refresh_group_scrub_snapshot_once, refresh_bot_scrub_snapshot_once):
+            try:
+                await refresh()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                log_rate_limited(
+                    logger,
+                    "warning",
+                    "message_scrub.group_extra.loop",
+                    "Message scrub extras refresh loop error: [{}]",
+                    exc,
+                )
 
 
 def start_group_scrub_refresh_loop() -> None:

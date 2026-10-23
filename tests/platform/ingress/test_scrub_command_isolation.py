@@ -38,13 +38,13 @@ def _group_event(
     )
 
 
-def _private_event(text: str, *, self_id: int = 100) -> PrivateMessageEvent:
+def _private_event(text: str, *, self_id: int = 100, sub_type: str = "friend") -> PrivateMessageEvent:
     return PrivateMessageEvent(
         time=1,
         self_id=self_id,
         post_type="message",
         message_type="private",
-        sub_type="friend",
+        sub_type=sub_type,
         message_id=1,
         user_id=7,
         message=Message(text),
@@ -135,6 +135,32 @@ def test_parser_rejects_mixed_cq_and_at_reply() -> None:
     assert match_scrub_command(_bot(), event2) is None
 
 
+def test_parser_maps_private_to_bot_command_ids() -> None:
+    import packages.blacklist.scrub_commands  # noqa: F401
+
+    add = match_scrub_command(_bot(), _private_event("/添加屏蔽词 广告"))
+    assert add is not None
+    assert add.command_id == "blacklist.bot_scrub_add"
+    assert add.word == "广告"
+
+    remove = match_scrub_command(_bot(), _private_event("/删除屏蔽词 广告"))
+    assert remove is not None
+    assert remove.command_id == "blacklist.bot_scrub_remove"
+
+    lst = match_scrub_command(_bot(), _private_event("/查看屏蔽词 2"))
+    assert lst is not None
+    assert lst.command_id == "blacklist.bot_scrub_list"
+    assert lst.page == 2
+
+    # 私聊不因同命令字串成群命令 ID
+    assert match_scrub_command(_bot(), _private_event("/添加屏蔽词 x")).command_id != "blacklist.scrub_add"
+
+    # sub_type=other 也可管理
+    other = match_scrub_command(_bot(), _private_event("/添加屏蔽词 广告", sub_type="other"))
+    assert other is not None
+    assert other.command_id == "blacklist.bot_scrub_add"
+
+
 def test_matcher_scrub_command_id_from_rule() -> None:
     import packages.blacklist.scrub_commands as sc
     from pallas.product.message_scrub.scrub_command import matcher_scrub_command_id
@@ -142,6 +168,32 @@ def test_matcher_scrub_command_id_from_rule() -> None:
     assert matcher_scrub_command_id(sc.add_scrub_cmd.matcher) == "blacklist.scrub_add"
     assert matcher_scrub_command_id(sc.remove_scrub_cmd.matcher) == "blacklist.scrub_remove"
     assert matcher_scrub_command_id(sc.list_scrub_cmd.matcher) == "blacklist.scrub_list"
+
+
+def test_matcher_scrub_command_id_private_bot_commands() -> None:
+    import packages.blacklist.scrub_commands as sc
+    from pallas.product.message_scrub.scrub_command import matcher_scrub_command_id
+
+    assert matcher_scrub_command_id(sc.bot_add_scrub_cmd.matcher) == "blacklist.bot_scrub_add"
+    assert matcher_scrub_command_id(sc.bot_remove_scrub_cmd.matcher) == "blacklist.bot_scrub_remove"
+    assert matcher_scrub_command_id(sc.bot_list_scrub_cmd.matcher) == "blacklist.bot_scrub_list"
+
+
+def test_matcher_scrub_command_id_rejects_bad_fixed_target() -> None:
+    import packages.blacklist.scrub_commands as sc
+    from pallas.product.message_scrub.scrub_command import (
+        mark_matcher_scrub_target,
+        matcher_scrub_command_id,
+    )
+
+    class _Fake:
+        pass
+
+    fake = _Fake()
+    fake.rule = sc.add_scrub_cmd.matcher.rule
+    mark_matcher_scrub_target(fake, "blacklist.not_a_bot_command")
+    # 固定属性非法时返回 None，不回退成群命令。
+    assert matcher_scrub_command_id(fake) is None
 
 
 # ---------------------------------------------------------------------------
@@ -185,6 +237,8 @@ async def test_hook_does_not_mark_private(monkeypatch: pytest.MonkeyPatch, scrub
     import packages.blacklist.scrub_commands  # noqa: F401
     from pallas.core.platform.ingress import gate
 
+    # 私聊同命令字存在，但非当前 Bot 号主：不得标记，按 scrub 拦截。
+    monkeypatch.setattr("pallas.core.foundation.config.user_is_bot_admin", AsyncMock(return_value=False))
     monkeypatch.setattr("pallas.core.perm.check.satisfies_command_permission", AsyncMock(return_value=True))
     monkeypatch.setattr("pallas.product.message_scrub.is_message_scrub_blocked_sync", lambda **k: True)
 
@@ -192,6 +246,20 @@ async def test_hook_does_not_mark_private(monkeypatch: pytest.MonkeyPatch, scrub
     with pytest.raises(IgnoredException):
         await gate.message_scrub_global_hook(_bot(), event)
     assert marked_scrub_command_id(event) is None
+
+
+@pytest.mark.asyncio
+async def test_hook_marks_authorized_private_bot_command(monkeypatch: pytest.MonkeyPatch, scrub_env: None) -> None:
+    import packages.blacklist.scrub_commands  # noqa: F401
+    from pallas.core.platform.ingress import gate
+
+    monkeypatch.setattr("pallas.core.foundation.config.user_is_bot_admin", AsyncMock(return_value=True))
+    monkeypatch.setattr("pallas.core.perm.check.satisfies_command_permission", AsyncMock(return_value=True))
+    monkeypatch.setattr("pallas.product.message_scrub.is_message_scrub_blocked_sync", lambda **k: True)
+
+    event = _private_event("/添加屏蔽词 secret")
+    await gate.message_scrub_global_hook(_bot(), event)
+    assert marked_scrub_command_id(event) == "blacklist.bot_scrub_add"
 
 
 @pytest.mark.asyncio

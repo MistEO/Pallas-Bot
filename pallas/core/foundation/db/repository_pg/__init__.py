@@ -59,6 +59,7 @@ from pallas.core.foundation.db.repository_pg.lifecycle import (
     _ensure_pg_bot_config_community_roster_show_qq,
     _ensure_pg_bot_config_disabled_plugins_audit,
     _ensure_pg_bot_config_group_style_enabled,
+    _ensure_pg_bot_config_message_scrub_extra,
     _ensure_pg_bot_config_persona,
     _ensure_pg_bot_config_plugin_storage,
     _ensure_pg_context_answer_message_reply_index,

@@ -405,7 +405,9 @@ async def message_scrub_global_hook(bot, event) -> None:
     from pallas.core.perm.check import satisfies_command_permission
     from pallas.product.message_scrub import is_message_scrub_blocked_sync
     from pallas.product.message_scrub.scrub_command import (
+        bot_scrub_manage_authorized,
         clear_scrub_command_marker,
+        is_bot_scrub_command_id,
         mark_scrub_command,
         match_scrub_command,
     )
@@ -413,17 +415,30 @@ async def message_scrub_global_hook(bot, event) -> None:
     if not isinstance(event, MessageEvent):
         return
 
-    # 每次重置并重验标记：只对「严格合法 + 已授权」的群屏蔽词命令做隔离放行。
+    # 每次重置并重验标记：只对「严格合法 + 已授权」的屏蔽词命令做隔离放行。
+    # 群命令沿用可配置命令权限；私聊 Bot 级命令额外要求当前 Bot 号主硬条件。
     clear_scrub_command_marker(event)
     match = match_scrub_command(bot, event)
-    if match is not None and await satisfies_command_permission(bot, event, match.command_id):
-        mark_scrub_command(event, match.command_id)
-        return
+    if match is not None:
+        if is_bot_scrub_command_id(match.command_id):
+            authorized = await bot_scrub_manage_authorized(bot, event, match.command_id)
+        else:
+            authorized = await satisfies_command_permission(bot, event, match.command_id)
+        if authorized:
+            mark_scrub_command(event, match.command_id)
+            return
 
     plain = (event.get_plaintext() or "").strip()
     raw_group_id = getattr(event, "group_id", None)
     group_id = int(raw_group_id) if raw_group_id is not None else None
-    if is_message_scrub_blocked_sync(plain_text=plain, raw_message=event.raw_message, group_id=group_id):
+    raw_self_id = getattr(bot, "self_id", None)
+    bot_id = int(raw_self_id) if raw_self_id is not None else None
+    if is_message_scrub_blocked_sync(
+        plain_text=plain,
+        raw_message=event.raw_message,
+        group_id=group_id,
+        bot_id=bot_id,
+    ):
         raise IgnoredException("message scrub globally blocked")
 
 

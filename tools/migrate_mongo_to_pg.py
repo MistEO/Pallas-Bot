@@ -768,6 +768,9 @@ async def _migrate_bot_config(db, sf, BCRow, ins, batch_size, dry_run) -> _Table
                     "taken_name": {str(k): v for k, v in tn.items()},
                     "drunk": {str(k): v for k, v in dk.items()},
                     "disabled_plugins": [_strip_null(_as_str(x)) for x in _as_list(raw.get("disabled_plugins"))],
+                    "message_scrub_extra": [
+                        w for w in (_strip_null(_as_str(x)) for x in _as_list(raw.get("message_scrub_extra"))) if w
+                    ],
                 })
             except Exception as e:
                 stats.warn(f"botconfig parse failed _id={raw.get('_id')}: {e}")
@@ -789,6 +792,7 @@ async def _migrate_bot_config(db, sf, BCRow, ins, batch_size, dry_run) -> _Table
                                 "taken_name",
                                 "drunk",
                                 "disabled_plugins",
+                                "message_scrub_extra",
                             )
                         },
                     )

@@ -8,10 +8,14 @@ from .config import (
     is_message_scrub_enabled,
 )
 from .group_extra import (
+    apply_bot_scrub_extra_local,
     apply_group_scrub_extra_local,
+    bot_scrub_extra_hits,
     group_scrub_extra_hits,
+    init_bot_scrub_snapshot,
     init_group_scrub_snapshot,
     normalize_group_scrub_extra,
+    reset_bot_scrub_snapshot,
     reset_group_scrub_snapshot,
     start_group_scrub_refresh_loop,
     stop_group_scrub_refresh_loop,
@@ -38,11 +42,14 @@ def is_message_scrub_blocked_sync(
     plain_text: str,
     raw_message: str,
     group_id: int | None = None,
+    bot_id: int | None = None,
 ) -> bool:
-    """全局本地词库 + 该群追加词（内存快照）。"""
+    """全局本地词库 + 该 Bot 追加词 + 该群追加词（内存快照）。"""
     if not is_message_scrub_enabled():
         return False
     if local_lexicon_hits(plain_text=plain_text, raw_message=raw_message):
+        return True
+    if bot_scrub_extra_hits(bot_id=bot_id, plain_text=plain_text, raw_message=raw_message):
         return True
     return group_scrub_extra_hits(group_id=group_id, plain_text=plain_text, raw_message=raw_message)
 
@@ -52,11 +59,14 @@ async def is_message_scrub_blocked_async(
     plain_text: str,
     raw_message: str,
     group_id: int | None = None,
+    bot_id: int | None = None,
 ) -> bool:
-    """本地词库 + 该群追加词优先；未命中后按审查链调用远程 API。"""
+    """本地词库 + Bot / 群追加词优先；未命中后按审查链调用远程 API。"""
     if not is_message_scrub_enabled():
         return False
     if local_lexicon_hits(plain_text=plain_text, raw_message=raw_message):
+        return True
+    if bot_scrub_extra_hits(bot_id=bot_id, plain_text=plain_text, raw_message=raw_message):
         return True
     if group_scrub_extra_hits(group_id=group_id, plain_text=plain_text, raw_message=raw_message):
         return True
@@ -65,16 +75,20 @@ async def is_message_scrub_blocked_async(
 
 __all__ = [
     "MessageScrubConfig",
+    "apply_bot_scrub_extra_local",
     "apply_group_scrub_extra_local",
+    "bot_scrub_extra_hits",
     "build_review_providers",
     "get_message_scrub_config",
     "group_scrub_extra_hits",
+    "init_bot_scrub_snapshot",
     "init_group_scrub_snapshot",
     "is_message_scrub_blocked_async",
     "is_message_scrub_blocked_sync",
     "is_message_scrub_enabled",
     "normalize_group_scrub_extra",
     "reload_message_scrub_caches",
+    "reset_bot_scrub_snapshot",
     "reset_group_scrub_snapshot",
     "start_group_scrub_refresh_loop",
     "start_message_scrub_if_enabled",

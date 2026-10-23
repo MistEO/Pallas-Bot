@@ -234,8 +234,9 @@ async def test_event_gate_passes_group_id_to_scrub(monkeypatch: pytest.MonkeyPat
 
     captured: dict = {}
 
-    def spy(*, plain_text: str, raw_message: str, group_id: int | None = None) -> bool:
+    def spy(*, plain_text: str, raw_message: str, group_id: int | None = None, bot_id: int | None = None) -> bool:
         captured["group_id"] = group_id
+        captured["bot_id"] = bot_id
         return True
 
     monkeypatch.setattr("pallas.product.message_scrub.is_message_scrub_blocked_sync", spy)
@@ -253,6 +254,7 @@ async def test_event_gate_passes_group_id_to_scrub(monkeypatch: pytest.MonkeyPat
 
     assert result is None
     assert captured["group_id"] == 200
+    assert captured["bot_id"] == 100
 
 
 @pytest.mark.asyncio
@@ -261,8 +263,9 @@ async def test_handler_passes_group_id_to_scrub(monkeypatch: pytest.MonkeyPatch)
 
     captured: dict = {}
 
-    async def spy(*, plain_text: str, raw_message: str, group_id: int | None = None) -> bool:
+    async def spy(*, plain_text: str, raw_message: str, group_id: int | None = None, bot_id: int | None = None) -> bool:
         captured["group_id"] = group_id
+        captured["bot_id"] = bot_id
         return True
 
     async def fake_ctx(bot_id: int, event):
@@ -271,10 +274,12 @@ async def test_handler_passes_group_id_to_scrub(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(mod, "is_message_scrub_blocked_async", spy)
     monkeypatch.setattr(mod, "build_repeater_event_context", fake_ctx)
 
-    event = SimpleNamespace(self_id=100, group_id=200, user_id=300, message_id=400)
+    event = SimpleNamespace(self_id=999, group_id=200, user_id=300, message_id=400)
     await mod.execute_repeater_message(SimpleNamespace(self_id=100), event)
 
     assert captured["group_id"] == 200
+    # 透传的是当前实际 bot.self_id，而非 event 适配器元数据 self_id
+    assert captured["bot_id"] == 100
 
 
 @pytest.mark.asyncio
@@ -283,8 +288,9 @@ async def test_runtime_handler_passes_group_id_to_scrub(monkeypatch: pytest.Monk
 
     captured: dict = {}
 
-    async def spy(*, plain_text: str, raw_message: str, group_id: int | None = None) -> bool:
+    async def spy(*, plain_text: str, raw_message: str, group_id: int | None = None, bot_id: int | None = None) -> bool:
         captured["group_id"] = group_id
+        captured["bot_id"] = bot_id
         return True
 
     async def fake_ctx(bot_id: int, event):
@@ -312,6 +318,7 @@ async def test_runtime_handler_passes_group_id_to_scrub(monkeypatch: pytest.Monk
 
     assert outcome.handled is True
     assert captured["group_id"] == 22
+    assert captured["bot_id"] == 1
 
 
 @pytest.mark.asyncio
@@ -320,8 +327,9 @@ async def test_gate_global_hook_passes_group_id(monkeypatch: pytest.MonkeyPatch)
 
     captured: dict = {}
 
-    def spy(*, plain_text: str, raw_message: str, group_id: int | None = None) -> bool:
+    def spy(*, plain_text: str, raw_message: str, group_id: int | None = None, bot_id: int | None = None) -> bool:
         captured["group_id"] = group_id
+        captured["bot_id"] = bot_id
         return False
 
     class _FakeMessageEvent:
@@ -330,18 +338,21 @@ async def test_gate_global_hook_passes_group_id(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr("pallas.product.message_scrub.is_message_scrub_blocked_sync", spy)
     monkeypatch.setattr("nonebot.adapters.onebot.v11.MessageEvent", _FakeMessageEvent)
 
+    bot = SimpleNamespace(self_id="100")
     group_event = _FakeMessageEvent()
     group_event.get_plaintext = lambda: "hi"
     group_event.raw_message = "hi"
     group_event.group_id = 555
-    await gate.message_scrub_global_hook(SimpleNamespace(), group_event)
+    await gate.message_scrub_global_hook(bot, group_event)
     assert captured["group_id"] == 555
+    assert captured["bot_id"] == 100
 
     private_event = _FakeMessageEvent()
     private_event.get_plaintext = lambda: "hi"
     private_event.raw_message = "hi"
-    await gate.message_scrub_global_hook(SimpleNamespace(), private_event)
+    await gate.message_scrub_global_hook(bot, private_event)
     assert captured["group_id"] is None
+    assert captured["bot_id"] == 100
 
 
 # ---------------------------------------------------------------------------

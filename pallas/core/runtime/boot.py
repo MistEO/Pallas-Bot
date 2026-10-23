@@ -65,11 +65,13 @@ def boot() -> nonebot.Driver:
         install_loop_exception_logging()
         await init_db()
         from pallas.product.message_scrub.group_extra import (
+            init_bot_scrub_snapshot,
             init_group_scrub_snapshot,
             start_group_scrub_refresh_loop,
         )
 
         await init_group_scrub_snapshot()
+        await init_bot_scrub_snapshot()
         start_group_scrub_refresh_loop()
         await start_ban_gate_snapshot()
         schedule_ensure_voices()

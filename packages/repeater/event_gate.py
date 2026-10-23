@@ -74,7 +74,10 @@ async def build_repeater_event_context(bot_id: int, event: GroupMessageEvent):
     from pallas.product.message_scrub import is_message_scrub_blocked_sync
 
     if is_message_scrub_blocked_sync(
-        plain_text=plain_body or "", raw_message=event.raw_message, group_id=int(event.group_id)
+        plain_text=plain_body or "",
+        raw_message=event.raw_message,
+        group_id=int(event.group_id),
+        bot_id=int(bot_id),
     ):
         record_repeater_ingress_early_discard("message_scrub")
         return None

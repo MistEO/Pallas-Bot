@@ -52,7 +52,13 @@ def scrub_env(monkeypatch: pytest.MonkeyPatch):
 
 class _Ctx:
     def __init__(
-        self, *, event: GroupMessageEvent | None = None, group_id: int = 1, user_id: str = "7", self_id: int = 100
+        self,
+        *,
+        event: GroupMessageEvent | None = None,
+        group_id: int = 1,
+        user_id: str = "7",
+        self_id: int = 100,
+        command_id: str = "",
     ):
         if event is None:
             event = _group_event("", group_id=group_id, user_id=int(user_id), self_id=self_id)
@@ -60,6 +66,7 @@ class _Ctx:
         self.group_id = int(event.group_id) if getattr(event, "group_id", None) is not None else None
         self.user_id = user_id
         self.bot = SimpleNamespace(self_id=self_id)
+        self.command_id = command_id
         self.replies: list[object] = []
 
     @property
@@ -70,8 +77,22 @@ class _Ctx:
         self.replies.append(message)
 
 
+_COMMAND_ID_BY_PREFIX = {
+    "添加屏蔽词": "blacklist.scrub_add",
+    "删除屏蔽词": "blacklist.scrub_remove",
+    "查看屏蔽词": "blacklist.scrub_list",
+}
+
+
+def _infer_command_id(plain_text: str) -> str:
+    for prefix, command_id in _COMMAND_ID_BY_PREFIX.items():
+        if prefix in plain_text:
+            return command_id
+    return ""
+
+
 def _ctx(plain_text: str, *, group_id: int = 1) -> _Ctx:
-    return _Ctx(event=_group_event(plain_text, group_id=group_id))
+    return _Ctx(event=_group_event(plain_text, group_id=group_id), command_id=_infer_command_id(plain_text))
 
 
 def _install_repo(monkeypatch: pytest.MonkeyPatch, row, *, fail_write: bool = False) -> dict:

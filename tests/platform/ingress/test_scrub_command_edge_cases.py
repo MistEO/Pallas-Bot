@@ -41,6 +41,7 @@ class _Ctx:
         self.group_id = int(event.group_id)
         self.user_id = "7"
         self.bot = SimpleNamespace(self_id="100", type="onebot.v11")
+        self.command_id = "blacklist.scrub_add"
         self.replies: list[object] = []
 
     @property
