@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import shutil
 from pathlib import Path
@@ -562,67 +563,42 @@ def rewrite_tree_relative_links(text: str, *, rel_src: str) -> str:
     return text
 
 
-def sync(dest_root: Path) -> int:
+def sync(dest_root: Path) -> set[str]:
     src_root = dest_root / "src"
-    count = 0
-    avatar_src = DOCS / "plugins" / "assets" / "brand-avatar.png"
-    avatar_dst = src_root / "public" / "assets" / "brand-avatar.png"
-    if avatar_src.is_file():
-        avatar_dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(avatar_src, avatar_dst)
-        print("sync plugins/assets/brand-avatar.png -> src/public/assets/brand-avatar.png")
-    topo_src = DOCS / "assets" / "concepts-topology.svg"
-    topo_dst = src_root / "public" / "assets" / "concepts-topology.svg"
-    if topo_src.is_file():
-        topo_dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(topo_src, topo_dst)
-        print("sync assets/concepts-topology.svg -> src/public/assets/concepts-topology.svg")
-    runtime_src = DOCS / "assets" / "message-runtime-architecture.svg"
-    runtime_dst = src_root / "public" / "assets" / "message-runtime-architecture.svg"
-    if runtime_src.is_file():
-        runtime_dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(runtime_src, runtime_dst)
-        print(
-            "sync assets/message-runtime-architecture.svg -> "
-            "src/public/assets/message-runtime-architecture.svg"
-        )
-    llm_src = DOCS / "assets" / "llm-output-path.svg"
-    llm_dst = src_root / "public" / "assets" / "llm-output-path.svg"
-    if llm_src.is_file():
-        llm_dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(llm_src, llm_dst)
-        print("sync assets/llm-output-path.svg -> src/public/assets/llm-output-path.svg")
-    agent_lifecycle_src = DOCS / "assets" / "agent-lifecycle-overview.svg"
-    agent_lifecycle_dst = src_root / "public" / "assets" / "agent-lifecycle-overview.svg"
-    if agent_lifecycle_src.is_file():
-        agent_lifecycle_dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(agent_lifecycle_src, agent_lifecycle_dst)
-        print(
-            "sync assets/agent-lifecycle-overview.svg -> "
-            "src/public/assets/agent-lifecycle-overview.svg"
-        )
-    system_topology_src = DOCS / "assets" / "architecture-system-topology.svg"
-    system_topology_dst = src_root / "public" / "assets" / "architecture-system-topology.svg"
-    if system_topology_src.is_file():
-        system_topology_dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(system_topology_src, system_topology_dst)
-        print(
-            "sync assets/architecture-system-topology.svg -> "
-            "src/public/assets/architecture-system-topology.svg"
-        )
-    shard_topology_src = DOCS / "assets" / "shard-runtime-topology.svg"
-    shard_topology_dst = src_root / "public" / "assets" / "shard-runtime-topology.svg"
-    if shard_topology_src.is_file():
-        shard_topology_dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(shard_topology_src, shard_topology_dst)
-        print(
-            "sync assets/shard-runtime-topology.svg -> "
-            "src/public/assets/shard-runtime-topology.svg"
-        )
+    written: set[str] = set()
+
+    def record(path: Path) -> None:
+        written.add(path.relative_to(dest_root).as_posix())
+
+    single_assets = [
+        ("plugins/assets/brand-avatar.png", "public/assets/brand-avatar.png"),
+        ("assets/concepts-topology.svg", "public/assets/concepts-topology.svg"),
+        (
+            "assets/message-runtime-architecture.svg",
+            "public/assets/message-runtime-architecture.svg",
+        ),
+        ("assets/llm-output-path.svg", "public/assets/llm-output-path.svg"),
+        ("assets/agent-lifecycle-overview.svg", "public/assets/agent-lifecycle-overview.svg"),
+        (
+            "assets/architecture-system-topology.svg",
+            "public/assets/architecture-system-topology.svg",
+        ),
+        ("assets/shard-runtime-topology.svg", "public/assets/shard-runtime-topology.svg"),
+    ]
+    for rel_src, rel_dst in single_assets:
+        source = DOCS / rel_src
+        if not source.is_file():
+            continue
+        dst = src_root / rel_dst
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, dst)
+        record(dst)
+        print(f"sync {rel_src} -> src/{rel_dst}")
     for asset in sorted((DOCS / "assets").glob("*.png")):
         dst = src_root / "public" / "assets" / asset.name
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(asset, dst)
+        record(dst)
         print(f"sync assets/{asset.name} -> src/public/assets/{asset.name}")
     for rel_src, rel_dst in FILE_MAP.items():
         source = DOCS / rel_src
@@ -634,15 +610,19 @@ def sync(dest_root: Path) -> int:
         out = src_root / rel_dst
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(transform_for_vitepress(body), encoding="utf-8")
-        count += 1
+        record(out)
         print(f"sync {rel_src} -> src/{rel_dst}")
-    return count
+    return written
 
 
-def sync_plugins_only(dest_root: Path) -> int:
+def sync_plugins_only(dest_root: Path) -> set[str]:
     """只同步 plugins/<name>/README.md → src/plugins/<name>.md。"""
     src_root = dest_root / "src"
-    count = 0
+    written: set[str] = set()
+
+    def record(path: Path) -> None:
+        written.add(path.relative_to(dest_root).as_posix())
+
     for name in PLUGIN_NAMES:
         rel_src = f"plugins/{name}/README.md"
         rel_dst = f"plugins/{name}.md"
@@ -655,16 +635,54 @@ def sync_plugins_only(dest_root: Path) -> int:
         out = src_root / rel_dst
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(transform_for_vitepress(body), encoding="utf-8")
-        count += 1
+        record(out)
         print(f"sync {rel_src} -> src/{rel_dst}")
     # 插件索引
     index_src = DOCS / "plugins" / "README.md"
     if index_src.is_file():
         body = transform_for_vitepress(index_src.read_text(encoding="utf-8"))
-        (src_root / "plugins" / "index.md").write_text(body, encoding="utf-8")
-        count += 1
+        index_dst = src_root / "plugins" / "index.md"
+        index_dst.write_text(body, encoding="utf-8")
+        record(index_dst)
         print("sync plugins/README.md -> src/plugins/index.md")
-    return count
+    return written
+
+
+SYNC_MANIFEST = ".synced-docs-manifest.json"
+PLUGIN_DST_PREFIX = "src/plugins/"
+
+
+def read_manifest(dest_root: Path) -> list[str]:
+    try:
+        data = json.loads((dest_root / SYNC_MANIFEST).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(data, list):
+        return []
+    return [item for item in data if isinstance(item, str)]
+
+
+def write_manifest(dest_root: Path, written: set[str]) -> None:
+    payload = json.dumps(sorted(written), ensure_ascii=False, indent=2) + "\n"
+    (dest_root / SYNC_MANIFEST).write_text(payload, encoding="utf-8")
+
+
+def prune_stale(dest_root: Path, written: set[str], previous: list[str]) -> list[str]:
+    """删除上次生成、本次不再生成的文件。
+
+    同步只写不删时，主仓删掉的页面会永久留在文档站上（例如插件下架后
+    仍能直接访问旧说明页），所以按上次落盘的清单回收。
+    """
+    removed: list[str] = []
+    for rel in previous:
+        if rel in written:
+            continue
+        target = dest_root / rel
+        if target.is_file():
+            target.unlink()
+            removed.append(rel)
+            print(f"remove stale: {rel}")
+    return removed
 
 
 def main() -> None:
@@ -683,8 +701,20 @@ def main() -> None:
     args = parser.parse_args()
     if not args.dest.is_dir():
         raise SystemExit(f"dest not found: {args.dest}")
-    n = sync_plugins_only(args.dest) if args.plugins_only else sync(args.dest)
-    print(f"done: {n} files")
+    previous = read_manifest(args.dest)
+    if args.plugins_only:
+        written = sync_plugins_only(args.dest)
+        # 仅回收插件页命名空间，避免用插件子集把其余同步页误删
+        plugin_previous = [rel for rel in previous if rel.startswith(PLUGIN_DST_PREFIX)]
+        removed = prune_stale(args.dest, written, plugin_previous)
+        write_manifest(args.dest, (set(previous) - set(plugin_previous)) | written)
+    else:
+        written = sync(args.dest)
+        removed = prune_stale(args.dest, written, previous)
+        write_manifest(args.dest, written)
+    print(f"done: {len(written)} files")
+    if removed:
+        print(f"removed {len(removed)} stale file(s)")
 
 
 if __name__ == "__main__":
